@@ -38,7 +38,7 @@
 #include "content/urldb.h"
 #include "utils/useragent.h"
 
-#include "pwnet.h"
+#include "../core/web/engine/pwnet.h"
 #include "pwback.h"
 #include "psiweb.h"
 

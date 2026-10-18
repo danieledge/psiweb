@@ -1,7 +1,7 @@
 /* psicompat.h - force-included into every Links source for EPOC R5
  * (ESTLIB, gcc 3.0). Fills the gaps between ESTLIB's headers and what
  * Links expects of a POSIX system. The functions declared here are in
- * psi_os.c (or web/compat/nsprintf.c for snprintf).
+ * psi_os.c (or core/web/compat/nsprintf.c for snprintf).
  */
 #ifndef PSICOMPAT_H
 #define PSICOMPAT_H
@@ -64,7 +64,7 @@ int vsnprintf(char *str, size_t size, const char *fmt, va_list ap);
 #endif
 
 /* psi_os.c: sockets and pipes are pseudo-descriptors there (one network
- * connection, over web/engine/pwnet.c); files go on to ESTLIB */
+ * connection, over core/web/engine/pwnet.c); files go on to ESTLIB */
 #include <unistd.h>
 #include <fcntl.h>
 int psi_select(int n, void *r, void *w, void *e, void *tv);

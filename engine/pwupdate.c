@@ -26,8 +26,8 @@
 #include <stdarg.h>
 
 #include "includes.h"          /* web/tls: libtomcrypt (SHA-256) */
-#include "pwnet.h"
-#include "../../ssh/pgdevbox.h"
+#include "../core/web/engine/pwnet.h"
+#include "../core/ssh/pgdevbox.h"
 #include "../psiweb.h"
 #include "../fb/pwback.h"
 

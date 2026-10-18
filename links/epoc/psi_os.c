@@ -7,7 +7,7 @@
  *   from PsiWeb.app is polled by the psi driver's timer (psi_drv.c), which
  *   keeps the wait short.
  * - Pseudo-descriptors: a socket is PsiWeb's single network connection,
- *   pwn_* in web/engine/pwnet.c, over psiglue (modem or Psion Internet).
+ *   pwn_* in core/web/engine/pwnet.c, over psiglue (modem or Psion Internet).
  *   psiglue also resolves the name, and pwn does TLS (ssh/tls13.c), so
  *   Links' DNS, connect() and OpenSSL are not used at all. Only one socket
  *   is live: making a new one ends the old (Links runs with
@@ -17,7 +17,7 @@
 #include "links.h"
 
 #include "pwback.h"
-#include "pwnet.h"
+#include "../../core/web/engine/pwnet.h"
 #include "psiweb.h"
 
 #undef read

@@ -44,7 +44,7 @@ from unicorn import Uc, UcError, UC_ARCH_ARM, UC_MODE_ARM, UC_HOOK_CODE, UC_HOOK
 from unicorn.arm_const import *
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-BUILD = os.environ.get("PW_BUILD", os.path.join(HERE, "../../../build/links/epoc"))
+BUILD = os.environ.get("PW_BUILD", os.path.join(HERE, "../../build/links/epoc"))
 args = sys.argv[1:]
 COUNT = "--count" in args
 def optval(name):

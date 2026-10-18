@@ -2,21 +2,22 @@
 # target, with zlib, libpng and IJG libjpeg compiled from source as they
 # will be for EPOC. Normally run through build_host.sh inside the
 # psion-build container (tools/docker/psibuild).
-#   make -C web/links            -> build/links/host/links-psi
+#   make -C links            -> build/links/host/links-psi
 WEB     := $(abspath ..)
-TOP     := $(abspath ../..)
+TOP     := $(WEB)
+CORE    ?= $(TOP)/core
 LK      ?= $(TOP)/build/links
 SRC     := $(LK)/links-2.30
 PNG     := $(LK)/libpng-1.6.43
 JPG     := $(LK)/jpeg-9f
-ZL      := $(TOP)/ssh/zlib
+ZL      := $(CORE)/ssh/zlib
 O       ?= $(LK)/host
 OUT     := $(O)/links-psi
 
 CC      := gcc -m32
 OPT     := -O2 -g
 INC     := -I$(O)/inc -I$(PNG) -I$(JPG) -I$(ZL)
-# OpenSSL for https on the PC only (the Psion will use ssh/tls13.c)
+# OpenSSL for https on the PC only (the Psion will use core/ssh/tls13.c)
 SSLINC  := -I$(O)/sslinc
 SSLLIBS := /usr/lib/i386-linux-gnu/libssl.so.3 /usr/lib/i386-linux-gnu/libcrypto.so.3
 
@@ -69,7 +70,7 @@ $(O)/psi/psi_drv.o: psi_drv.c $(HDRS) $(WEB)/fb/pwback.h $(SRC)/links.h
 $(O)/psi/psi_mem.o: psi_mem.c
 	@mkdir -p $(dir $@)
 	$(CC) -c $(OPT) -Wall $< -o $@
-$(O)/psi/psi_grey.o: psi_grey.c $(WEB)/fb/pwback.h $(TOP)/ssh/psigrey.h
+$(O)/psi/psi_grey.o: psi_grey.c $(WEB)/fb/pwback.h $(CORE)/ssh/psigrey.h
 	@mkdir -p $(dir $@)
 	$(CC) -c $(OPT) -w -std=gnu99 -I$(WEB)/fb $< -o $@
 $(O)/psi/psi_digest.o: psi_digest.c
@@ -77,7 +78,7 @@ $(O)/psi/psi_digest.o: psi_digest.c
 	$(CC) -c $(OPT) -Wall $< -o $@
 $(O)/psi/%.o: $(WEB)/fb/%.c $(WEB)/fb/pwback.h
 	@mkdir -p $(dir $@)
-	$(CC) -c $(OPT) -w -std=gnu99 -D_DEFAULT_SOURCE -I$(TOP)/ssh -I$(WEB) $< -o $@
+	$(CC) -c $(OPT) -w -std=gnu99 -D_DEFAULT_SOURCE -I$(CORE)/ssh -I$(WEB) $< -o $@
 
 $(O)/jpeg/%.o: $(JPG)/%.c $(O)/inc/jconfig.h
 	@mkdir -p $(dir $@)

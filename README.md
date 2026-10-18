@@ -1,6 +1,6 @@
 # PsiWeb
 
-A web browser for the **Psion Series 5mx**. Its engine is [Links 2](http://links.twibright.com/) (2.30, graphics mode), built with the 1999 EPOC R5 toolchain. It runs on PsiTerm's networking: the same Wi-Fi modem or dial-up link, and the apps' own TLS 1.3 client for HTTPS.
+A web browser for the **Psion Series 5mx**. Its engine is [Links 2](http://links.twibright.com/) (2.30, graphics mode), built with the 1999 EPOC R5 toolchain. It runs on the suite's shared networking ([psion-core](https://github.com/danieledge/psion-core), this repository's `core/` submodule): the same Wi-Fi modem or dial-up link as PsiTerm and PsiMail, and the suite's own TLS 1.3 client for HTTPS.
 
 - Pages are plain documents: Links has **no CSS and no JavaScript**. Simple sites read well; big modern home pages come out as long lists.
 - Pictures (JPEG, PNG, GIF) are fetched **only when asked**: View > Show pictures (Ctrl+I) for the page showing, or Tools > Preferences > Pictures > On every page.
@@ -9,7 +9,7 @@ A web browser for the **Psion Series 5mx**. Its engine is [Links 2](http://links
 
 Up to 0.61 the engine was NetSurf. Its sources are still in the tree as a fallback (see *The NetSurf engine* below), until Links has been proved on the device. The whole port is described in [`links/PORTING.md`](links/PORTING.md).
 
-**Status: alpha.** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiterm/issues).
+**Status: alpha.** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
 
 [![Download PsiWeb.sis](https://img.shields.io/badge/Download-PsiWeb.sis-2ea44f?logo=github)](https://github.com/danieledge/psiterm/raw/main/dist/PsiWeb.sis)
 
@@ -44,7 +44,7 @@ The toolbar (Open, Back, Home, Pictures - pressed in while the page's pictures s
 
 **Files PsiWeb cannot show** (a PDF, a ZIP, a Word file): PsiWeb says what the file is and how big, and asks "Save it to a file?". Yes opens the standard Save as dialog (Documents on the Memory disk if there is one). The bottom left then shows how much has come, "Saved" says when it is done, and Esc stops it. A file bigger than 4 MB is not saved, and a part file is never left behind.
 
-**Tools > Connection settings**: modem (`ATDT host:port`, as PsiTerm) or the Psion's own TCP/IP (dial-up), baud rate and flow control. These are the same settings as PsiTerm and PsiMail use. **Test** (Ctrl+T) tries them before OK. The serial port can be used by one program at a time, so disconnect PsiTerm or PsiMail first (and the Remote link must be off). The [Atom modem firmware](../firmware/atom-modem/README.md) is a Wi-Fi modem tuned for the Psion.
+**Tools > Connection settings**: modem (`ATDT host:port`, as PsiTerm) or the Psion's own TCP/IP (dial-up), baud rate and flow control. These are the same settings as PsiTerm and PsiMail use. **Test** (Ctrl+T) tries them before OK. The serial port can be used by one program at a time, so disconnect PsiTerm or PsiMail first (and the Remote link must be off). The [PsiConnect Atom modem firmware](https://github.com/danieledge/psiconnect) is a Wi-Fi modem tuned for the Psion.
 
 **Tools > Preferences**: the home page and pictures.
 
@@ -56,7 +56,7 @@ A proxy on a computer on your network makes browsing much quicker and lighter, w
 - PsiWeb's updates from GitHub come through it too (they are still checked against the signature).
 
 Two kinds work:
-- [PsiProxy](../proxy/README.md), in this repository, the one made for PsiWeb. It also slims each page for the 640x240 screen (articles extracted into one column, home pages turned into lists of headlines, site menus folded into one `[ Menu ]` link), so there is less to fetch, lay out and hold in memory; turns pictures (WebP, AVIF, JPEG, PNG, GIF) into 16-grey GIFs at most 320 pixels wide; can render JavaScript-only pages in a headless browser, if you turn that on; and receives logs from *Send log to server*. It listens on port 8081 by default.
+- [PsiProxy](https://github.com/danieledge/psiproxy), the one made for PsiWeb. It also slims each page for the 640x240 screen (articles extracted into one column, home pages turned into lists of headlines, site menus folded into one `[ Menu ]` link), so there is less to fetch, lay out and hold in memory; turns pictures (WebP, AVIF, JPEG, PNG, GIF) into 16-grey GIFs at most 320 pixels wide; can render JavaScript-only pages in a headless browser, if you turn that on; and receives logs from *Send log to server*. It listens on port 8081 by default.
 - [WebOne](https://github.com/atauenis/webone), or any HTTP proxy that takes `GET http://...` requests: TLS and one connection, but no slimming and no logs.
 
 The link from the Psion to the proxy is plain HTTP, so keep the proxy on a network you trust.
@@ -75,7 +75,7 @@ The link from the Psion to the proxy is plain HTTP, so keep the proxy on a netwo
 3. It checks the Ed25519 signature in `dist/PsiWeb.sis.sig` against PsiTerm's release key, built into `psiweb.exe`.
 4. It offers to run the installer.
 
-To publish a release: set the version in `web/app/psiweb.cpp` (KVersion), `web/pkg/psiweb.pkg` and `dist/PsiWeb-version.txt`, build, run `tools/release/sign.py --product PsiWeb dist/PsiWeb.sis <version>`, and commit `dist/PsiWeb.sis`, `.sig` and `-version.txt`.
+The files it reads live in the **psiterm** repository's `dist/` (`PsiWeb.sis`, `PsiWeb.sis.sig`, `PsiWeb-version.txt`): every installed PsiWeb was built to look there, and that has not changed with the split of the repositories. See *Releases* below.
 
 ### What to expect
 
@@ -101,44 +101,74 @@ PsiMail opens links and "View as web page" in PsiWeb. It starts PsiWeb with the 
 ## How it fits together
 
 ```
-PsiWeb.app  (web/app: EIKON UI - screen, keys, pen, menus, dialogs, settings)
-    |  global chunk "PsiWebShared" (web/psiweb.h): PsiTerm's PsiShared
-    |  (serial/dial-up settings) + events, commands, questions (password,
-    |  save to file), a 640x240 16-grey screen
+PsiWeb.app  (app/: EIKON UI - screen, keys, pen, menus, dialogs, settings)
+    |  global chunk "PsiWebShared" (psiweb.h): the suite's PsiShared
+    |  (serial/dial-up settings, core/ssh/psishared.h) + events, commands,
+    |  questions (password, save to file), a 640x240 16-grey screen
 psiweb.exe  (Links 2.30 in graphics mode, C, gcc 3.0)
     - links/psi_drv.c     the Links graphics driver: RGB565 frame -> 16 greys
                           (links/psi_grey.c), keys, pen, commands, questions,
                           picture memory
     - links/epoc/psi_os.c the select loop and pseudo-sockets over pwnet
     - engine/pwepoc.cpp   the chunk, PsiWeb.log, heartbeats
-    - engine/pwnet.c      over ssh/psiglue.cpp (modem or TCP/IP) and
-                          ssh/tls13.c (web/tls: X25519, ChaCha20-Poly1305)
+    - engine/pwupdate.c   the signed updater
+    - core/web/engine/pwnet.c   one connection at a time, over
+                          core/ssh/psiglue.cpp (modem or TCP/IP) and
+                          core/ssh/tls13.c (tls/, core/web/tls: X25519,
+                          ChaCha20-Poly1305)
 ```
+
+The shared parts (the connection layer, the shared memory layout, the connection settings and their Test, TLS, zlib, the C-library shims and the build and emulator tools) are [psion-core](https://github.com/danieledge/psion-core), the git submodule `core/`.
 
 Links is patched (`links/patches/links-2.30-psion.diff`): the `psi` driver, no Links menus or bars, pictures on request, the speed work and the picture memory. The engine writes `C:\System\Data\PsiWeb.log` (and `PsiWeb.old`, the run before), with timings, link messages, infoprints and the heap used by each page.
 
 ## Building
 
-Use the `psion-build` Docker image (see `docs/BUILDING.md`):
+Clone with the core submodule and use the `psion-build` Docker image (see psion-core's [docs/BUILDING.md](https://github.com/danieledge/psion-core/blob/main/docs/BUILDING.md)):
 
 ```sh
-tools/docker/psibuild web/build.sh                          # dist/PsiWeb.sis
-tools/docker/psibuild "PSIWEB_SIS=$PWD/build/x.sis web/build.sh"   # elsewhere
-tools/docker/psibuild "make -f web/links/epoc.mk -j8 exe"   # only psiweb.exe
-tools/docker/psibuild "make -f web/links/epoc.mk -j8 emu"   # the harness image
+git clone --recurse-submodules https://github.com/danieledge/psiweb.git
+cd psiweb
+core/tools/docker/psibuild setup                            # once: the image and the SDK
+core/tools/docker/psibuild "bash build.sh"                  # dist/PsiWeb.sis
+core/tools/docker/psibuild "PSIWEB_SIS=$PWD/build/x.sis bash build.sh"   # elsewhere
+core/tools/docker/psibuild "make -f links/epoc.mk -j8 exe"  # only psiweb.exe
+core/tools/docker/psibuild "make -f links/epoc.mk -j8 emu"  # the harness image
 ```
 
-The first build fetches Links 2.30, libjpeg 9f and libpng 1.6.43 at pinned checksums (`links/fetch.sh`) into `build/links` and applies the patch.
+A checkout made without `--recurse-submodules` gets its core with `git submodule update --init`. The first build fetches Links 2.30, libjpeg 9f and libpng 1.6.43 at pinned checksums (`links/fetch.sh`) into `build/links` and applies the patch.
+
+## Releases
+
+Installed PsiWebs update from the **psiterm** repository's `dist/` (`PsiWeb-version.txt`, `PsiWeb.sis`, `PsiWeb.sis.sig`), which is where they looked before the split; the updater's address in the code has not changed. So a release is built here and published there:
+
+1. Set the version in `app/psiweb.cpp` (`KVersion`) and `pkg/psiweb.pkg` (two digits: 0.70 is `0,70,0`), and build.
+2. `bash release.sh <version>` signs `dist/PsiWeb.sis` with `core/tools/release/sign.py --product PsiWeb` (the key is outside every repository) and writes `dist/PsiWeb-version.txt`. If a psiterm checkout is beside this one (`../psiterm`, or `$PSITERM`), it copies the three files into its `dist/` together.
+3. Commit and push the three files in psiterm (branch `dev` for the test builds, `main` for everyone).
+
+`dist/` here is not committed; the psiterm copy is the one the Psions read.
 
 ## Testing
 
 - **ARM harness** (`links/emu/run_links.py`, `links/emu/run_pages.sh`): runs the Psion-compiled engine in unicorn, with Python standing in for EPOC and the app, and a 10 MB heap. It counts instructions, records and replays network traffic (`NET=record|replay`), profiles, and answers the engine's questions (`auth USER PASS`, `save PATH` script lines).
-- **5mx emulator** (`tools/emu/`): the real package on the real ROM. `python3 tools/emu/net.py web` loads a page through an emulated modem.
+- **5mx emulator** (`core/tools/emu/`, run from this checkout): the real package on the real ROM. `node --experimental-strip-types core/tools/emu/mkcard.ts psiweb` makes the card, `core/tools/emu/run.sh NAME ...` runs it; `python3 core/tools/emu/net.py web` loads a page through an emulated modem (it needs the psiconnect checkout beside this one for the modem).
 - **PC build** (`links/build_host.sh`, `links/run_host.sh`): Links with the `psi` driver on Linux, for quick checks.
 
 ## The NetSurf engine
 
-`PSIWEB_ENGINE=netsurf web/build.sh` still builds the 0.61 NetSurf engine (`web/Makefile`, `web/engine/fetch_psi.c`, `web/fb`, `web/patches`, `web/emu`). The app works with either engine. NetSurf rendered CSS, but needed 15 to 25 MB for a page like BBC's, against the 10 MB heap. `links/PORTING.md` says how to remove it once Links is proved on the device.
+`PSIWEB_ENGINE=netsurf bash build.sh` still builds the 0.61 NetSurf engine (`Makefile`, `engine/fetch_psi.c`, `fb/`, `patches/`, `emu/`). The app works with either engine. NetSurf rendered CSS, but needed 15 to 25 MB for a page like BBC's, against the 10 MB heap. `links/PORTING.md` says how to remove it once Links is proved on the device.
+
+## The suite
+
+PsiWeb is one of a family of programs that bring the Series 5mx into 2026, with a home page at [danieledge.github.io/psion](https://danieledge.github.io/psion/):
+
+- [PsiTerm](https://github.com/danieledge/psiterm): SSH client and terminal, SFTP, tmux tabs (its `dist/` also carries PsiMail's and PsiWeb's releases)
+- [PsiMail](https://github.com/danieledge/psimail): IMAP/SMTP email with TLS, CalDAV calendar, contacts
+- [PsiCast](https://github.com/danieledge/psicast): the Psion's screen in a browser, through the Atom
+- [PsiLinux](https://github.com/danieledge/psilinux): Linux programs on the Psion
+- [PsiConnect](https://github.com/danieledge/psiconnect): the Atom modem firmware (Wi-Fi modem, PPP, web proxy)
+- [PsiProxy](https://github.com/danieledge/psiproxy): the proxy on your own computer
+- [psion-core](https://github.com/danieledge/psion-core): the shared code and tools, each program's `core/` submodule
 
 ## Support
 
@@ -147,4 +177,4 @@ you can [buy me a coffee](https://buymeacoffee.com/danedge).
 
 ## Licence
 
-Links is GPL v2, as NetSurf is, so `psiweb.exe` as a whole is **GPL v2**; `PsiWeb.sis` carries the licence text. libjpeg and libpng have their own permissive licences. PsiWeb's own code and the PsiTerm parts are MIT.
+Links is GPL v2, as NetSurf is, so `psiweb.exe` as a whole is **GPL v2**; `PsiWeb.sis` carries the licence text. libjpeg and libpng have their own permissive licences. PsiWeb's own code and the psion-core parts are MIT (`LICENSE`); see [THIRD-PARTY.md](THIRD-PARTY.md).

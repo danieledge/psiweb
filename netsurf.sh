@@ -10,7 +10,7 @@
 # libpng development files.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
-NS=${1:-$HERE/../build/netsurf}
+NS=${1:-$HERE/build/netsurf}
 mkdir -p "$NS"
 NS=$(cd "$NS" && pwd)
 PREFIX=$NS/hinst
