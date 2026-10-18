@@ -2,19 +2,22 @@
 # through ./build.sh, which prepares NetSurf ($(NS)) and the rules.
 #   make TARGET=host   PC test build (psiweb-host), same code as the Psion
 #   make TARGET=epoc   psiweb.exe for the Psion
-WEB     := $(abspath .)
-TOP     := $(abspath ..)
-NS      ?= $(TOP)/build/netsurf
+# (run from the repository root, with relative paths, so the __FILE__ in
+# the objects carries no machine's paths: gcc 3.0 has no -ffile-prefix-map)
+WEB     := .
+TOP     := $(WEB)
+CORE    ?= core
+NS      ?= build/netsurf
 NSINC   := $(NS)/hinst/include
 TARGET  ?= epoc
-O       := $(TOP)/build/web-$(TARGET)
+O       := build/web-$(TARGET)
 
 .DEFAULT_GOAL := all
 include $(O)/rules.mk
 
 ifeq ($(TARGET),host)
 TCC     := gcc
-TFLAGS  := -O1 -g -w -std=gnu99 -D_DEFAULT_SOURCE -I$(TOP)/ssh
+TFLAGS  := -O1 -g -w -std=gnu99 -D_DEFAULT_SOURCE -I$(CORE)/ssh
 PLAT_OBJS := $(O)/web/pwhost.o $(O)/web/pgnet_host.o
 NETDEFS := -DPW_NO_TLS
 OUT     := $(O)/psiweb-host
@@ -29,11 +32,11 @@ export TMP := /tmp/
 TCC     := arm-pe-gcc
 ARCH    := -s -fomit-frame-pointer -O2 -fno-strict-aliasing -nostdinc -mcpu=arm710 -mapcs-32 -mshort-load-bytes -msoft-float
 DEFS    := -D__SYMBIAN32__ -D__PSISOFT32__ -D__GCC32__ -D__EPOC32__ -D__MARM__ -D__EXE__ -DNDEBUG
-TFLAGS  := $(ARCH) $(DEFS) -std=gnu99 -fno-builtin -w -I$(TOP)/ssh -I$(WEB)/compat -I$(E)/include/libc -I$(E)/include -I$(TOP)/ssh/zlib -include $(WEB)/compat/nscompat.h
+TFLAGS  := $(ARCH) $(DEFS) -std=gnu99 -fno-builtin -w -I$(CORE)/ssh -I$(CORE)/web/compat -I$(E)/include/libc -I$(E)/include -I$(CORE)/ssh/zlib -include $(CORE)/web/compat/nscompat.h
 OUT     := $(REL)/psiweb.exe
-CXXFLAGS := $(ARCH) $(DEFS) -Wno-ctor-dtor-privacy -fcheck-new -fvtable-thunks -w -I$(WEB) -I$(TOP)/ssh -I$(E)/include/libc -I$(E)/include
-LTC     := $(TOP)/ssh/db/libtomcrypt/src
-LTCFLAGS := $(ARCH) $(DEFS) -std=gnu99 -fno-builtin -w -I$(WEB)/tls -I$(WEB)/compat -I$(LTC)/headers -I$(E)/include/libc -I$(E)/include -DLTC_SOURCE
+CXXFLAGS := $(ARCH) $(DEFS) -Wno-ctor-dtor-privacy -fcheck-new -fvtable-thunks -w -I$(WEB) -I$(CORE)/ssh -I$(E)/include/libc -I$(E)/include
+LTC     := $(CORE)/ssh/db/libtomcrypt/src
+LTCFLAGS := $(ARCH) $(DEFS) -std=gnu99 -fno-builtin -w -I$(WEB)/tls -I$(CORE)/web/tls -I$(CORE)/web/compat -I$(LTC)/headers -I$(E)/include/libc -I$(E)/include -DLTC_SOURCE
 LTC_SRCS := stream/chacha/chacha_crypt stream/chacha/chacha_ivctr32 stream/chacha/chacha_keystream \
 	stream/chacha/chacha_setup stream/chacha/chacha_done mac/poly1305/poly1305 hashes/sha2/sha256 hashes/sha2/sha512 \
 	misc/zeromem misc/burn_stack misc/crypt/crypt_argchk misc/compare_testvector
@@ -54,10 +57,10 @@ ALL_OBJS := $(foreach p,$(NS_LIBS),$(OBJS_$(p))) $(OBJS_netsurf) $(WEB_OBJS)
 
 all: $(OUT)
 
-# psiweb.h embeds ssh/psishared.h: if either changes, every object that may
+# psiweb.h embeds core/ssh/psishared.h: if either changes, every object that may
 # touch the shared chunk must be rebuilt, or app and engine disagree on its
 # layout and the engine crashes at start
-$(WEB_OBJS): psiweb.h $(TOP)/ssh/psishared.h
+$(WEB_OBJS): psiweb.h $(CORE)/ssh/psishared.h
 
 $(O)/web/nsfb_epoc.o: fb/nsfb_epoc.c fb/pwback.h
 	@mkdir -p $(dir $@)
@@ -65,10 +68,10 @@ $(O)/web/nsfb_epoc.o: fb/nsfb_epoc.c fb/pwback.h
 $(O)/web/%.o: fb/%.c fb/pwback.h
 	@mkdir -p $(dir $@)
 	$(TCC) -c $(TFLAGS) $< -o $@
-$(O)/web/fetch_psi.o: engine/fetch_psi.c engine/pwnet.h fb/pwback.h
+$(O)/web/fetch_psi.o: engine/fetch_psi.c $(CORE)/web/engine/pwnet.h fb/pwback.h
 	@mkdir -p $(dir $@)
-	$(TCC) -c $(TFLAGS) $(NSFLAGS) -I$(TOP)/ssh/zlib $< -o $@
-$(O)/web/pwnet.o: engine/pwnet.c engine/pwnet.h psiweb.h ../ssh/psishared.h
+	$(TCC) -c $(TFLAGS) $(NSFLAGS) -I$(CORE)/ssh/zlib $< -o $@
+$(O)/web/pwnet.o: $(CORE)/web/engine/pwnet.c $(CORE)/web/engine/pwnet.h psiweb.h $(CORE)/ssh/psishared.h
 	@mkdir -p $(dir $@)
 	$(TCC) -c $(TFLAGS) $(NETDEFS) $< -o $@
 $(O)/pwres.c: mkres.py res/welcome.html
@@ -84,33 +87,33 @@ ifeq ($(TARGET),host)
 $(OUT): $(ALL_OBJS)
 	gcc -o $@ $^ -lz -lm
 else
-$(O)/web/pwepoc.o: engine/pwepoc.cpp psiweb.h fb/pwback.h ../ssh/psishared.h
+$(O)/web/pwepoc.o: engine/pwepoc.cpp psiweb.h fb/pwback.h $(CORE)/ssh/psishared.h
 	@mkdir -p $(dir $@)
 	$(TCC) -c $(CXXFLAGS) $< -o $@
-$(O)/web/psiglue.o: $(TOP)/ssh/psiglue.cpp $(TOP)/ssh/psishared.h $(TOP)/ssh/psibell.h $(TOP)/ssh/psilink.h
+$(O)/web/psiglue.o: $(CORE)/ssh/psiglue.cpp $(CORE)/ssh/psishared.h $(CORE)/ssh/psibell.h $(CORE)/ssh/psilink.h
 	@mkdir -p $(dir $@)
 	$(TCC) -c $(CXXFLAGS) '-DPSI_SHARED_NAME="PsiWebShared"' $< -o $@
-$(O)/web/%.o: compat/%.c
+$(O)/web/%.o: $(CORE)/web/compat/%.c
 	@mkdir -p $(dir $@)
 	$(TCC) -c $(TFLAGS) $< -o $@
-$(O)/web/tls13.o: $(TOP)/ssh/tls13.c tls/includes.h
+$(O)/web/tls13.o: $(CORE)/ssh/tls13.c tls/includes.h
 	@mkdir -p $(dir $@)
-	$(TCC) -c $(LTCFLAGS) -I$(TOP)/ssh/db/src $< -o $@
-$(O)/web/pwupdate.o: engine/pwupdate.c engine/pwnet.h psiweb.h psiweb_cmds.h tls/includes.h ../ssh/psishared.h
+	$(TCC) -c $(LTCFLAGS) -I$(CORE)/ssh/db/src $< -o $@
+$(O)/web/pwupdate.o: engine/pwupdate.c $(CORE)/web/engine/pwnet.h psiweb.h psiweb_cmds.h tls/includes.h $(CORE)/ssh/psishared.h
 	@mkdir -p $(dir $@)
-	$(TCC) -c $(LTCFLAGS) -I$(TOP)/ssh $< -o $@
-$(O)/emu/pwupdate_test.o: engine/pwupdate.c engine/pwnet.h psiweb.h psiweb_cmds.h tls/includes.h
+	$(TCC) -c $(LTCFLAGS) -I$(CORE)/ssh $< -o $@
+$(O)/emu/pwupdate_test.o: engine/pwupdate.c $(CORE)/web/engine/pwnet.h psiweb.h psiweb_cmds.h tls/includes.h
 	@mkdir -p $(dir $@)
-	$(TCC) -c $(LTCFLAGS) -I$(TOP)/ssh -DPW_TEST_KEY $< -o $@
+	$(TCC) -c $(LTCFLAGS) -I$(CORE)/ssh -DPW_TEST_KEY $< -o $@
 $(O)/web/%.o: tls/%.c tls/includes.h tls/options.h
 	@mkdir -p $(dir $@)
-	$(TCC) -c $(LTCFLAGS) -I$(TOP)/ssh/db/src $< -o $@
+	$(TCC) -c $(LTCFLAGS) -I$(CORE)/ssh/db/src $< -o $@
 $(O)/ltc/%.o:
 	@mkdir -p $(dir $@)
 	$(TCC) -c $(LTCFLAGS) $(LTC)/$(subst __,/,$*).c -o $@
-$(O)/zlib/%.o: $(TOP)/ssh/zlib/%.c
+$(O)/zlib/%.o: $(CORE)/ssh/zlib/%.c
 	@mkdir -p $(dir $@)
-	$(TCC) -c $(ARCH) $(DEFS) -fno-builtin -w -I$(WEB)/compat -I$(E)/include/libc -I$(E)/include $< -o $@
+	$(TCC) -c $(ARCH) $(DEFS) -fno-builtin -w -I$(CORE)/web/compat -I$(E)/include/libc -I$(E)/include $< -o $@
 
 LINKOBJS = $(REL)/eexe.o $(ALL_OBJS) $(REL)/ecrt0.o $(SYSLIBS)
 
@@ -120,7 +123,7 @@ EMU_OBJS := $(filter-out $(O)/web/pwepoc.o $(O)/web/psiglue.o $(O)/web/pwupdate.
 	$(O)/emu/emu_rt.o $(O)/emu/emu_hc.o $(O)/emu/emu_back.o $(O)/emu/pwupdate_test.o
 $(O)/emu/%.o: emu/%.c
 	@mkdir -p $(dir $@)
-	$(TCC) -c $(ARCH) -O2 -fno-builtin -w -D__EPOC32__ -I$(WEB) -I$(TOP)/ssh -I$(E)/include/libc $< -o $@
+	$(TCC) -c $(ARCH) -O2 -fno-builtin -w -D__EPOC32__ -I$(WEB) -I$(CORE)/ssh -I$(E)/include/libc $< -o $@
 $(O)/psiweb-emu.pe: $(EMU_OBJS)
 	arm-pe-ld -o $@ -e main -Map $(O)/psiweb-emu.map $(EMU_OBJS) $(LIBGCC)
 emu: $(O)/psiweb-emu.pe

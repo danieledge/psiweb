@@ -1,12 +1,12 @@
 #!/bin/bash
 # Builds build/links/host/links-psi: Links 2 with the "psi" graphics driver
-# and web/fb/pwhost.c, a PC stand-in for the Psion that renders 640x240 in
+# and fb/pwhost.c, a PC stand-in for the Psion that renders 640x240 in
 # 16 greys and takes a script (see run_host.sh).
 # Run inside the psion-build container:
-#   tools/docker/psibuild web/links/build_host.sh
+#   core/tools/docker/psibuild links/build_host.sh
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
-TOP=$(cd "$HERE/../.." && pwd)
+TOP=$(cd "$HERE/.." && pwd)
 LK=$TOP/build/links
 SRC=$LK/links-2.30
 

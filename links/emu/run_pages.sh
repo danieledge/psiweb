@@ -16,7 +16,7 @@
 # compared before and after a change.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
-TOP=$(cd "$HERE/../../.." && pwd)
+TOP=$(cd "$HERE/../.." && pwd)
 OUT=${1:-$TOP/build/links/emu-shots}
 [ $# -gt 0 ] && shift
 mkdir -p "$OUT/www"
@@ -39,7 +39,7 @@ showpics=http://127.0.0.1:$PORT/images.html
 
 # the local picture page (JPEG, PNG, GIF), served on 127.0.0.1 only
 if [ "$NET" != replay ]; then
-	python3 "$TOP/web/links/mktestpage.py" "$OUT/www" > /dev/null
+	python3 "$TOP/links/mktestpage.py" "$OUT/www" > /dev/null
 	python3 -m http.server $PORT --bind 127.0.0.1 -d "$OUT/www" > "$OUT/httpd.log" 2>&1 &
 	HTTPD=$!
 	trap 'kill $HTTPD 2>/dev/null' EXIT

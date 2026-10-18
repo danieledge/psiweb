@@ -33,7 +33,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "pwback.h"
-#include "../../ssh/psigrey.h"
+#include "../core/ssh/psigrey.h"
 
 static const unsigned char bayer[4][4] = {
 	{   8, 136,  40, 168 },

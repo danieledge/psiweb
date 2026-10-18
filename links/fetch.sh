@@ -1,15 +1,15 @@
 #!/bin/bash
 # Fetches the sources for Links 2 in PsiWeb at pinned versions, checks them,
 # unpacks them into build/links and applies the Psion patches.
-#   web/links/fetch.sh [DIR]      (default: build/links)
+#   links/fetch.sh [DIR]      (default: build/links)
 #
 #   links-2.30      http://links.twibright.com/          GPL v2
 #   jpeg-9f         https://www.ijg.org/ (IJG libjpeg)   IJG licence
 #   libpng-1.6.43   https://github.com/pnggroup/libpng   libpng licence
-# zlib comes from ssh/zlib in this repository.
+# zlib comes from core/ssh/zlib (psion-core).
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
-LK=${1:-$HERE/../../build/links}
+LK=${1:-$HERE/../build/links}
 mkdir -p "$LK"
 LK=$(cd "$LK" && pwd)
 

@@ -3,7 +3,7 @@
 # at 640x240 in 16 greys, as the Psion would show them, with the heap peak
 # for each page. Run on the PC from the repository root:
 #
-#   web/links/run_host.sh [OUTDIR] [NAME=URL ...]
+#   links/run_host.sh [OUTDIR] [NAME=URL ...]
 #
 # With no pages given it runs the standard set (see PAGES below), plus a
 # local page with JPEG, PNG and GIF pictures served on 127.0.0.1. Each page
@@ -18,7 +18,7 @@
 #   NOBUILD=1        skip the build
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
-TOP=$(cd "$HERE/../.." && pwd)
+TOP=$(cd "$HERE/.." && pwd)
 RUN=$TOP/build/links/run
 OUT=${1:-$TOP/build/links/shots}
 [ $# -gt 0 ] && shift
@@ -42,7 +42,7 @@ OPTS="-async-dns 0 -html-user-font-size 14 -menu-font-size 12 \
 -html-g-background-color 0xffffff -menu-background-color 0xffffff -menu-foreground-color 0x000000 \
 -dither-images 0 -dither-letters 0 $LINKS_OPTS"
 
-[ -n "$NOBUILD" ] || tools/docker/psibuild web/links/build_host.sh
+[ -n "$NOBUILD" ] || core/tools/docker/psibuild links/build_host.sh
 
 # a local page with pictures in each format
 python3 "$HERE/mktestpage.py" "$RUN/www"
@@ -85,7 +85,7 @@ if [ -z "$*" ]; then
 fi
 
 # all pages in one container; each page is its own links-psi process
-tools/docker/psibuild "cd '$RUN' && (python3 -m http.server 8765 --bind 127.0.0.1 -d www > httpd.log 2>&1 &) && sleep 1;
+core/tools/docker/psibuild "cd '$RUN' && (python3 -m http.server 8765 --bind 127.0.0.1 -d www > httpd.log 2>&1 &) && sleep 1;
 for p in $(echo $PAGES | tr '\n' ' '); do
 	n=\${p%%=*}
 	echo \"== \$n\"

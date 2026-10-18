@@ -47,7 +47,7 @@
 /* functions ESTLIB has (or psi_os.c supplies) */
 #define HAVE_STRFTIME 1
 #define HAVE_VPRINTF 1
-#define HAVE_SNPRINTF 1		/* web/compat/nsprintf.c */
+#define HAVE_SNPRINTF 1		/* core/web/compat/nsprintf.c */
 #define HAVE_CALLOC 1
 #define HAVE_GETCWD 1
 #define HAVE_GETPID 1
@@ -79,7 +79,7 @@
 #define RENAME_OVER_EXISTING_FILES 1
 
 /* no IPv6, no threads, no fork for DNS: every connection goes through
- * psiglue (web/engine/pwnet.c), which also resolves the name */
+ * psiglue (core/web/engine/pwnet.c), which also resolves the name */
 #define NO_ASYNC_LOOKUP
 #define HAVE_GETHOSTBYNAME 1
 

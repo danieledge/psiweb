@@ -24,7 +24,7 @@
 #define HAVE_JPEG 1
 #define HAVE_JPEGLIB_H 1
 
-/* zlib is built from source (ssh/zlib), not found by configure */
+/* zlib is built from source (core/ssh/zlib), not found by configure */
 #ifndef HAVE_ZLIB
 #define HAVE_ZLIB 1
 #endif

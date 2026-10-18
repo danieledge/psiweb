@@ -1,0 +1,32 @@
+# build output
+/build/
+/dist/
+*.o
+*.obj
+*.lib
+*.map
+*.marm
+*.rpp
+__pycache__/
+*.pyc
+
+# release signing key: never commit
+*.key
+signing/
+
+# local debugging / device data
+*.psi
+screenshots/
+*.log
+*.log.old
+*_local.h
+*_local.*
+.env
+.env.*
+
+# editors / OS
+.DS_Store
+*~
+*.swp
+.claude/
+CLAUDE.local.md
