@@ -209,6 +209,7 @@ RESOURCE MENU_PANE r_pw_tools_menu
 		MENU_ITEM { command=EPwCmdConnSettings; txt="Connection settings..."; flags=EEikMenuItemSeparatorAfter; },
 		MENU_ITEM { command=EPwCmdRestart; txt="Restart browser engine"; },
 		MENU_ITEM { command=EPwCmdSendLog; txt="Send log to server"; },
+		MENU_ITEM { command=EPwCmdKeepLog; txt="Keep a log"; flags=EEikMenuItemCheckBox; },
 		MENU_ITEM { command=EPwCmdUpdate; txt="Update PsiWeb..."; flags=EEikMenuItemSeparatorAfter; },
 		MENU_ITEM { command=EPwCmdHelp; txt="Help on PsiWeb"; },
 		MENU_ITEM { command=EPwCmdAbout; txt="About PsiWeb"; }

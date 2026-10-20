@@ -111,6 +111,8 @@ struct TPwSettings
 // TPwSettings::iDisplay, one byte at the end of PsiWeb.ini (0.81); all 0 is the standard
 const TInt KPwDisplayReading = 1;      // View > Reading mode
 const TInt KPwDisplayScaledText = 2;   // Preferences > Text: scaled (Links' own fonts)
+const TInt KPwKeepLog = 4;             // (0.77) Tools > Keep a log: PsiWeb.log is written only with
+                                       // this bit (in the same byte; older files have it 0: off)
 
 class CPwView;
 
@@ -414,6 +416,7 @@ private:
 	TBool ProcessCommandParametersL(TApaCommand aCommand, TFileName& aDocumentName, const TDesC8& aTail);
 	void ProcessMessageL(TUid aUid, const TDesC8& aParams);
 	void DynInitMenuPaneL(TInt aMenuId, CEikMenuPane* aMenuPane);
+	void HandleAttemptDimmedSelectionL(TInt aCommandId);
 	void LoadSettings(TPwSettings& aSettings);
 	void SaveSettings(const TPwSettings& aSettings);
 	void PageInfoL();

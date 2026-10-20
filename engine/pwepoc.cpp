@@ -67,6 +67,11 @@ extern "C" int pwb_gettimeofday(void* aTv, void*)
 // One line per event, "mm:ss.t text", for finding out where a page stops:
 // status text, busy changes, link messages, fetch errors, frames drawn.
 // The last run's log is kept as PsiWeb.old.
+// (0.77) Only while Tools > Keep a log is ticked (PsiShared.log_on, which
+// the app sets in the chunk and changes when the tick changes): until then
+// no file is made, and nothing is written. The lines carry status text, so
+// the addresses of pages; a user name and password in an address
+// (http://name:password@host/) never go in.
 // (a test build can put it on the emulator's card, where it can be read
 // back: web/links/epoc.mk PWEPOC_DEFS=-DPW_LOG_ON_D)
 #ifdef PW_LOG_ON_D
@@ -81,6 +86,7 @@ static RFile gLog;
 static TInt gLogOpen = 0;       // 0 not tried, 1 open, -1 failed
 static TUint gLogT0 = 0;
 static char gLogLast[96];
+static PwShared* gPw = 0;
 
 static void LogOpen()
 	{
@@ -100,16 +106,37 @@ static void LogOpen()
 
 extern "C" void pw_log(const char* aText)
 	{
+	if (!gPw || !gPw->net.log_on || !aText)
+		return;                              // (0.77) no log unless Tools > Keep a log is ticked
 	if (gLogOpen == 0)
 		LogOpen();
-	if (gLogOpen != 1 || !aText)
+	if (gLogOpen != 1)
 		return;
 	TUint t = (User::TickCount() - gLogT0) * 10 / 64;       // 1/10 s
 	TBuf8<160> line;
 	line.AppendFormat(_L8("%02u:%02u.%u "), (t / 600) % 100, (t / 10) % 60, t % 10);
 	TInt n = 0;
 	while (aText[n] && n < 120) n++;
-	line.Append((const TUint8*)aText, n);
+	// "scheme://name:password@host": the part before the @ is left out
+	for (TInt i = 0; i < n && line.Length() < line.MaxLength() - 8; )
+		{
+		line.Append((TUint8)aText[i]);
+		if (i + 2 < n && aText[i] == ':' && aText[i + 1] == '/' && aText[i + 2] == '/')
+			{
+			line.Append(_L8("//"));
+			i += 3;
+			TInt j = i;
+			while (j < n && aText[j] != '@' && aText[j] != '/' && aText[j] != ' ' && aText[j] != '?')
+				j++;
+			if (j < n && aText[j] == '@')
+				{
+				line.Append(_L8("...@"));
+				i = j + 1;
+				}
+			continue;
+			}
+		i++;
+		}
 	line.Append(_L8("\r\n"));
 	gLog.Write(line);
 	gLog.Flush();
@@ -160,7 +187,6 @@ extern "C" long pw_log_read(int aOld, long aPos, void* aBuf, long aMax)
 
 static void LogLink(const char* aText) { pw_log(aText); }
 
-static PwShared* gPw = 0;
 static int gInitDone = 0;
 static int gInitResult = -1;
 static PwShared* gDummy = 0;       // stands in if PsiWeb.app's chunk is missing
@@ -178,7 +204,6 @@ static PwShared* Pw()
 	if (!gInitDone)
 		{
 		gInitDone = 1;
-		pw_log("engine start");
 		pg_set_link_log(LogLink);
 		gInitResult = pg_attach();     // the chunk only: the serial port is
 		                               // opened when a page is fetched
@@ -194,6 +219,7 @@ static PwShared* Pw()
 		PwShared* s = (PwShared*)pg_shared();
 		if (s && s->magic == PW_MAGIC)
 			gPw = s;
+		pw_log("engine start");            // (after the chunk: it says whether to keep a log)
 #ifdef PW_DIAG
 		{
 		char db[48];

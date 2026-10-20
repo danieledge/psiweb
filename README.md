@@ -63,7 +63,9 @@ Two kinds work:
 
 The link from the Psion to the proxy is plain HTTP, so keep the proxy on a network you trust.
 
-**Send log to server** (Tools): sends `PsiWeb.log` and `PsiWeb.old` to the proxy, if it is a PsiProxy, which saves them for you to read when something goes wrong. It is dimmed until a proxy is set. The log goes as plain HTTP and holds the addresses of the pages you visited, so send it only to your own PsiProxy.
+**Keep a log** (Tools): PsiWeb keeps no log unless this is ticked (it is off on a new Psion and after an update). Then it writes what it does to `C:\System\Data\PsiWeb.log` (the run before is kept as `PsiWeb.old`), for whoever is looking into a problem; untick it to stop, at once (the log kept so far stays). A user name and password in an address never go in.
+
+**Send log to server** (Tools): sends `PsiWeb.log` and `PsiWeb.old` to the proxy, if it is a PsiProxy, which saves them for you to read when something goes wrong. It is dimmed until a proxy is set and *Keep a log* is ticked. The log goes as plain HTTP and holds the addresses of the pages you visited, so send it only to your own PsiProxy.
 
 **After use, Psion Internet** (Connection settings > Network): *Stays connected* (the standard on a new Psion) keeps the dial-up connection up after use, until you disconnect (Ctrl+U); *Disconnects when idle* leaves it to the Psion's own idle time, as before. Anyone updating from an older version keeps *Disconnects when idle* until they change it.
 
@@ -122,7 +124,7 @@ psiweb.exe  (Links 2.30 in graphics mode, C, gcc 3.0)
 
 The shared parts (the connection layer, the shared memory layout, the connection settings and their Test, TLS, zlib, the C-library shims and the build and emulator tools) are [psion-core](https://github.com/danieledge/psion-core), the git submodule `core/`.
 
-Links is patched (`links/patches/links-2.30-psion.diff`): the `psi` driver, no Links menus or bars, pictures on request, the speed work and the picture memory. The engine writes `C:\System\Data\PsiWeb.log` (and `PsiWeb.old`, the run before), with timings, link messages, infoprints and the heap used by each page.
+Links is patched (`links/patches/links-2.30-psion.diff`): the `psi` driver, no Links menus or bars, pictures on request, the speed work and the picture memory. With *Tools > Keep a log* ticked, the engine writes `C:\System\Data\PsiWeb.log` (and `PsiWeb.old`, the run before), with timings, link messages, infoprints and the heap used by each page.
 
 ## Building
 

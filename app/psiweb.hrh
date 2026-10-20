@@ -34,6 +34,7 @@ enum TPwCommands
 	EPwCmdHistoryFull,       // History > Full history...
 	EPwCmdClearHistory,      // History > Clear history
 	EPwCmdHistNone,          // History > (No history), dimmed
+	EPwCmdKeepLog,           // Tools > Keep a log (0.77)
 	EPwCmdFav0 = 0x1100,     // the favourites on the menu: 16 slots
 	EPwCmdHist0 = 0x1120     // the History cascade's pages: 16 slots
 	};
