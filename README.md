@@ -65,7 +65,7 @@ The link from the Psion to the proxy is plain HTTP, so keep the proxy on a netwo
 
 **Keep a log** (Tools): PsiWeb keeps no log unless this is ticked (it is off on a new Psion and after an update). Then it writes what it does to `C:\System\Data\PsiWeb.log` (the run before is kept as `PsiWeb.old`), for whoever is looking into a problem; untick it to stop, at once (the log kept so far stays). A user name and password in an address never go in.
 
-**Send log to server** (Tools): sends `PsiWeb.log` and `PsiWeb.old` to the proxy, if it is a PsiProxy, which saves them for you to read when something goes wrong. It is dimmed until a proxy is set and *Keep a log* is ticked. The log goes as plain HTTP and holds the addresses of the pages you visited, so send it only to your own PsiProxy.
+**Send log to server** (Tools): sends `PsiWeb.log` and `PsiWeb.old` to the proxy, if it is a PsiProxy, which saves them for you to read when something goes wrong. With the Atom modem's own proxy they go to the PsiProxy set in the modem's Web proxy settings (AT$PU); without one it says *Needs PsiProxy on a computer*. It is dimmed until a proxy is set and *Keep a log* is ticked. The log goes as plain HTTP and holds the addresses of the pages you visited, so send it only to your own PsiProxy.
 
 **After use, Psion Internet** (Connection settings > Network): *Stays connected* (the standard on a new Psion) keeps the dial-up connection up after use, until you disconnect (Ctrl+U); *Disconnects when idle* leaves it to the Psion's own idle time, as before. Anyone updating from an older version keeps *Disconnects when idle* until they change it.
 

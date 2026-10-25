@@ -1030,8 +1030,8 @@ void CPwView::LogTick()
 		TBuf<96> why;
 		TBuf<128> msg;
 		FromUtf8(why, s->log_msg);
-		if (why.Length() >= 2 && why.Left(2) == _L("No"))
-			msg = why;                       // "Not available ...", "No log to send"
+		if ((why.Length() >= 2 && why.Left(2) == _L("No")) || (why.Length() >= 5 && why.Left(5) == _L("Needs")))
+			msg = why;                       // "Not available ...", "No log to send", "Needs PsiProxy on a computer"
 		else
 			{
 			msg = _L("Could not send log - ");
