@@ -57,11 +57,14 @@ A proxy on a computer on your network makes browsing much quicker and lighter, w
 - one connection stays open for the whole session, so the modem dials once;
 - PsiWeb's updates from GitHub come through it too (they are still checked against the signature).
 
-Two kinds work:
+Three kinds work:
+- The [PsiConnect Atom modem](https://github.com/danieledge/psiconnect)'s own proxy: proxy host `psiproxy`, port `8080`. It does the TLS, simplifies pages (with text-only and reader modes), converts JPEG, PNG and GIF pictures to 16 greys and gzips the line, with no computer needed. Tell it where a PsiProxy is (`AT$PU`) and it hands calls to that when it answers.
 - [PsiProxy](https://github.com/danieledge/psiproxy), the one made for PsiWeb. It also slims each page for the 640x240 screen (articles extracted into one column, home pages turned into lists of headlines, site menus folded into one `[ Menu ]` link), so there is less to fetch, lay out and hold in memory; turns pictures (WebP, AVIF, JPEG, PNG, GIF) into 16-grey GIFs at most 320 pixels wide; can render JavaScript-only pages in a headless browser, if you turn that on; and receives logs from *Send log to server*. It listens on port 8081 by default.
 - [WebOne](https://github.com/atauenis/webone), or any HTTP proxy that takes `GET http://...` requests: TLS and one connection, but no slimming and no logs.
 
 The link from the Psion to the proxy is plain HTTP, so keep the proxy on a network you trust.
+
+Which to choose, and what each gives across the suite: [Choosing your setup](https://github.com/danieledge/psion-core/blob/main/docs/SETUP.md).
 
 **Keep a log** (Tools): PsiWeb keeps no log unless this is ticked (it is off on a new Psion and after an update). Then it writes what it does to `C:\System\Data\PsiWeb.log` (the run before is kept as `PsiWeb.old`), for whoever is looking into a problem; untick it to stop, at once (the log kept so far stays). A user name and password in an address never go in.
 
