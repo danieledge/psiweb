@@ -44,7 +44,8 @@ Z_SRCS  := adler32 crc32 inflate inftrees inffast zutil
 PLAT_OBJS := $(O)/web/pwepoc.o $(O)/web/psiglue.o $(O)/web/nscompat.o $(O)/web/nsprintf.o \
 	$(O)/web/tls13.o $(O)/web/x25519.o $(O)/web/pwrandom.o $(O)/web/pwupdate.o \
 	$(addprefix $(O)/ltc/,$(subst /,__,$(LTC_SRCS:=.o))) $(addprefix $(O)/zlib/,$(Z_SRCS:=.o))
-LIBGCC  := $(SDK)/gcc-3.0-psion-98r2-9/lib/gcc-lib/arm-epoc-pe/3.0-psion-98r2/libgcc.a
+V4BX_DIR := $(O)
+include $(CORE)/tools/v4bx.mk
 SYSLIBS := $(REL)/estlib.lib $(REL)/euser.lib $(REL)/c32.lib $(REL)/efsrv.lib $(REL)/esock.lib $(REL)/insock.lib $(REL)/nifman.lib $(LIBGCC)
 endif
 
@@ -124,13 +125,14 @@ EMU_OBJS := $(filter-out $(O)/web/pwepoc.o $(O)/web/psiglue.o $(O)/web/pwupdate.
 $(O)/emu/%.o: emu/%.c
 	@mkdir -p $(dir $@)
 	$(TCC) -c $(ARCH) -O2 -fno-builtin -w -D__EPOC32__ -I$(WEB) -I$(CORE)/ssh -I$(E)/include/libc $< -o $@
-$(O)/psiweb-emu.pe: $(EMU_OBJS)
+$(O)/psiweb-emu.pe: $(EMU_OBJS) $(LIBGCC)
 	arm-pe-ld -o $@ -e main -Map $(O)/psiweb-emu.map $(EMU_OBJS) $(LIBGCC)
 emu: $(O)/psiweb-emu.pe
-$(OUT): $(ALL_OBJS)
+$(OUT): $(ALL_OBJS) $(LIBGCC)
 	arm-pe-ld -s -e _E32Startup --base-file $(O)/psiweb.bas -o $(O)/psiweb.tmp.exe $(LINKOBJS)
 	arm-pe-dlltool --as=arm-pe-as --output-exp $(O)/psiweb.exp --base-file $(O)/psiweb.bas $(LINKOBJS)
 	arm-pe-ld -s -e _E32Startup -Map $(O)/psiweb.map -o $(O)/psiweb.tmp.exe $(O)/psiweb.exp $(LINKOBJS)
+	python3 $(V4BX_PY) --check $(O)/psiweb.tmp.exe     # (no BX: the netBook has none)
 	wine $(E)/tools/petran.exe $(O)/psiweb.tmp.exe $@ -nocall -uid1 0x1000007a -uid2 0x00000000 -uid3 0x01000A7B -heap 0x40000 0xa00000 -stack 0x40000
 	@ls -la $@
 endif

@@ -62,7 +62,8 @@ AR      := arm-pe-ar
 ARCH    := -fomit-frame-pointer -O2 -fno-strict-aliasing -nostdinc -mcpu=arm710 -mapcs-32 -mshort-load-bytes -msoft-float
 DEFS    := -D__SYMBIAN32__ -D__PSISOFT32__ -D__GCC32__ -D__EPOC32__ -D__MARM__ -D__EXE__ -DNDEBUG
 LIBC    := -I$(E)/include/libc -I$(E)/include
-LIBGCC  := $(SDK)/gcc-3.0-psion-98r2-9/lib/gcc-lib/arm-epoc-pe/3.0-psion-98r2/libgcc.a
+V4BX_DIR := $(O)
+include $(CORE)/tools/v4bx.mk
 
 LINKS_SRCS := af_unix auth bfu block bookmark cache charsets compress connect \
 	cookies data default dip dither dns doh drivers error file finger fn_impl ftp \
@@ -223,7 +224,7 @@ $(O)/emu/setjmp.o: $(LW)/emu/setjmp.s
 	@mkdir -p $(dir $@)
 	arm-pe-as $< -o $@
 
-$(O)/psiweb-emu.pe: $(LINKS_OBJS) $(PSI_OBJS) $(EMU_OBJS) $(JPG_LIB) $(PNG_LIB) $(Z_LIB)
+$(O)/psiweb-emu.pe: $(LINKS_OBJS) $(PSI_OBJS) $(EMU_OBJS) $(JPG_LIB) $(PNG_LIB) $(Z_LIB) $(LIBGCC)
 	arm-pe-ld -o $@ -e main -Map $(O)/psiweb-emu.map $(LINKS_OBJS) $(PSI_OBJS) $(EMU_OBJS) \
 		$(PNG_LIB) $(JPG_LIB) $(Z_LIB) $(LIBGCC)
 	arm-pe-nm -n $@ > $(O)/psiweb-emu.syms
@@ -253,10 +254,11 @@ $(O)/dev/pwupdate.o: $(WEB)/engine/pwupdate.c $(CORE)/web/engine/pwnet.h $(WEB)/
 
 # petran: heap 256 KB to 10 MB (as NetSurf's), 256 KB stack (Links' table
 # layout recurses); UIDs as NetSurf's psiweb.exe, so PsiWeb.app starts it
-$(O)/psiweb.exe: $(LINKS_OBJS) $(PSI_OBJS) $(DEV_OBJS) $(JPG_LIB) $(PNG_LIB) $(Z_LIB)
+$(O)/psiweb.exe: $(LINKS_OBJS) $(PSI_OBJS) $(DEV_OBJS) $(JPG_LIB) $(PNG_LIB) $(Z_LIB) $(LIBGCC)
 	arm-pe-ld -s -e _E32Startup --base-file $(O)/psiweb.bas -o $(O)/psiweb.tmp.exe $(EXE_OBJS)
 	arm-pe-dlltool --as=arm-pe-as --output-exp $(O)/psiweb.exp --base-file $(O)/psiweb.bas $(EXE_OBJS)
 	arm-pe-ld -s -e _E32Startup -Map $(O)/psiweb.map -o $(O)/psiweb.tmp.exe $(O)/psiweb.exp $(EXE_OBJS)
+	python3 $(V4BX_PY) --check $(O)/psiweb.tmp.exe     # (no BX: the netBook has none)
 	WINEDEBUG=-all wine $(E)/tools/petran.exe $(O)/psiweb.tmp.exe $@ -nocall -uid1 0x1000007a -uid2 0x00000000 -uid3 0x01000A7B -heap 0x40000 0xa00000 -stack 0x40000
 	@ls -la $@
 exe: $(O)/psiweb.exe
