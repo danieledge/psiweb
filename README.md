@@ -57,13 +57,18 @@ A proxy on a computer on your network makes browsing much quicker and lighter, w
 - one connection stays open for the whole session, so the modem dials once;
 - PsiWeb's updates from GitHub come through it too (they are still checked against the signature).
 
-Two kinds work:
+Three kinds work:
+- The [PsiConnect Atom modem](https://github.com/danieledge/psiconnect)'s own proxy: proxy host `psiproxy`, port `8080`. It does the TLS, simplifies pages (with text-only and reader modes), converts JPEG, PNG and GIF pictures to 16 greys and gzips the line, with no computer needed. Tell it where a PsiProxy is (`AT$PU`) and it hands calls to that when it answers.
 - [PsiProxy](https://github.com/danieledge/psiproxy), the one made for PsiWeb. It also slims each page for the 640x240 screen (articles extracted into one column, home pages turned into lists of headlines, site menus folded into one `[ Menu ]` link), so there is less to fetch, lay out and hold in memory; turns pictures (WebP, AVIF, JPEG, PNG, GIF) into 16-grey GIFs at most 320 pixels wide; can render JavaScript-only pages in a headless browser, if you turn that on; and receives logs from *Send log to server*. It listens on port 8081 by default.
 - [WebOne](https://github.com/atauenis/webone), or any HTTP proxy that takes `GET http://...` requests: TLS and one connection, but no slimming and no logs.
 
 The link from the Psion to the proxy is plain HTTP, so keep the proxy on a network you trust.
 
-**Send log to server** (Tools): sends `PsiWeb.log` and `PsiWeb.old` to the proxy, if it is a PsiProxy, which saves them for you to read when something goes wrong. It is dimmed until a proxy is set. The log goes as plain HTTP and holds the addresses of the pages you visited, so send it only to your own PsiProxy.
+Which to choose, and what each gives across the suite: [Choosing your setup](https://github.com/danieledge/psion-core/blob/main/docs/SETUP.md).
+
+**Keep a log** (Tools): PsiWeb keeps no log unless this is ticked (it is off on a new Psion and after an update). Then it writes what it does to `C:\System\Data\PsiWeb.log` (the run before is kept as `PsiWeb.old`), for whoever is looking into a problem; untick it to stop, at once (the log kept so far stays). A user name and password in an address never go in.
+
+**Send log to server** (Tools): sends `PsiWeb.log` and `PsiWeb.old` to the proxy, if it is a PsiProxy, which saves them for you to read when something goes wrong. With the Atom modem's own proxy they go to the PsiProxy set in the modem's Web proxy settings (AT$PU); without one it says *Needs PsiProxy on a computer*. It is dimmed until a proxy is set and *Keep a log* is ticked. The log goes as plain HTTP and holds the addresses of the pages you visited, so send it only to your own PsiProxy.
 
 **After use, Psion Internet** (Connection settings > Network): *Stays connected* (the standard on a new Psion) keeps the dial-up connection up after use, until you disconnect (Ctrl+U); *Disconnects when idle* leaves it to the Psion's own idle time, as before. Anyone updating from an older version keeps *Disconnects when idle* until they change it.
 
@@ -122,7 +127,7 @@ psiweb.exe  (Links 2.30 in graphics mode, C, gcc 3.0)
 
 The shared parts (the connection layer, the shared memory layout, the connection settings and their Test, TLS, zlib, the C-library shims and the build and emulator tools) are [psion-core](https://github.com/danieledge/psion-core), the git submodule `core/`.
 
-Links is patched (`links/patches/links-2.30-psion.diff`): the `psi` driver, no Links menus or bars, pictures on request, the speed work and the picture memory. The engine writes `C:\System\Data\PsiWeb.log` (and `PsiWeb.old`, the run before), with timings, link messages, infoprints and the heap used by each page.
+Links is patched (`links/patches/links-2.30-psion.diff`): the `psi` driver, no Links menus or bars, pictures on request, the speed work and the picture memory. With *Tools > Keep a log* ticked, the engine writes `C:\System\Data\PsiWeb.log` (and `PsiWeb.old`, the run before), with timings, link messages, infoprints and the heap used by each page.
 
 ## Building
 

@@ -84,7 +84,7 @@ static void SaveSharedLink(RFs& aFs, const TPwSettings& aSettings)
 
 _LIT(KEngineExe, "psiweb.exe");
 _LIT(KIniFile, "C:\\System\\Apps\\PsiWeb\\PsiWeb.ini");
-_LIT(KVersion, "0.76");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
+_LIT(KVersion, "0.77");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
 _LIT(KDefaultHome, "http://68k.news/");
 const TInt KZoomSteps[] = { 50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200 };
 const TInt KZoomCount = 11;
@@ -290,6 +290,7 @@ void CPwView::StartEngineL()
 	s->load_images = iSettings.iImages;
 	s->zoom = iSettings.iZoom;
 	s->display = (iSettings.iDisplay & KPwDisplayScaledText) ? PW_DISPLAY_SCALED_TEXT : 0;
+	s->net.log_on = (iSettings.iDisplay & KPwKeepLog) ? 1 : 0;   // (0.77) Tools > Keep a log; the engine reads it at each line
 	CopyToC(s->net.version, sizeof(s->net.version), KVersion);
 	// updates are saved to the CF card if there is one (D:), else C:
 	TVolumeInfo vol;
@@ -978,6 +979,11 @@ void CPwView::SendLog()
 		iEikonEnv->InfoMsg(_L("Not available while sending the log"));
 		return;
 		}
+	if (!(iSettings.iDisplay & KPwKeepLog))
+		{
+		iEikonEnv->InfoMsg(_L("Logging is off - turn on Tools > Keep a log"));
+		return;
+		}
 	if (!iRunning)
 		{
 		iEikonEnv->InfoMsg(_L("Not available - the browser engine has stopped"));
@@ -1024,8 +1030,8 @@ void CPwView::LogTick()
 		TBuf<96> why;
 		TBuf<128> msg;
 		FromUtf8(why, s->log_msg);
-		if (why.Length() >= 2 && why.Left(2) == _L("No"))
-			msg = why;                       // "Not available ...", "No log to send"
+		if ((why.Length() >= 2 && why.Left(2) == _L("No")) || (why.Length() >= 5 && why.Left(5) == _L("Needs")))
+			msg = why;                       // "Not available ...", "No log to send", "Needs PsiProxy on a computer"
 		else
 			{
 			msg = _L("Could not send log - ");
@@ -1477,7 +1483,7 @@ TBool CPwConnDialog::OkToExitL(TInt aButtonId)
 	if (link.iKeepUp && iSettings.iNetMode)
 		{
 		TFileName near(iEikonEnv->EikAppUi()->Application()->AppFullName());
-		PsiHoldStart(fs, near);
+		PsiHoldStart(fs, near, (iSettings.iDisplay & KPwKeepLog) != 0);
 		}
 	return ETrue;
 	}
@@ -1752,7 +1758,7 @@ void CPwAppUi::LoadSettings(TPwSettings& aSettings)
 					if (pos < d.Length())
 						aSettings.iImages = d[pos++] != 0;
 					if (pos < d.Length())            // (0.81) display: Reading mode, text
-						aSettings.iDisplay = d[pos++] & (KPwDisplayReading | KPwDisplayScaledText);
+						aSettings.iDisplay = d[pos++] & (KPwDisplayReading | KPwDisplayScaledText | KPwKeepLog);
 					}
 				}
 			}
@@ -1825,9 +1831,12 @@ void CPwAppUi::DynInitMenuPaneL(TInt aMenuId, CEikMenuPane* aMenuPane)
 		}
 	else if (aMenuId == R_PW_TOOLS_MENU)
 		{
-		// dimmed, not gone, until a proxy is set: the log goes to it
+		// dimmed, not gone, until a proxy is set: the log goes to it;
+		// (0.77) and while no log is kept
+		const TPwSettings& st = iView->Settings();
 		aMenuPane->SetItemDimmed(EPwCmdSendLog,
-			!iView->Settings().iUseProxy || iView->Settings().iProxyHost.Length() == 0);
+			!(st.iDisplay & KPwKeepLog) || !st.iUseProxy || st.iProxyHost.Length() == 0);
+		aMenuPane->SetItemButtonState(EPwCmdKeepLog, (st.iDisplay & KPwKeepLog) ? EEikMenuItemSymbolOn : 0);
 		}
 	else if (aMenuId == R_PW_VIEW_MENU)
 		{
@@ -1837,6 +1846,20 @@ void CPwAppUi::DynInitMenuPaneL(TInt aMenuId, CEikMenuPane* aMenuPane)
 			(iView->Settings().iDisplay & KPwDisplayReading) ? EEikMenuItemSymbolOn : 0);
 		aMenuPane->SetItemButtonState(EPwCmdImages, iView->PicturesShown() ? EEikMenuItemSymbolOn : 0);
 		}
+	}
+
+// a dimmed command chosen: say why (Tools > Send log to server)
+void CPwAppUi::HandleAttemptDimmedSelectionL(TInt aCommandId)
+	{
+	if (aCommandId != EPwCmdSendLog)
+		{
+		CEikAppUi::HandleAttemptDimmedSelectionL(aCommandId);
+		return;
+		}
+	if (!(iView->Settings().iDisplay & KPwKeepLog))
+		iEikonEnv->InfoMsg(_L("Logging is off - turn on Tools > Keep a log"));
+	else
+		iEikonEnv->InfoMsg(_L("Not available - set a proxy in Connection settings"));
 	}
 
 // cuts aText to aWidth pixels of aFont, ending in "..." (one character on
@@ -2167,6 +2190,15 @@ void CPwAppUi::HandleCommandL(TInt aCommand)
 		break;
 	case EPwCmdSendLog:
 		iView->SendLog();
+		break;
+	case EPwCmdKeepLog:
+		// (0.77) off unless ticked; what is in PsiWeb.log already stays. The
+		// engine looks at each line, so it starts or stops at once.
+		st.iDisplay ^= KPwKeepLog;
+		SaveSettings(st);
+		if (iView->Shared())
+			iView->Shared()->net.log_on = (st.iDisplay & KPwKeepLog) ? 1 : 0;
+		iEikonEnv->InfoMsg((st.iDisplay & KPwKeepLog) ? _L("Keeping a log") : _L("Not keeping a log"));
 		break;
 	case EPwCmdAbout:
 		AboutL();
