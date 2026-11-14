@@ -216,6 +216,7 @@ void pwb_ready(void) { fprintf(stderr, "[host] ready\n"); }
 const char *pwb_home_url(void) { return getenv("PW_HOME") ? getenv("PW_HOME") : "about:blank"; }
 const char *pwb_res_dir(void) { return getenv("PW_RES") ? getenv("PW_RES") : "res/"; }
 int pwb_load_images(void) { return 1; }
+int pwb_depth(void) { return 4; }
 int pwb_zoom(void) { return getenv("PW_ZOOM") ? atoi(getenv("PW_ZOOM")) : 100; }
 
 unsigned long pwb_ms(void) { return (unsigned long)now_ms(); }

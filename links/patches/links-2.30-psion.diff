@@ -3,7 +3,7 @@ Links 2.30 for PsiWeb (web/links). Applied by web/links/fetch.sh.
 - img.c (PSI_LAZY_IMAGES): no decoder or full-size buffer kept for pictures not yet drawn;
   during layout a JPEG is read only up to its size (phase 3)
 - jpeg.c (PSI_JPEG_SCALE): libjpeg scales while decoding; buffered mode only for progressive;
-  colour JPEGs decoded to grey (Y only), fast IDCT; a progressive JPEG takes in all the
+  colour JPEGs decoded to grey (Y only) on 16 greys, fast IDCT; a progressive JPEG takes in all the
   data there is before showing a scan (phase 3)
 - html.c (PSIWEB): no <link rel=canonical/alternate/...> lines, no prefetch/preload
 - html.c, html_r.c (PSIWEB): the form search for each control no longer starts at the top of
@@ -1096,12 +1096,12 @@ Display (docs/display.md, fonts):
 +			global_cinfo->scale_num = num;
 +			global_cinfo->scale_denom = 8;
 +		}
-+		/* PsiWeb: the Psion shows 16 greys, so colour JPEGs are decoded
-+		 * to grey (Y only): libjpeg then skips the chroma IDCTs (which
-+		 * libjpeg 9 does at 16x16 to upsample) and the colour
-+		 * conversion - most of the cost of a photo on the ARM. The fast
-+		 * integer IDCT is plenty for 16 greys. */
-+		if (global_cinfo->jpeg_color_space == JCS_YCbCr)
++		/* PsiWeb: on 16 greys (the 5mx) colour JPEGs are decoded to grey
++		 * (Y only): libjpeg then skips the chroma IDCTs and the colour
++		 * conversion, most of the cost of a photo on the ARM. A colour
++		 * screen (the netBook: pwb_depth 8) keeps the colour. */
++		extern int pwb_depth(void);
++		if (global_cinfo->jpeg_color_space == JCS_YCbCr && pwb_depth() != 8)
 +			global_cinfo->out_color_space = JCS_GRAYSCALE;
 +		global_cinfo->dct_method = JDCT_IFAST;
 +		global_cinfo->do_fancy_upsampling = FALSE;

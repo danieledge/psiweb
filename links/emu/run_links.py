@@ -4,6 +4,7 @@ driver, ARM code from the 1999 EPOC GCC) in an ARM emulator on a PC.
 
 A copy of web/emu/run_psiweb.py (NetSurf's harness) with, in addition:
   --images         the app's "Show pictures" setting is on at start
+  --netbook        the netBook's screen: 640x480 in EPOC's 256 colours (screenshots in colour)
   --heap-limit N   psiweb's heap limit in bytes (default 10 MB, as on the
                    Psion); malloc fails above it
   --profile [N]    instructions per function (needs --count): the top N
@@ -62,6 +63,8 @@ PROXY = None
 if "--proxy" in args:
     PROXY = args[args.index("--proxy") + 1]
 IMAGES = "--images" in args
+# --netbook: the netBook's screen, 640x480 in EPOC's 256 colours
+NETBOOK = "--netbook" in args
 HEAP_LIMIT = 10 * 1024 * 1024
 if "--heap-limit" in args:
     HEAP_LIMIT = int(args[args.index("--heap-limit") + 1])
@@ -137,8 +140,22 @@ mathcalls = {}
 def log(*a):
     print("[%6.2fs]" % (time.time() - T0), *a, flush=True)
 
+def epoc256():
+    import re
+    h = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "psi_pal.h")).read()
+    vals = [int(v, 16) for v in re.findall(r"0x([0-9a-f]{6})", h)][:256]
+    return [(v & 255, (v >> 8) & 255, v >> 16) for v in vals]
+
 def shot(name):
     from PIL import Image
+    if NETBOOK:
+        pal = epoc256()
+        fb = rd(state["fb4"], 480 * 640)
+        im = Image.new("RGB", (640, 480))
+        im.putdata([pal[b] for b in fb])
+        im.save(name)
+        log("saved", name)
+        return
     fb = rd(state["fb4"], 240 * 320)
     im = Image.new("L", (640, 240))
     px = im.load()
@@ -444,6 +461,7 @@ def hc(op, a, b, c, d):
         log("[mem] %s: live %d KB, page peak %d KB, failed allocations %d" % (cstr(a, 200), b // 1024, c // 1024, d))
         return 0
     if op == 212: return 1 if IMAGES else 0          # pwb_load_images
+    if op == 213: return 8 if NETBOOK else 4         # pwb_depth
     if op == 25:                                     # memory report
         mem.update(in_use=a, peak=b, arena=c, n=d)
         log("[heap] in use %d KB, peak %d KB" % (a // 1024, b // 1024)); return 0

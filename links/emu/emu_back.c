@@ -14,12 +14,20 @@ int emu_hc(int op, int a, int b, int c, int d);
 void emu_mem_report(void);
 enum {
 	HB = 200, HB_OPEN = HB, HB_PRESENT, HB_EVENT, HB_CMD, HB_STATUS, HB_TITLE,
-	HB_URL, HB_BUSY, HB_READY, HB_MS, HB_CONFIG, HB_UPDCFG, HB_IMAGES,
+	HB_URL, HB_BUSY, HB_READY, HB_MS, HB_CONFIG, HB_UPDCFG, HB_IMAGES, HB_DEPTH,
 	HP = 300, HP_DIAL = HP, HP_HANGUP, HP_AVAIL, HP_READ, HP_WRITE, HP_WAIT, HP_ENTROPY
 };
 
 static PwShared g_sh;
-static unsigned char g_fb4[PW_MAX_H * PW_STRIDE];
+/* the screen: the 5mx's 640x240 in 16 greys, or (run_links.py --netbook)
+   the netBook's 640x480 in EPOC's 256 colours; it goes in g_sh.fb, as on
+   the Psion */
+static int g_depth = -1;
+int pwb_depth(void)
+{
+	if (g_depth < 0) g_depth = emu_hc(HB_DEPTH, 0, 0, 0, 0) == 8 ? 8 : 4;
+	return g_depth;
+}
 
 /* the harness's settings (proxy, connection) go in on first use: main()
    reads use_proxy before pwb_open runs, as the real chunk is filled in by
@@ -44,16 +52,17 @@ PsiShared *pg_shared(void) { return &g_sh.net; }
 
 int pwb_open(int *w, int *h)
 {
-	*w = 640; *h = 240;
+	*w = 640; *h = pwb_depth() == 8 ? 480 : 240;
 	emu_config();
 	emu_hc(HB_UPDCFG, (int)&g_sh.upd_source, (int)g_sh.upd_host, (int)&g_sh.upd_port, (int)g_sh.net.version);
 	strcpy(g_sh.net.save_as, "C:\\PsiWeb-update.sis");
-	return emu_hc(HB_OPEN, (int)g_fb4, PW_STRIDE, 0, 0);
+	return emu_hc(HB_OPEN, (int)g_sh.fb, pwb_depth() == 8 ? PW_STRIDE8 : PW_STRIDE, 0, 0);
 }
 void pwb_close(void) { emu_mem_report(); }
 void pwb_present(const unsigned short *fb, int fbw, int x0, int y0, int x1, int y1)
 {
-	pw_grey_convert(fb, fbw, g_fb4, PW_STRIDE, x0, y0, x1, y1);
+	if (pwb_depth() == 8) pw_colour_convert(fb, fbw, g_sh.fb, PW_STRIDE8, x0, y0, x1, y1);
+	else pw_grey_convert(fb, fbw, g_sh.fb, PW_STRIDE, x0, y0, x1, y1);
 	emu_hc(HB_PRESENT, y0, y1, 0, 0);
 }
 int pwb_next_event(pwb_event *ev, int timeout_ms) { return emu_hc(HB_EVENT, (int)ev, timeout_ms, 0, 0); }

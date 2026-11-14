@@ -93,7 +93,7 @@ LINKS_OBJS := $(addprefix $(O)/links/,$(LINKS_SRCS:=.o))
 ifeq ($(STRIKES),1)
 LINKS_OBJS += $(O)/links/strike_psi.o
 endif
-PSI_OBJS   := $(O)/psi/psi_drv.o $(O)/psi/psi_os.o $(O)/psi/pwgrey.o $(O)/psi/psi_str.o $(O)/psi/psi_digest.o $(O)/psi/pwnet.o \
+PSI_OBJS   := $(O)/psi/psi_drv.o $(O)/psi/psi_os.o $(O)/psi/pwgrey.o $(O)/psi/pwcolour.o $(O)/psi/psi_str.o $(O)/psi/psi_digest.o $(O)/psi/pwnet.o \
 	$(O)/psi/nsprintf.o $(O)/psi/tls13.o $(O)/psi/x25519.o $(O)/psi/pwrandom.o \
 	$(addprefix $(O)/ltc/,$(subst /,__,$(LTC_SRCS:=.o)))
 JPG_LIB    := $(O)/libjpeg.a
@@ -168,6 +168,9 @@ $(O)/psi/psi_os.o: $(LW)/epoc/psi_os.c $(HDRS) $(O)/inc/welcome.inc $(CORE)/web/
 	@mkdir -p $(dir $@)
 	$(CC) -c $(LCFLAGS) -I$(WEB)/fb -I$(WEB) -I$(CORE)/web/engine -I$(CORE)/ssh $< -o $@
 $(O)/psi/pwgrey.o: $(LW)/psi_grey.c $(WEB)/fb/pwback.h $(CORE)/ssh/psigrey.h
+	@mkdir -p $(dir $@)
+	$(CC) -c $(CFLAGS_C) -std=gnu99 -I$(WEB)/fb $< -o $@
+$(O)/psi/pwcolour.o: $(LW)/psi_colour.c $(LW)/psi_pal.h $(WEB)/fb/pwback.h
 	@mkdir -p $(dir $@)
 	$(CC) -c $(CFLAGS_C) -std=gnu99 -I$(WEB)/fb $< -o $@
 $(O)/psi/psi_str.o: $(LW)/psi_str.c

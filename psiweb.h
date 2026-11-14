@@ -1,9 +1,14 @@
 /* psiweb.h - memory shared between PsiWeb.app and psiweb.exe
  *
  * PsiWeb.app (the EIKON front: menus, dialogs, the screen) creates a global
- * chunk with this layout and launches psiweb.exe (NetSurf). psiweb draws each
- * page into 'fb' - 4 bits per pixel, 16 greys, the same layout as an EGray16
- * CFbsBitmap - and the app copies the changed rows to the screen.
+ * chunk with this layout and launches psiweb.exe (Links). psiweb draws each
+ * page into 'fb' and the app copies the changed rows to the screen. 'depth'
+ * (the app's choice, from the screen it finds) says how:
+ *   4: 16 greys, the layout of an EGray16 CFbsBitmap (the Series 5mx);
+ *   8: EPOC's 256 colours, one byte a pixel, the layout of an EColor256
+ *      CFbsBitmap (the netBook and other colour machines).
+ * The chunk is made only as big as the screen needs (PW_SHARED_SIZE): 'fb'
+ * comes last, and on the 5mx its far end is never there.
  *
  * 'net' comes first so the PsiTerm network glue (ssh/psiglue.cpp, which
  * expects a PsiShared at the start of the chunk) works unchanged: the app
@@ -23,8 +28,9 @@
 
 #define PW_MAGIC        0x42455750u     /* 'PWEB' */
 #define PW_MAX_W        640
-#define PW_MAX_H        240
-#define PW_STRIDE       (PW_MAX_W / 2)  /* bytes per 4bpp row */
+#define PW_MAX_H        480             /* the netBook; the 5mx has 240 */
+#define PW_STRIDE       (PW_MAX_W / 2)  /* bytes per 4bpp row (16 greys) */
+#define PW_STRIDE8      PW_MAX_W        /* bytes per 8bpp row (256 colours) */
 #define PW_EVQ          64
 #define PW_URL_MAX      512
 
@@ -149,8 +155,20 @@ typedef struct
 	volatile int log_state;            /* PW_LOG_* (psiweb) */
 	char log_msg[96];                  /* the reason, if it failed */
 
-	unsigned char fb[PW_MAX_H * PW_STRIDE];
+	/* the screen (app sets before the engine starts): PW_DEPTH_* and the
+	   bytes in a row of fb */
+	int depth;
+	int stride;
+	volatile int progress;             /* psiweb: how far the page has come,
+	                                      0 to 100; -1 when nothing loads */
+
+	unsigned char fb[PW_MAX_H * PW_STRIDE8];   /* MUST stay last: see above */
 	} PwShared;
+
+#define PW_DEPTH_GREY16	4
+#define PW_DEPTH_COLOR256	8
+/* the chunk for a screen of h rows of 'stride' bytes */
+#define PW_SHARED_SIZE(h, stride)	((int)((char *)((PwShared *)0)->fb - (char *)0) + (h) * (stride))
 
 /* PwShared.display (Preferences > Text; all 0 is the standard) */
 #define PW_DISPLAY_SCALED_TEXT	1	/* Links' scaled fonts, not the pre-drawn sharp ones */

@@ -33,12 +33,16 @@ const char *pwb_first_url(void);                       /* Links: the first page 
 const char *pwb_res_dir(void);
 int  pwb_load_images(void);
 int  pwb_zoom(void);                                  /* percent */
+int  pwb_depth(void);                                 /* the screen: 4 (16 greys) or 8 (EPOC's 256 colours) */
 void *pwb_shared(void);                               /* the PwShared block */
 unsigned long pwb_ms(void);                           /* milliseconds, any origin */
 
 /* 565 -> 16 greys, EGray16 layout (low nibble = left pixel, 'stride' bytes/row) */
 void pw_grey_convert(const unsigned short *fb, int fbw, unsigned char *out, int stride,
                      int x0, int y0, int x1, int y1);
+/* 565 -> EPOC's 256 colours, EColor256 layout (a byte a pixel): psi_colour.c */
+void pw_colour_convert(const unsigned short *fb, int fbw, unsigned char *out, int stride,
+                       int x0, int y0, int x1, int y1);
 
 /* Diagnostic trace to PsiWeb.log (startup, per-frame). OFF by default; a
  * diagnostic build turns it on with PW_DIAG (web/links/epoc.mk:

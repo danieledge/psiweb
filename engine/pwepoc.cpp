@@ -292,7 +292,10 @@ extern "C" void pwb_present(const unsigned short* aFb, int aFbW, int aX0, int aY
 	    t.Format(_L8("present: fbw=%d %d,%d-%d,%d"), aFbW, aX0, aY0, aX1, aY1);
 	    Mem::Copy(b, t.Ptr(), t.Length()); b[t.Length()] = 0; pw_log(b); } }
 #endif
-	pw_grey_convert(aFb, aFbW, s->fb, PW_STRIDE, aX0, aY0, aX1, aY1);
+	if (s->depth == PW_DEPTH_COLOR256)
+		pw_colour_convert(aFb, aFbW, s->fb, s->stride, aX0, aY0, aX1, aY1);
+	else
+		pw_grey_convert(aFb, aFbW, s->fb, PW_STRIDE, aX0, aY0, aX1, aY1);
 	// widen the dirty band; the app resets it after copying
 	if (aY0 < s->dirty_y0) s->dirty_y0 = aY0;
 	if (aY1 > s->dirty_y1) s->dirty_y1 = aY1;
@@ -542,6 +545,7 @@ extern "C" const char* pwb_first_url()
 extern "C" const char* pwb_res_dir() { return Pw()->res_dir; }
 extern "C" int pwb_load_images() { return Pw()->load_images; }
 extern "C" int pwb_zoom() { return Pw()->zoom; }
+extern "C" int pwb_depth() { return Pw()->depth == PW_DEPTH_COLOR256 ? 8 : 4; }
 extern "C" void* pwb_shared() { return Pw(); }
 
 // (the fetcher's poll slices and time-outs: tick resolution, not seconds)

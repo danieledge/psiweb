@@ -171,10 +171,25 @@ const unsigned char *pw_v565_table(void);
 static const unsigned char *vtab;
 #define v565(p) (vtab[(p) & 0xffff])
 
+/* A colour screen (the netBook, psi_colour.c): a picture's byte is a
+ * palette index instead of a grey, dithered by error diffusion in colour
+ * (fs_colour), and g2p turns it into a 565 pixel that the frame conversion
+ * maps back to the same index. */
+static int psi_colour;
+int pw_colour_init(void);
+const unsigned char *pw_colour_table(void);
+const unsigned char *pw_colour_rgb(void);
+unsigned int pw_colour_565(int i);
+
 static void make_g2p(void)
 {
 	unsigned p, n = 0;
 	int v;
+	if (psi_colour) {
+		for (v = 0; v < 256; v++) g2p[v] = pw_colour_565(v);
+		g2p_ready = 1;
+		return;
+	}
 	vtab = pw_v565_table();
 	/* grey 565 values first (r = g = b), then any 565 value for the v
 	   still missing: every v from 0 to 255 has one */
@@ -287,6 +302,88 @@ static void fs_rows(const struct bitmap *bmp, unsigned char *row, int top, int l
 	fs_next = top + lines;
 }
 
+/* Pictures on a colour screen: 565 rows -> palette indexes, by
+ * Floyd-Steinberg (serpentine) in red, green and blue, to EPOC's palette.
+ * As fs_rows: rows in one go or in strips, the error carried on while the
+ * strips follow on. 'src' rows are 565 ('sstride' bytes apart), 'dst' rows
+ * the picture's own (bmp->x bytes); a row is read whole before it is
+ * written, so dst may be the same memory as src (register_bitmap packs in
+ * place) as long as each 565 row is first copied out (fs_row565). */
+static int *fs_cerr;			/* two rows of 3 x (width + 2) */
+static int fs_cw = -1;
+static unsigned short *fs_row565;	/* the row being dithered */
+static int fs_roww = -1;
+
+static void fs_colour(const struct bitmap *bmp, const unsigned char *src, size_t sstride,
+                      unsigned char *dst, int top, int lines)
+{
+	const unsigned char *ct = pw_colour_table(), *pal = pw_colour_rgb();
+	int w = bmp->x, y, x, n3;
+	int *ec, *en, *t;
+	if (!ct || w <= 0) return;
+	if (w != fs_roww || !fs_row565) {
+		if (fs_row565) mem_free(fs_row565);
+		fs_row565 = mem_alloc_mayfail(2 * (size_t)w);
+		fs_roww = fs_row565 ? w : -1;
+	}
+	n3 = 3 * (w + 2);
+	if (bmp != fs_bmp || top != fs_next || w != fs_cw || !fs_cerr) {
+		if (w != fs_cw || !fs_cerr) {
+			if (fs_cerr) mem_free(fs_cerr);
+			fs_cerr = mem_alloc_mayfail(sizeof(int) * 2 * (size_t)n3);
+			fs_cw = fs_cerr ? w : -1;
+		}
+		if (fs_cerr) memset(fs_cerr, 0, sizeof(int) * 2 * (size_t)n3);
+		fs_serp = 0;
+		fs_bmp = bmp;
+	}
+	if (!fs_cerr || !fs_row565) {		/* no memory: the nearest colour only */
+		for (y = 0; y < lines; y++, src += sstride, dst += w) {
+			const unsigned short *s = (const unsigned short *)src;
+			for (x = 0; x < w; x++) dst[x] = ct[s[x]];
+		}
+		fs_forget();
+		return;
+	}
+	ec = fs_cerr;
+	en = fs_cerr + n3;
+	for (y = 0; y < lines; y++, src += sstride, dst += w) {
+		const unsigned short *s = fs_row565;
+		int dir = fs_serp ? -1 : 1, fr = 0, fg = 0, fb = 0;
+		int x0 = fs_serp ? w - 1 : 0, xe = fs_serp ? -1 : w;
+		memcpy(fs_row565, src, 2 * (size_t)w);
+		for (x = x0; x != xe; x += dir) {
+			unsigned p = s[x];
+			int r5 = p >> 11, g6 = (p >> 5) & 63, b5 = p & 31, i, e, d7, e3, e5;
+			int *c = ec + 3 * (x + 1), *nb = en + 3 * (x + 1 - dir), *nn = en + 3 * (x + 1), *nf = en + 3 * (x + 1 + dir);
+			int r = ((r5 << 3) | (r5 >> 2)) + c[0] + fr;
+			int g = ((g6 << 2) | (g6 >> 4)) + c[1] + fg;
+			int b = ((b5 << 3) | (b5 >> 2)) + c[2] + fb;
+			if (r < 0) r = 0; else if (r > 255) r = 255;
+			if (g < 0) g = 0; else if (g > 255) g = 255;
+			if (b < 0) b = 0; else if (b > 255) b = 255;
+			i = ct[((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3)];
+			dst[x] = (unsigned char)i;
+#define FS_SPREAD(v, k, f) \
+			e = (v) - pal[3 * i + (k)]; \
+			d7 = (e * 7) >> 4; e3 = (e * 3) >> 4; e5 = (e * 5) >> 4; \
+			f = d7; nb[k] += e3; nn[k] += e5; nf[k] += e - d7 - e3 - e5;
+			FS_SPREAD(r, 0, fr)
+			FS_SPREAD(g, 1, fg)
+			FS_SPREAD(b, 2, fb)
+#undef FS_SPREAD
+		}
+		t = ec; ec = en; en = t;
+		memset(en, 0, sizeof(int) * (size_t)n3);
+		fs_serp = !fs_serp;
+	}
+	if (ec != fs_cerr) {			/* keep the incoming row first */
+		memcpy(fs_cerr, ec, sizeof(int) * (size_t)n3);
+		memset(fs_cerr + n3, 0, sizeof(int) * (size_t)n3);
+	}
+	fs_next = top + lines;
+}
+
 static int psi_get_empty_bitmap(struct bitmap *dest)
 {
 	size_t n;
@@ -317,11 +414,17 @@ static void psi_register_bitmap(struct bitmap *bmp)
 	if (!g2p_ready) make_g2p();
 	d = bmp->data;
 	s = bmp->data;
-	for (y = 0; y < bmp->y; y++, d += bmp->x, s += bmp->skip)
-		pack_row(d, (const unsigned short *)s, bmp->x);
-	fs_forget();
-	fs_rows(bmp, bmp->data, 0, bmp->y, (size_t)bmp->x);
-	fs_forget();
+	if (psi_colour) {
+		fs_forget();
+		fs_colour(bmp, s, (size_t)bmp->skip, d, 0, bmp->y);
+		fs_forget();
+	} else {
+		for (y = 0; y < bmp->y; y++, d += bmp->x, s += bmp->skip)
+			pack_row(d, (const unsigned short *)s, bmp->x);
+		fs_forget();
+		fs_rows(bmp, bmp->data, 0, bmp->y, (size_t)bmp->x);
+		fs_forget();
+	}
 	psi_pic_bytes -= n;			/* (2n before, n now) */
 	bmp->data = mem_realloc(bmp->data, n);	/* (shrinking: in place) */
 	bmp->flags = (void *)2;			/* packed */
@@ -358,10 +461,14 @@ static void psi_commit_strip(struct bitmap *bmp, int top, int lines)
 	int y;
 	if (!PACKED(bmp) || !bmp->data || !strip_buf) return;
 	if (top < 0 || top + lines > bmp->y) return;
+	if (psi_colour)
+		fs_colour(bmp, strip_buf, (size_t)bmp->skip, (unsigned char *)bmp->data + (size_t)top * bmp->x, top, lines);
+	else {
 	for (y = 0; y < lines; y++)
 		pack_row((unsigned char *)bmp->data + (size_t)(top + y) * bmp->x,
 			(const unsigned short *)(strip_buf + (size_t)y * bmp->skip), bmp->x);
 	fs_rows(bmp, (unsigned char *)bmp->data + (size_t)top * bmp->x, top, lines, (size_t)bmp->x);
+	}
 	if (strip_size > 65536) {		/* (a wide picture's: give it back) */
 		mem_free(strip_buf);
 		strip_buf = NULL;
@@ -1238,6 +1345,11 @@ static unsigned char *psi_init_driver(unsigned char *param, unsigned char *displ
 		return stracpy(cast_uchar "psi: no screen\n");
 	PW_TRACE("drv: screen open");
 	psi_w = w; psi_h = h;
+	psi_colour = pwb_depth() == 8;
+	if (psi_colour && !pw_colour_init()) {
+		pwb_close();
+		return stracpy(cast_uchar "psi: no memory for the colours\n");
+	}
 	psi_fb = malloc((size_t)w * h * 2);
 	if (!psi_fb) {
 		pwb_close();

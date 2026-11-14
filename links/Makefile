@@ -36,7 +36,7 @@ Z_SRCS   := adler32 crc32 inflate inftrees inffast zutil deflate trees
 
 LINKS_OBJS := $(addprefix $(O)/links/,$(LINKS_SRCS:=.o))
 # (psi_grey.c, as in the ARM build: psi_drv.c uses its table of greys)
-PSI_OBJS   := $(O)/psi/psi_drv.o $(O)/psi/psi_mem.o $(O)/psi/pwhost.o $(O)/psi/psi_grey.o $(O)/psi/psi_digest.o
+PSI_OBJS   := $(O)/psi/psi_drv.o $(O)/psi/psi_mem.o $(O)/psi/pwhost.o $(O)/psi/psi_grey.o $(O)/psi/psi_colour.o $(O)/psi/psi_digest.o
 JPG_LIB    := $(O)/libjpeg.a
 PNG_LIB    := $(O)/libpng.a
 Z_LIB      := $(O)/libz.a
@@ -71,6 +71,9 @@ $(O)/psi/psi_mem.o: psi_mem.c
 	@mkdir -p $(dir $@)
 	$(CC) -c $(OPT) -Wall $< -o $@
 $(O)/psi/psi_grey.o: psi_grey.c $(WEB)/fb/pwback.h $(CORE)/ssh/psigrey.h
+	@mkdir -p $(dir $@)
+	$(CC) -c $(OPT) -w -std=gnu99 -I$(WEB)/fb $< -o $@
+$(O)/psi/psi_colour.o: psi_colour.c psi_pal.h $(WEB)/fb/pwback.h
 	@mkdir -p $(dir $@)
 	$(CC) -c $(OPT) -w -std=gnu99 -I$(WEB)/fb $< -o $@
 $(O)/psi/psi_digest.o: psi_digest.c

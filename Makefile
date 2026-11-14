@@ -52,7 +52,7 @@ endif
 NSFLAGS := -I$(NS)/netsurf -I$(NS)/netsurf/include -I$(NS)/netsurf/build/Linux-framebuffer \
 	-I$(NS)/netsurf/frontends -I$(NS)/netsurf/content/handlers -I$(NSINC) -DPSIWEB -I$(WEB)/fb -I$(WEB)
 
-WEB_OBJS := $(O)/web/nsfb_epoc.o $(O)/web/pwgrey.o $(O)/web/utf8proc.o $(O)/web/pwres.o \
+WEB_OBJS := $(O)/web/nsfb_epoc.o $(O)/web/pwgrey.o $(O)/web/pwcolour.o $(O)/web/utf8proc.o $(O)/web/pwres.o \
 	$(O)/web/fetch_psi.o $(O)/web/pwnet.o $(PLAT_OBJS)
 ALL_OBJS := $(foreach p,$(NS_LIBS),$(OBJS_$(p))) $(OBJS_netsurf) $(WEB_OBJS)
 
@@ -66,6 +66,10 @@ $(WEB_OBJS): psiweb.h $(CORE)/ssh/psishared.h
 $(O)/web/nsfb_epoc.o: fb/nsfb_epoc.c fb/pwback.h
 	@mkdir -p $(dir $@)
 	$(TCC) -c $(TFLAGS) -I$(NS)/libnsfb/include -I$(NS)/libnsfb/src $< -o $@
+# (the netBook's colours: the Links engine's, as pwepoc.cpp presents with it)
+$(O)/web/pwcolour.o: links/psi_colour.c links/psi_pal.h fb/pwback.h
+	@mkdir -p $(dir $@)
+	$(CC) -c $(CFLAGS_C) -std=gnu99 -Ifb $< -o $@
 $(O)/web/%.o: fb/%.c fb/pwback.h
 	@mkdir -p $(dir $@)
 	$(TCC) -c $(TFLAGS) $< -o $@
