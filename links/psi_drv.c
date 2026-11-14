@@ -650,6 +650,41 @@ static void report_state(int force)
 	report_page();
 }
 
+/* How far the page has come, for the toolband's progress bar (0.78): 0 to
+ * 100, or -1 when nothing loads. While a new page is fetched, by its bytes
+ * (by its size when the server gave one, else creeping towards 95); then,
+ * while its pictures come, by how many of them have come. */
+static int page_progress(struct session *ses, int busy)
+{
+	struct f_data_c *fd;
+	struct status *st = NULL;
+	if (!busy || !ses) return -1;
+	/* as session.c change_screen_status: the new page's request, which
+	   becomes the frame's once its first data has come */
+	fd = current_frame(ses);
+	if (ses->rq) st = &ses->rq->stat;
+	else if (fd && fd->rq) st = &fd->rq->stat;
+	if (st && st->state >= 0) {
+		off_t pos = st->prg ? st->prg->pos : 0;
+		if (st->state == S_TRANS && st->prg && st->prg->size > 0 && pos <= st->prg->size)
+			return 5 + (int)((double)pos * 95 / (double)st->prg->size);
+		if (pos > 0) return 5 + (int)((double)pos * 90 / ((double)pos + 32768));
+		return 3;
+	}
+	if (fd && fd->af) {
+		struct additional_file *af;
+		struct list_head *laf;
+		int all = 0, done = 0;
+		foreach(struct additional_file, af, laf, fd->af->af) {
+			all++;
+			if (!af->rq || af->rq->stat.state < 0) done++;
+			if (all >= 500) break;
+		}
+		if (all) return done * 100 / all;
+	}
+	return -1;
+}
+
 /* The page's place for PsiWeb.app's scroll bar (EIKON's, beside the page:
  * Links draws no vertical bar for the top frame, see links.h
  * G_PAGE_SB_WIDTH), and whether its pictures are shown (the Pictures
@@ -679,6 +714,7 @@ static void report_page(void)
 	s->page_y = y;
 	s->page_vh = vh;
 	s->page_pics = ses ? psi_show_pictures(ses) : 0;
+	s->progress = page_progress(ses, !list_empty(queue) || !list_empty(downloads));
 #endif
 }
 

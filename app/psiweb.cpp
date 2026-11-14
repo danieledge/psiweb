@@ -794,6 +794,7 @@ void CPwView::Tick()
 			ui->PageTick();
 		iLastBusy = busy;
 		}
+	((CPwAppUi*)iEikonEnv->EikAppUi())->ChromeTick();   // (0.78) the toolband's address and progress
 	if (s && iRunning && s->page_pics != iPics)
 		{
 		iPics = s->page_pics;
@@ -1302,12 +1303,17 @@ void CPwView::Key(TUint aCode, TUint aMods)
 
 TKeyResponse CPwView::OfferKeyEventL(const TKeyEvent& aKeyEvent, TEventCode aType)
 	{
+	CPwAppUi* ui = (CPwAppUi*)iEikonEnv->EikAppUi();
 	if (aType != EEventKey)
 		return EKeyWasNotConsumed;
 	TUint code = aKeyEvent.iCode;
 	TUint mods = aKeyEvent.iModifiers;
 	if (code == EKeyMenu)
 		return EKeyWasNotConsumed;
+	// (0.78) the toolband's address is being typed in: it has the keys,
+	// but for the menu's shortcuts
+	if (ui->Editing() && !(mods & EModifierCtrl) && ui->AddressKeyL(aKeyEvent, aType))
+		return EKeyWasConsumed;
 	// the Zoom in and Zoom out icons beside the screen: as View > Zoom in
 	// and Zoom out (Ctrl+M, Shift+Ctrl+M)
 	if (code == (TUint)EEikSidebarZoomInKey || code == (TUint)EEikSidebarZoomOutKey)
@@ -1327,7 +1333,7 @@ TKeyResponse CPwView::OfferKeyEventL(const TKeyEvent& aKeyEvent, TEventCode aTyp
 			// R Reading mode
 			switch (letter)
 				{
-				case 'm': case 'q': case 'h': case 'a': case 'r':
+				case 'm': case 'q': case 'h': case 'a': case 'r': case 't':
 					return EKeyWasNotConsumed;
 				}
 			}
@@ -1577,19 +1583,47 @@ void CPwAppUi::ConstructL()
 	BaseConstructL();
 	TPwSettings settings;
 	LoadSettings(settings);
+	iShownProgress = -1;
 	TRAPD(pics, ToolbarPicturesL());
 	(void)pics;                              // (no PsiWeb.mbm: words only)
-	// the Pictures button stays pressed in while the page's pictures show
+	// the Pictures buttons stay pressed in while the page's pictures show
 	CEikButtonBase* picsButton = iToolBar ? (CEikButtonBase*)iToolBar->ControlById(EPwCmdImages) : NULL;
 	if (picsButton)
 		picsButton->SetBehavior(EEikButtonLatches);
-	ShowPicturesState(settings.iImages);
+	picsButton = iToolBand ? (CEikButtonBase*)iToolBand->ControlById(EPwCmdImages) : NULL;
+	if (picsButton)
+		picsButton->SetBehavior(EEikButtonLatches);
+	// the toolband's address: a field with a sunken edge; a tap on it (seen
+	// in HandleWsEventL and through its observer) or Ctrl+L starts typing
+	if (iToolBand)
+		{
+		iAddress = (CEikEdwin*)iToolBand->ControlById(EPwCtlAddress);
+		iProgress = (CEikProgressInfo*)iToolBand->ControlById(EPwCtlProgress);
+		if (iAddress)
+			{
+			iAddress->SetBorder(TEikBorder::EShallowSunken);
+			iAddress->SetObserver(this);
+			}
+		if (iProgress)
+			{
+			iProgress->SetFinalValue(100);
+			iProgress->MakeVisible(EFalse);  // (only while a page loads)
+			}
+		}
 	if (iToolBar && !settings.iToolbar)
 		iToolBar->MakeVisible(EFalse);       // remembered from last time
+	if (iToolBand)
+		{
+		iToolBand->MakeVisible(settings.iToolband);
+		iToolBand->ActivateL();              // (EEikToolBarDelayActivation: laid out first)
+		}
+	ShowPicturesState(settings.iImages);
 	iFavs = CPwList::NewL(iCoeEnv->FsSession(), _L("C:\\System\\Apps\\PsiWeb\\Favourites.dat"), KPwMaxFavs);
 	iHist = CPwList::NewL(iCoeEnv->FsSession(), _L("C:\\System\\Apps\\PsiWeb\\History.dat"), KPwMaxHist);
 	iView = new(ELeave) CPwView;
-	iView->ConstructL(PageRect(settings.iToolbar), settings);
+	iView->ConstructL(PageRect(), settings);
+	if (iToolBand && iToolBand->IsVisible())
+		iToolBand->DrawNow();
 	AddToStackL(iView);
 	iCoeEnv->RootWin().EnableOnEvents(EEventControlAlways);   // (0.54) switch-on events even when in the background
 	// the user's contrast and backlight back if a program stopped in
@@ -1621,8 +1655,37 @@ void CPwAppUi::HandleWsEventL(const TWsEvent& aEvent, CCoeControl* aDestination)
 		iForeground = aEvent.Type() == EEventFocusGained;
 		UpdateReading();
 		}
+	else if (aEvent.Type() == EEventKey && aEvent.Key()->iRepeats > 0
+		&& (aEvent.Key()->iModifiers & EModifierCtrl) && (aEvent.Key()->iCode == 20 || aEvent.Key()->iCode == 't' || aEvent.Key()->iCode == 'T'))
+		return;      // (0.78) Ctrl+T or Shift+Ctrl+T held: once, not again and again (each restarts the engine)
 	else if (aEvent.Type() == EEventKey && iForeground && !iReading.Active())
 		UpdateReading(ETrue);
+	else if (aEvent.Type() == EEventPointer && iAddress)
+		{
+		// (0.78) the first tap on the toolband's address starts typing
+		// there, with the whole address chosen (the tap goes no further,
+		// so the edwin does not move the cursor), as a modern browser
+		// does; later taps place the cursor. A tap anywhere else while
+		// typing leaves the address as it was.
+		const TPointerEvent& pe = *aEvent.Pointer();
+		if (pe.iType == TPointerEvent::EButton1Down)
+			{
+			iPenTaken = EFalse;
+			if (aDestination == iToolBand && iAddress->Rect().Contains(pe.iPosition) && !iEditing)
+				{
+				StartAddressL();
+				iPenTaken = ETrue;
+				}
+			else if (iEditing && aDestination != iToolBand)
+				EndAddressL(EFalse);
+			}
+		if (iPenTaken)
+			{
+			if (pe.iType == TPointerEvent::EButton1Up)
+				iPenTaken = EFalse;
+			return;
+			}
+		}
 	CEikAppUi::HandleWsEventL(aEvent, aDestination);
 	}
 
@@ -1642,9 +1705,9 @@ void CPwAppUi::HandleSwitchOnEventL(CCoeControl* aDestination)
 // a toolbar button's picture, from PsiWeb.mbm (made by web/tools/mkicons.py):
 // 24x20, in the middle of its side, the words beside it as the built-in
 // programs' buttons have them
-void CPwAppUi::ButtonPictureL(TInt aId, TInt aIcon)
+void CPwAppUi::ButtonPictureL(CEikToolBar* aBar, TInt aId, TInt aIcon)
 	{
-	CEikCommandButton* b = iToolBar ? (CEikCommandButton*)iToolBar->ControlById(aId) : NULL;
+	CEikCommandButton* b = aBar ? (CEikCommandButton*)aBar->ControlById(aId) : NULL;
 	if (!b)
 		return;
 	TFileName mbm = Application()->BitmapStoreName();
@@ -1662,36 +1725,60 @@ void CPwAppUi::ButtonPictureL(TInt aId, TInt aIcon)
 	}
 
 // the Pictures button pressed in (the page's pictures show) or not
+// (on the toolbar and on the toolband)
 void CPwAppUi::ShowPicturesState(TBool aOn)
 	{
-	CEikButtonBase* b = iToolBar ? (CEikButtonBase*)iToolBar->ControlById(EPwCmdImages) : NULL;
-	if (!b)
-		return;
+	CEikToolBar* bars[2] = { iToolBar, iToolBand };
 	CEikButtonBase::TState st = aOn ? CEikButtonBase::ESet : CEikButtonBase::EClear;
-	if (b->State() == st)
-		return;
-	b->SetState(st);
-	if (iToolBar->IsVisible())
-		b->DrawNow();
+	for (TInt i = 0; i < 2; i++)
+		{
+		CEikButtonBase* b = bars[i] ? (CEikButtonBase*)bars[i]->ControlById(EPwCmdImages) : NULL;
+		if (!b || b->State() == st)
+			continue;
+		b->SetState(st);
+		if (bars[i]->IsVisible())
+			b->DrawNow();
+		}
 	}
 
 void CPwAppUi::ToolbarPicturesL()
 	{
-	if (!iToolBar)
-		return;
-	ButtonPictureL(EPwCmdOpen, EMbmToolOpen);
-	ButtonPictureL(EPwCmdBack, EMbmToolBack);
-	ButtonPictureL(EPwCmdHome, EMbmToolHome);
-	ButtonPictureL(EPwCmdImages, EMbmToolPictures);
+	ButtonPictureL(iToolBar, EPwCmdOpen, EMbmToolOpen);
+	ButtonPictureL(iToolBar, EPwCmdBack, EMbmToolBack);
+	ButtonPictureL(iToolBar, EPwCmdHome, EMbmToolHome);
+	ButtonPictureL(iToolBar, EPwCmdImages, EMbmToolPictures);
+	// (the toolband's pictures are named in its resource: pwicons.rh)
 	}
 
-// the page's room: ClientRect() keeps the toolbar's width back even when
-// the toolbar is hidden, so give it to the page here
-TRect CPwAppUi::PageRect(TBool aToolbar) const
+// 480 lines (the netBook): room for the toolband as well as the page
+TBool CPwAppUi::TallScreen() const
 	{
-	TRect r = ClientRect();
-	if (!aToolbar || !iToolBar)
-		r.iBr.iX = iEikonEnv->ScreenDevice()->SizeInPixels().iWidth;
+	return iEikonEnv->ScreenDevice()->SizeInPixels().iHeight >= 400;
+	}
+
+// The bars laid out as they are shown, and the page's room: the rest.
+// (ClientRect() keeps the toolbar's and the toolband's room back even when
+// they are hidden.) The toolband runs along the top, as far as the toolbar
+// when that is shown, else the whole width.
+TRect CPwAppUi::PageRect()
+	{
+	TRect r(TPoint(0, 0), iEikonEnv->ScreenDevice()->SizeInPixels());
+	if (iToolBar && iToolBar->IsVisible())
+		iToolBar->ReduceRect(r);
+	if (iToolBand)
+		{
+		// (an edwin's minimum size is its size: made small first, so the
+		// band can lay it out shorter as well as longer)
+		if (iAddress)
+			{
+			TRAPD(e2, iAddress->SetSizeL(TSize(40, iAddress->Size().iHeight)));
+			(void)e2;
+			}
+		TRAPD(err, iToolBand->SetBoundingRectL(r));
+		(void)err;
+		if (iToolBand->IsVisible())
+			iToolBand->ReduceRect(r);
+		}
 	return r;
 	}
 
@@ -1703,13 +1790,176 @@ void CPwAppUi::ShowToolBarL(TBool aShow)
 	if (!iToolBar)
 		return;
 	iToolBar->MakeVisible(aShow);
+	TRect page = PageRect();
+	if (aShow)
+		iToolBar->DrawNow();             // whole, before the engine's stop holds the screen up
+	if (iToolBand && iToolBand->IsVisible())
+		iToolBand->DrawNow();            // (longer or shorter now)
+	iCoeEnv->WsSession().Flush();
+	iView->SetPageRectL(page);
+	}
+
+// View > Show toolband (Shift+Ctrl+T), as Ctrl+T: the page takes its room
+void CPwAppUi::ShowToolBandL(TBool aShow)
+	{
+	if (!iToolBand)
+		return;
+	if (!aShow && iEditing)
+		EndAddressL(EFalse);
+	iToolBand->MakeVisible(aShow);
+	TRect page = PageRect();
 	if (aShow)
 		{
-		iToolBar->DrawNow();             // whole, before the engine's stop holds the screen up
+		iAddressStale = ETrue;           // (shown afresh)
+		ChromeTick();
+		iToolBand->DrawNow();
 		iCoeEnv->WsSession().Flush();
 		}
-	iView->SetPageRectL(PageRect(aShow));
+	iView->SetPageRectL(page);
 	}
+
+// ----- the toolband's address and progress (0.78) -----------------------------------
+
+void CPwAppUi::SetAddressL(const TDesC& aText)
+	{
+	if (!iAddress)
+		return;
+	iAddress->SetTextL(&aText);
+	iAddress->SetCursorPosL(0, EFalse);  // (the start of the address in view)
+	if (iToolBand->IsVisible())
+		iAddress->DrawNow();
+	}
+
+// the address and the progress bar follow the engine (each tick)
+void CPwAppUi::ChromeTick()
+	{
+	if (!iView || !iAddress || !iToolBand->IsVisible())
+		return;
+	PwShared* s = iView->Shared();
+	if (!s)
+		return;
+	if (!iEditing)
+		{
+		TBuf<PW_URL_MAX> url;
+		if (iView->EngineRunning())
+			FromUtf8(url, s->url);
+		if (url.Compare(_L("about:blank")) == 0 || url.Compare(_L("about:welcome")) == 0)
+			url.Zero();
+		if (iAddressStale || url.Compare(iShownUrl) != 0)
+			{
+			iAddressStale = EFalse;
+			iShownUrl = url;
+			TRAPD(err, SetAddressL(url));
+			(void)err;
+			}
+		}
+	TInt p = iView->EngineRunning() && s->busy ? s->progress : -1;
+	if (p > 100)
+		p = 100;
+	if (p != iShownProgress && iProgress)
+		{
+		if (p < 0)
+			{
+			iProgress->MakeVisible(EFalse);
+			iToolBand->DrawNow();        // (the band's own grey where it was)
+			}
+		else
+			{
+			if (iShownProgress < 0)
+				iProgress->MakeVisible(ETrue);
+			iProgress->SetAndDraw(p);
+			}
+		iShownProgress = p;
+		}
+	}
+
+// Ctrl+L or a tap on the address: type an address (or words to search
+// for). The whole address is chosen, so typing replaces it.
+void CPwAppUi::StartAddressL()
+	{
+	if (!iAddress || !iToolBand->IsVisible())
+		return;
+	if (!iEditing)
+		{
+		iEditing = ETrue;
+		// (not SetFocus: the toolband makes its controls non-focusing.
+		// The view hands the keys over through AddressKeyL, and the
+		// address shows its cursor and selection as if it had the focus)
+		ShowAddressCursorL(ETrue);
+		iAddress->SelectAllL();
+		iAddress->DrawNow();
+		}
+	}
+
+void CPwAppUi::ShowAddressCursorL(TBool aShow)
+	{
+	CTextView* tv = iAddress ? iAddress->TextView() : NULL;
+	if (!tv)
+		return;
+	tv->SetCursorVisibilityL(TCursor::EFCursorInvisible, aShow ? TCursor::EFCursorFlashing : TCursor::EFCursorInvisible);
+	tv->SetSelectionVisibilityL(aShow);
+	}
+
+// the address shows the page again; aGo: first, go where it says
+void CPwAppUi::EndAddressL(TBool aGo)
+	{
+	if (!iEditing || !iAddress)
+		return;
+	TBuf<PW_URL_MAX> url;
+	iAddress->GetText(url);
+	url.Trim();
+	iEditing = EFalse;
+	iAddress->ClearSelectionL();
+	ShowAddressCursorL(EFalse);
+	if (aGo && url.Length() > 0)
+		{
+		iShownUrl = url;                 // (until the engine says where it went)
+		iView->Command(PW_CMD_OPEN, url);
+		}
+	else
+		{
+		iAddressStale = ETrue;           // the page's own address back
+		ChromeTick();
+		}
+	}
+
+// keys while the address is being typed in: Enter goes, Esc leaves it;
+// the menu's shortcuts still work (they never reach here)
+TBool CPwAppUi::AddressKeyL(const TKeyEvent& aKeyEvent, TEventCode aType)
+	{
+	if (!iEditing || !iAddress)
+		return EFalse;
+	if (aType != EEventKey)
+		return ETrue;
+	switch (aKeyEvent.iCode)
+		{
+	case EKeyEnter:
+		// (a held Enter, still repeating from the key that opened
+		// PsiWeb or chose a link, does not go anywhere)
+		if (aKeyEvent.iRepeats == 0)
+			EndAddressL(ETrue);
+		return ETrue;
+	case EKeyEscape:
+		EndAddressL(EFalse);
+		return ETrue;
+	case EKeyUpArrow:
+	case EKeyDownArrow:
+	case EKeyPageUp:
+	case EKeyPageDown:
+	case EKeyTab:
+		return ETrue;
+		}
+	iAddress->OfferKeyEventL(aKeyEvent, aType);
+	return ETrue;
+	}
+
+// the address asks for the focus (a tap on it)
+void CPwAppUi::HandleControlEventL(CCoeControl* aControl, TCoeEvent aEventType)
+	{
+	if (aControl == iAddress && aEventType == EEventRequestFocus)
+		StartAddressL();
+	}
+
 
 CPwAppUi::~CPwAppUi()
 	{
@@ -1735,7 +1985,10 @@ void CPwAppUi::LoadSettings(TPwSettings& aSettings)
 	aSettings.iHome = KDefaultHome;
 	aSettings.iImages = 0;            // pictures only when asked (View > Show pictures)
 	aSettings.iZoom = 100;
-	aSettings.iToolbar = 1;
+	// (0.78) a tall screen (the netBook) starts with the toolband along the
+	// top and the page the whole width; the 5mx with the toolbar, as before
+	aSettings.iToolbar = TallScreen() ? 0 : 1;
+	aSettings.iToolband = TallScreen() ? 1 : 0;
 	aSettings.iDisplay = 0;           // sharp text, Reading mode off (docs/display.md)
 	RFile file;
 	if (file.Open(iCoeEnv->FsSession(), KIniFile, EFileRead) != KErrNone)
@@ -1775,6 +2028,12 @@ void CPwAppUi::LoadSettings(TPwSettings& aSettings)
 						aSettings.iImages = d[pos++] != 0;
 					if (pos < d.Length())            // (0.81) display: Reading mode, text
 						aSettings.iDisplay = d[pos++] & (KPwDisplayReading | KPwDisplayScaledText | KPwKeepLog);
+					if (pos < d.Length())            // (0.78) the toolband: bit 0 shown, bit 1 chosen
+						{
+						TInt band = d[pos++];
+						if (band & 2)
+							aSettings.iToolband = band & 1;
+						}
 					}
 				}
 			}
@@ -1815,6 +2074,7 @@ void CPwAppUi::SaveSettings(const TPwSettings& aSettings)
 	d.Append((TUint8)aSettings.iToolbar);
 	d.Append((TUint8)aSettings.iImages);    // (0.62)
 	d.Append((TUint8)aSettings.iDisplay);   // (0.81)
+	d.Append((TUint8)(2 | (aSettings.iToolband ? 1 : 0)));   // (0.78)
 	TInt r = file.Write(d);
 	if (r == KErrNone)
 		r = file.Flush();
@@ -1858,6 +2118,8 @@ void CPwAppUi::DynInitMenuPaneL(TInt aMenuId, CEikMenuPane* aMenuPane)
 		{
 		aMenuPane->SetItemButtonState(EPwCmdToggleToolbar,
 			iView->Settings().iToolbar ? EEikMenuItemSymbolOn : 0);
+		aMenuPane->SetItemButtonState(EPwCmdToggleToolband,
+			iView->Settings().iToolband ? EEikMenuItemSymbolOn : 0);
 		aMenuPane->SetItemButtonState(EPwCmdReading,
 			(iView->Settings().iDisplay & KPwDisplayReading) ? EEikMenuItemSymbolOn : 0);
 		aMenuPane->SetItemButtonState(EPwCmdImages, iView->PicturesShown() ? EEikMenuItemSymbolOn : 0);
@@ -2026,6 +2288,9 @@ void CPwAppUi::HandleCommandL(TInt aCommand)
 	if (aCommand == EEikCmdZoomIn) aCommand = EPwCmdZoomIn;
 	else if (aCommand == EEikCmdZoomOut) aCommand = EPwCmdZoomOut;
 	else if (aCommand == EEikCmdZoomNormal) aCommand = EPwCmdZoomNormal;
+	// any other command leaves the address as it was (a button, a menu)
+	if (iEditing && aCommand != EPwCmdAddress)
+		EndAddressL(EFalse);
 	switch (aCommand)
 		{
 	case EEikCmdExit:
@@ -2034,7 +2299,7 @@ void CPwAppUi::HandleCommandL(TInt aCommand)
 		break;
 	case EPwCmdOpen:
 		{
-		TBuf<500> url;
+			TBuf<500> url;
 		FromUtf8(url, sh->url);
 		if (url.Compare(_L("about:blank")) == 0)
 			url.Zero();
@@ -2130,6 +2395,18 @@ void CPwAppUi::HandleCommandL(TInt aCommand)
 		st.iToolbar = !st.iToolbar;
 		SaveSettings(st);
 		ShowToolBarL(st.iToolbar);
+		break;
+	case EPwCmdToggleToolband:
+		st.iToolband = !st.iToolband;
+		SaveSettings(st);
+		ShowToolBandL(st.iToolband);
+		break;
+	case EPwCmdAddress:
+		// Ctrl+L: the toolband's address if it is shown, else Open address
+		if (iToolBand && iToolBand->IsVisible() && iAddress)
+			StartAddressL();
+		else
+			HandleCommandL(EPwCmdOpen);
 		break;
 	case EPwCmdReading:                      // View > Reading mode (docs/display.md)
 		st.iDisplay ^= KPwDisplayReading;

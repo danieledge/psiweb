@@ -46,7 +46,8 @@ PwShared *emu_shared = &g_sh;
 const int emu_ask_offsets[] = {
 	(int)&((PwShared *)0)->auth_state, (int)&((PwShared *)0)->auth_user, (int)&((PwShared *)0)->auth_pass,
 	(int)&((PwShared *)0)->save_state, (int)&((PwShared *)0)->save_path, (int)&((PwShared *)0)->auth_realm,
-	(int)&((PwShared *)0)->save_name, (int)&((PwShared *)0)->save_type, (int)&((PwShared *)0)->save_size
+	(int)&((PwShared *)0)->save_name, (int)&((PwShared *)0)->save_type, (int)&((PwShared *)0)->save_size,
+	(int)&((PwShared *)0)->progress
 };
 PsiShared *pg_shared(void) { return &g_sh.net; }
 

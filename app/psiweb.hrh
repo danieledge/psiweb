@@ -35,8 +35,17 @@ enum TPwCommands
 	EPwCmdClearHistory,      // History > Clear history
 	EPwCmdHistNone,          // History > (No history), dimmed
 	EPwCmdKeepLog,           // Tools > Keep a log (0.77)
+	EPwCmdToggleToolband,    // View > Show toolband (Shift+Ctrl+T, 0.78)
+	EPwCmdAddress,           // Ctrl+L: to the toolband's address (0.78)
 	EPwCmdFav0 = 0x1100,     // the favourites on the menu: 16 slots
 	EPwCmdHist0 = 0x1120     // the History cascade's pages: 16 slots
+	};
+
+// the toolband's own controls (0.78)
+enum TPwBandControls
+	{
+	EPwCtlAddress = 0x1200,  // the address: what is showing, and where to go
+	EPwCtlProgress           // how far the page has come
 	};
 
 enum TPwDialogControls

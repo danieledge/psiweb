@@ -5,6 +5,7 @@ driver, ARM code from the 1999 EPOC GCC) in an ARM emulator on a PC.
 A copy of web/emu/run_psiweb.py (NetSurf's harness) with, in addition:
   --images         the app's "Show pictures" setting is on at start
   --netbook        the netBook's screen: 640x480 in EPOC's 256 colours (screenshots in colour)
+  --progress       log the toolband's progress figure (psiweb.h progress) as it changes
   --heap-limit N   psiweb's heap limit in bytes (default 10 MB, as on the
                    Psion); malloc fails above it
   --profile [N]    instructions per function (needs --count): the top N
@@ -65,6 +66,7 @@ if "--proxy" in args:
 IMAGES = "--images" in args
 # --netbook: the netBook's screen, 640x480 in EPOC's 256 colours
 NETBOOK = "--netbook" in args
+PROGRESS = "--progress" in args       # log the progress figure as it changes
 HEAP_LIMIT = 10 * 1024 * 1024
 if "--heap-limit" in args:
     HEAP_LIMIT = int(args[args.index("--heap-limit") + 1])
@@ -469,6 +471,14 @@ def hc(op, a, b, c, d):
     if op == 200: state["fb4"] = a; return 0
     if op == 201: state["last_draw"] = now(); return 0
     if op == 202:                                    # next event
+        if PROGRESS:
+            # the toolband's progress (psiweb.h progress) as the engine
+            # leaves it, logged when it changes
+            sh = struct.unpack("<I", rd(sym("emu_shared"), 4))[0]
+            p = struct.unpack("<i", rd(sh + struct.unpack("<10i", rd(sym("emu_ask_offsets"), 40))[9], 4))[0]
+            if p != state.get("progress"):
+                state["progress"] = p
+                log("progress", p)
         end_t = now() + (s32(b) if s32(b) >= 0 else 100) / 1000.0
         while True:
             script_step()

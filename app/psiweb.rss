@@ -15,6 +15,7 @@ NAME PSIW
 #include <eiklabel.rh>
 #include <eikctrls.hrh>
 #include <eiktbar.rh>
+#include <eikprogi.rh>
 #include <eikclock.rh>
 #include <eikspace.rh>
 #include <eikrted.rh>
@@ -23,6 +24,7 @@ NAME PSIW
 #include <eikon.rsg>
 
 #include "psiweb.hrh"
+#include "pwicons.rh"
 
 RESOURCE RSS_SIGNATURE { }
 
@@ -33,6 +35,7 @@ RESOURCE EIK_APP_INFO
 	menubar=r_pw_menubar;
 	hotkeys=r_pw_hotkeys;
 	toolbar=r_pw_toolbar;
+	toolband=r_pw_toolband;
 	}
 
 // The standard toolbar: the program's name, four buttons for the pen (Open
@@ -80,6 +83,48 @@ RESOURCE TOOLBAR r_pw_toolbar
 		};
 	}
 
+// The toolband (0.78), along the top: Back, Forward, Reload, Stop and Home
+// (16x16 colour pictures from PsiWeb.mbm, put on by CPwAppUi), the address
+// (a tap or Ctrl+L, then type an address or words to search for, Enter
+// goes there, Esc leaves it), how far the page has come, and Pictures (as
+// the toolbar's). Shown at first on a tall screen (the netBook), where the
+// toolbar is hidden and the page has the whole width; on the 5mx the
+// toolbar as before, and Shift+Ctrl+T shows the toolband. Its buttons act
+// at once, as the style guide asks.
+RESOURCE TOOLBAND r_pw_toolband
+	{
+	breadth=KEikStdToolBandHeight;
+	flags=EEikToolBarHorizontal|EEikToolBarDelayActivation;
+	controls=
+		{
+		TBAR_BUTTON { id=EPwCmdBack; flags=EEikToolBarCtrlHasSetMinLength; length=EEikStdTwoStateIconicToolBandButtonWidth; bmpfile="*"; bmpid=EMbmBandBack; bmpmask=EMbmBandBackMask; },
+		TBAR_BUTTON { id=EPwCmdForward; flags=EEikToolBarCtrlHasSetMinLength; length=EEikStdTwoStateIconicToolBandButtonWidth; bmpfile="*"; bmpid=EMbmBandForward; bmpmask=EMbmBandForwardMask; },
+		TBAR_BUTTON { id=EPwCmdReload; flags=EEikToolBarCtrlHasSetMinLength; length=EEikStdTwoStateIconicToolBandButtonWidth; bmpfile="*"; bmpid=EMbmBandReload; bmpmask=EMbmBandReloadMask; },
+		TBAR_BUTTON { id=EPwCmdStop; flags=EEikToolBarCtrlHasSetMinLength; length=EEikStdTwoStateIconicToolBandButtonWidth; bmpfile="*"; bmpid=EMbmBandStop; bmpmask=EMbmBandStopMask; },
+		TBAR_BUTTON { id=EPwCmdHome; flags=EEikToolBarCtrlHasSetMinLength; length=EEikStdTwoStateIconicToolBandButtonWidth; bmpfile="*"; bmpid=EMbmBandHome; bmpmask=EMbmBandHomeMask; },
+		TBAR_CTRL { type=EEikCtSpacer; flags=EEikToolBarCtrlHasSetMinLength; length=6; control=SPACER; },
+		TBAR_CTRL
+			{
+			type=EEikCtEdwin;
+			id=EPwCtlAddress;
+			flags=EEikToolBarCtrlIsStretchable;
+			length=0;
+			control=EDWIN { flags=EEikEdwinNoLineOrParaBreaks|EEikEdwinNoAutoSelection|EEikEdwinJustAutoCurEnd; width=20; lines=1; maxlength=500; };
+			},
+		TBAR_CTRL { type=EEikCtSpacer; flags=EEikToolBarCtrlHasSetMinLength; length=6; control=SPACER; },
+		TBAR_CTRL
+			{
+			type=EEikCtProgInfo;
+			id=EPwCtlProgress;
+			flags=EEikToolBarCtrlHasSetMinLength;
+			length=64;
+			control=PROGRESSINFO { text_type=EEikProgressTextNone; finalval=100; width=64; height=13; };
+			},
+		TBAR_CTRL { type=EEikCtSpacer; flags=EEikToolBarCtrlHasSetMinLength; length=6; control=SPACER; },
+		TBAR_BUTTON { id=EPwCmdImages; flags=EEikToolBarCtrlHasSetMinLength; length=EEikStdTwoStateIconicToolBandButtonWidth; bmpfile="*"; bmpid=EMbmBandPictures; bmpmask=EMbmBandPicturesMask; }
+		};
+	}
+
 // Shortcuts: EIKON's standard letters for the standard commands (Ctrl+E
 // close, Ctrl+O open, Ctrl+M / Shift+Ctrl+M zoom, Ctrl+T toolbar, Ctrl+K
 // preferences, Shift+Ctrl+H help, Shift+Ctrl+A about), the built-in Email program's Ctrl+U
@@ -93,7 +138,7 @@ RESOURCE HOTKEYS r_pw_hotkeys
 		{
 		HOTKEY { command=EEikCmdExit; key='e'; },
 		HOTKEY { command=EPwCmdOpen; key='o'; },
-		HOTKEY { command=EPwCmdOpen; key='l'; },
+		HOTKEY { command=EPwCmdAddress; key='l'; },
 		HOTKEY { command=EPwCmdHome; key='h'; },
 		HOTKEY { command=EPwCmdReload; key='r'; },
 		HOTKEY { command=EPwCmdBack; key='b'; },
@@ -108,6 +153,7 @@ RESOURCE HOTKEYS r_pw_hotkeys
 		{
 		HOTKEY { command=EPwCmdZoomOut; key='m'; },
 		HOTKEY { command=EPwCmdReading; key='r'; },
+		HOTKEY { command=EPwCmdToggleToolband; key='t'; },
 		HOTKEY { command=EPwCmdAddFav; key='d'; },
 		HOTKEY { command=EPwCmdPageInfo; key='q'; },
 		HOTKEY { command=EPwCmdHelp; key='h'; },
@@ -158,6 +204,7 @@ RESOURCE MENU_PANE r_pw_view_menu
 		MENU_ITEM { command=EPwCmdZoomOut; txt="Zoom out"; },
 		MENU_ITEM { command=EPwCmdZoomNormal; txt="Normal size"; flags=EEikMenuItemSeparatorAfter; },
 		MENU_ITEM { command=EPwCmdToggleToolbar; txt="Show toolbar"; flags=EEikMenuItemCheckBox; },
+		MENU_ITEM { command=EPwCmdToggleToolband; txt="Show toolband"; flags=EEikMenuItemCheckBox; },
 		MENU_ITEM { command=EPwCmdReading; txt="Reading mode"; flags=EEikMenuItemCheckBox; },
 		MENU_ITEM { command=EPwCmdImages; txt="Show pictures"; flags=EEikMenuItemCheckBox|EEikMenuItemSeparatorAfter; },
 		MENU_ITEM { command=EPwCmdPageInfo; txt="Page information..."; }

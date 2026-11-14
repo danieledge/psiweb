@@ -1,0 +1,21 @@
+// pwicons.rh - made by web/tools/mkicons.py: PsiWeb.mbm ids for psiweb.rss
+#define EMbmToolOpen 0
+#define EMbmToolOpenMask 1
+#define EMbmToolBack 2
+#define EMbmToolBackMask 3
+#define EMbmToolHome 4
+#define EMbmToolHomeMask 5
+#define EMbmToolPictures 6
+#define EMbmToolPicturesMask 7
+#define EMbmBandBack 8
+#define EMbmBandBackMask 9
+#define EMbmBandForward 10
+#define EMbmBandForwardMask 11
+#define EMbmBandReload 12
+#define EMbmBandReloadMask 13
+#define EMbmBandStop 14
+#define EMbmBandStopMask 15
+#define EMbmBandHome 16
+#define EMbmBandHomeMask 17
+#define EMbmBandPictures 18
+#define EMbmBandPicturesMask 19

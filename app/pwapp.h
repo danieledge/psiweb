@@ -23,6 +23,10 @@
 #include <eiksbfrm.h>
 #include <eiksbobs.h>
 #include <eiklbo.h>
+#include <eikedwin.h>
+#include <frmtview.h>
+#include <eikprogi.h>
+#include <eiktbar.h>
 
 extern "C" {
 #include <psiweb.h>
@@ -105,6 +109,7 @@ struct TPwSettings
 	TInt iImages;
 	TInt iZoom;            // percent
 	TInt iToolbar;         // View > Show toolbar
+	TInt iToolband;        // (0.78) View > Show toolband: the address, Back, Forward...
 	TInt iDisplay;         // KPwDisplay* bits (docs/display.md)
 	};
 
@@ -389,12 +394,17 @@ private:
 	TPwSettings& iSettings;
 	};
 
-class CPwAppUi : public CEikAppUi
+class CPwAppUi : public CEikAppUi, public MCoeControlObserver
 	{
 public:
 	void ConstructL();
 	~CPwAppUi();
 	void ShowPicturesState(TBool aOn);  // the Pictures button pressed in or not
+	// the toolband (0.78): its address and progress follow the engine
+	void ChromeTick();
+	TBool AddressKeyL(const TKeyEvent& aKeyEvent, TEventCode aType);   // ETrue: the address had it
+	TBool Editing() const { return iEditing; }
+	void EndAddressL(TBool aGo);        // the address shows the page again (and goes there)
 	void PageLoaded();                  // a page has loaded: History (pwfavs.cpp)
 	void PageTick();                    // ...and its title may arrive a moment later
 private:
@@ -428,12 +438,25 @@ private:
 	void AboutL();
 	void UpdateL();
 	void HelpL();                      // Tools > Help on PsiWeb (pwhelp.cpp)
-	void ButtonPictureL(TInt aId, TInt aIcon);
+	void ButtonPictureL(CEikToolBar* aBar, TInt aId, TInt aIcon);
 	void ToolbarPicturesL();
 	void ShowToolBarL(TBool aShow);
+	void ShowToolBandL(TBool aShow);
 	void RestartEngineL();
-	TRect PageRect(TBool aToolbar) const;
+	TRect PageRect();                   // the bars laid out as they are shown: the page's room
+	TBool TallScreen() const;           // 480 lines (the netBook): the toolband at first, not the toolbar
+	void StartAddressL();               // a tap on the address, or Ctrl+L
+	void HandleControlEventL(CCoeControl* aControl, TCoeEvent aEventType);
+	void SetAddressL(const TDesC& aText);
+	void ShowAddressCursorL(TBool aShow);   // the address's cursor and selection, as if it had the focus
 	CPwView* iView;
+	CEikEdwin* iAddress;                // the toolband's address and progress (NULL: no toolband)
+	CEikProgressInfo* iProgress;
+	TBool iEditing;                     // the address is being typed in
+	TBuf<PW_URL_MAX> iShownUrl;         // the page it shows
+	TBool iAddressStale;                // ...to be shown again, whatever it was
+	TBool iPenTaken;                    // the pen's down-to-up is the address's first tap
+	TInt iShownProgress;                // what the bar shows (-1: hidden)
 	};
 
 class CPwDocument : public CEikDocument
