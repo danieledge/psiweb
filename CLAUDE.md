@@ -8,7 +8,10 @@ shared code's notes are in `core/CLAUDE.md` and `core/docs/BUILDING.md`.
 
 PsiWeb is a web browser for the **Psion Series 5mx** (EPOC Release 5, ARM710T
 at 36 MHz, no FPU, about 16 MB RAM, 640x240 in 16 greys, gcc 3.0 Psion 98r2).
-Its engine is **Links 2.30** in graphics mode, patched. UID 0x01000A7A; the
+Its engine is **Links 2.30** in graphics mode, patched. The same `.sis` also
+runs on the **netBook** (StrongARM SA-1100, no BX instruction, 32 MB, 640x480
+in EPOC's 256 colours): PsiWeb.app looks at the screen it finds and asks the
+engine for colour and 480 lines (see *One build for both* in README.md). UID 0x01000A7A; the
 version is `KVersion` in `app/psiweb.cpp` and `pkg/psiweb.pkg`. The quality
 bar is first-party Psion engineering: it should look and behave like Psion's
 own programs.
@@ -26,7 +29,8 @@ emulator tools. Core keeps the old relative paths (`core/ssh/psiglue.cpp`,
    settings, favourites and history (`pwfavs.cpp`), help (`pwhelp.cpp`).
 2. **psiweb.exe** (Links, plain C on ESTLIB): `links/psi_drv.c` (the graphics
    driver: RGB565 frame to 16 greys, keys, pen, commands, questions, picture
-   memory), `links/epoc/psi_os.c` (the select loop and pseudo-sockets over
+   memory), `links/psi_colour.c` (the frame to EPOC's 256 colours on a
+   colour screen; `psi_pal.h` is EPOC's palette), `links/epoc/psi_os.c` (the select loop and pseudo-sockets over
    pwnet), `links/epoc/psi_heap.cpp` (the 10 MB heap), `engine/pwepoc.cpp`
    (the chunk, PsiWeb.log, heartbeats), `engine/pwupdate.c` (signed
    updates), with `core/web/engine/pwnet.c` over `core/ssh/psiglue.cpp` and
@@ -34,8 +38,9 @@ emulator tools. Core keeps the old relative paths (`core/ssh/psiglue.cpp`,
    `core/web/tls` the arithmetic).
 
 They talk through the global chunk "PsiWebShared" (`psiweb.h`, which embeds
-`core/ssh/psishared.h`): events, commands (`psiweb_cmds.h`), questions, and a
-640x240 4bpp screen. If either header changes, every object that touches the
+`core/ssh/psishared.h`): events, commands (`psiweb_cmds.h`), questions, and
+the screen: 640x240 at 4 bits a pixel (16 greys) on the 5mx, or up to
+640x480 at 8 bits (EPOC's 256 colours) on the netBook, as `depth` says. If either header changes, every object that touches the
 chunk must be rebuilt, or app and engine disagree and the engine crashes.
 
 The NetSurf engine (up to 0.61) is still in the tree (`Makefile`,
@@ -59,6 +64,15 @@ the SDK link `ptproj/psitermssh`, which `build.sh` points at `core/ssh`.
 - **ARM harness:** `links/emu/run_links.py`, `links/emu/run_pages.sh` run
   the exact ARM `psiweb.exe` under unicorn, with a 10 MB heap; the fixed
   page set is the gate for engine changes (time, heap, screenshots).
+  `RUN_OPTS="--netbook"` gives the netBook's screen (colour screenshots at
+  640x480); `--progress` logs the toolband's progress figure.
+- **netBook emulator:** put a test build in a scratch ROM image with
+  `../psion-netbook/tools/mkimage.mts --with PATH/PsiWeb.sis` (the file
+  must be called PsiWeb.sis; `--test-pictures=DIR` adds local pages in
+  `Z:\Pictures`, with `--without PsiCall` for room) and start it from
+  PsiHub (Ctrl+Menu, type, Enter). In that emulator a key often keeps
+  repeating after it is let go, as Enter or the letter: test with the pen
+  where possible.
 - **Emulator** (`core/tools/emu`, see its README): `node
   --experimental-strip-types core/tools/emu/mkcard.ts psiweb`, then
   `core/tools/emu/run.sh NAME ...`; `python3 core/tools/emu/net.py web` needs
@@ -104,6 +118,10 @@ Use the `epoc-eikon-ui-guide` skill if it is available.
   infoprints (no "error", no "please", no full stops).
 - Toolbar on the right: title, four 24x20 pictures (`tools/mkicons.py`),
   the clock. Black on white, grey for secondary text, clipped with "...".
+- Toolband along the top (0.78; Shift+Ctrl+T): Back, Forward, Reload, Stop,
+  Home (16x16 colour pictures, named in the resource through
+  `app/pwicons.rh`), the address (an edwin: Ctrl+L or a tap), progress,
+  Pictures. Shown at first on a tall screen, hidden on the 5mx.
 - Don't change the connection settings (the dialog, its fields, formats or
   defaults) unless the owner asks. `TPsiLink` is shared by every program.
 

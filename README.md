@@ -2,12 +2,13 @@
 
 [![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-support-FFDD00?logo=buymeacoffee&logoColor=000)](https://buymeacoffee.com/danedge)
 
-A web browser for the **Psion Series 5mx**. Its engine is [Links 2](http://links.twibright.com/) (2.30, graphics mode), built with the 1999 EPOC R5 toolchain. It runs on the suite's shared networking ([psion-core](https://github.com/danieledge/psion-core), this repository's `core/` submodule): the same Wi-Fi modem or dial-up link as PsiTerm and PsiMail, and the suite's own TLS 1.3 client for HTTPS.
+A web browser for the **Psion Series 5mx** and the **netBook** (in colour, on its whole 640x480 screen). Its engine is [Links 2](http://links.twibright.com/) (2.30, graphics mode), built with the 1999 EPOC R5 toolchain. It runs on the suite's shared networking ([psion-core](https://github.com/danieledge/psion-core), this repository's `core/` submodule): the same Wi-Fi modem or dial-up link as PsiTerm and PsiMail, and the suite's own TLS 1.3 client for HTTPS.
 
 - Pages are plain documents: Links has **no CSS and no JavaScript**. Simple sites read well; big modern home pages come out as long lists.
 - Pictures (JPEG, PNG, GIF) are fetched **only when asked**: View > Show pictures (Ctrl+I) for the page showing, or Tools > Preferences > Pictures > On every page.
 - Links are underlined, since blue is all but black in 16 greys.
 - PsiWeb starts on a built-in welcome page, without dialling.
+- On the netBook, pages and pictures are in colour, and a toolband along the top has Back, Forward, Reload, Stop, Home, the address and a progress bar (see *On the netBook*).
 
 Up to 0.61 the engine was NetSurf. Its sources are still in the tree as a fallback (see *The NetSurf engine* below), until Links has been proved on the device. The whole port is described in [`links/PORTING.md`](links/PORTING.md).
 
@@ -21,7 +22,8 @@ Install `dist/PsiWeb.sis` (to D: if you have a CF card). PsiWeb is on the Extras
 
 | Key | |
 |---|---|
-| Ctrl+O (or Ctrl+L) | open an address, or type words to search for |
+| Ctrl+L | type an address, or words to search for, in the toolband (the Open address dialog when the toolband is hidden) |
+| Ctrl+O | open an address, or type words to search for (with a list of recent pages) |
 | Ctrl+B / Ctrl+F | back / forward |
 | Esc | stop loading (or saving a file) |
 | Ctrl+R, Ctrl+H | reload, home page |
@@ -101,6 +103,30 @@ Figures are ARM instructions counted in the emulator harness, at an assumed 15 M
 - The engine's heap is limited to 10 MB. On a long page, pictures away from the screen are let go and decoded again when they come back. A page that still does not fit stops where it is and says "Page too big".
 - `psiweb.exe` is about 1.9 MB. EPOC loads an EXE into RAM, so this comes on top of the heap.
 
+### On the netBook
+
+The same `PsiWeb.sis` installs on the netBook. PsiWeb looks at the screen when it starts:
+
+- **Colour.** Pages are drawn in EPOC's 256 colours: text, rules and backgrounds take the nearest colour (text stays crisp; its smooth edges use EPOC's 16 greys), and pictures are blended from the colours by error diffusion, once, as they come. Colour JPEGs keep their colour.
+- **The whole screen.** The page has all 480 lines and, with the toolbar hidden, the whole width.
+- **The toolband** (View > Show toolband, Shift+Ctrl+T) along the top: Back, Forward, Reload, Stop and Home, the page's address, a bar that fills as the page comes (its bytes, then its pictures), and Pictures. Tap the address, or press Ctrl+L, and type: the whole address is chosen, so typing replaces it. Enter goes there (or searches for the words), Esc leaves it as it was. On the netBook the toolband is shown and the toolbar hidden at first; Ctrl+T brings the toolbar back, and the toolband then stops at it.
+
+On the Series 5mx nothing changes unless you ask: 16 greys, the toolbar, 240 lines. The toolband is there too (Shift+Ctrl+T), at the cost of 25 lines.
+
+![PsiWeb on the netBook](docs/img/netbook-colour.png)
+
+![PsiWeb on the Series 5mx with the toolband](docs/img/5mx-toolband.png)
+
+#### One build for both
+
+One package detects the machine at run time; there is no netBook build. The reasons:
+
+- **BX.** The netBook's StrongARM has no BX instruction. The engine has been linked without BX since 0.77 (core's patched libgcc, checked by `v4bx.py --check`), and the app's own code has none, so the 5mx build already runs on the netBook.
+- **Size and memory.** The colour code adds about 5 KB to `psiweb.exe`, and the toolband 4 KB to the app and 2 KB of pictures. Its 64 KB colour table is made only on a colour screen, and the shared memory is made only as big as the screen needs, so the 5mx uses no more memory than before. A second build would double the downloads and the updater's files for no gain.
+- **Speed.** Nothing changes on the 5mx: the ARM harness gives the same instruction counts as 0.77 on the test pages. On the netBook the colour table takes about 17 million instructions once, at start (about a tenth of a second at 190 MHz).
+
+The test is the screen's display mode (a colour mode gives colour) and its height (up to 480 lines; a tall screen starts with the toolband).
+
 ### Opened by PsiMail
 
 PsiMail opens links and "View as web page" in PsiWeb. It starts PsiWeb with the address on its command line, or hands it to a PsiWeb that is already running. Messages are opened from PsiMail's store as `file:///D:/System/Data/PsiMail/...` (or `C:`).
@@ -111,11 +137,12 @@ PsiMail opens links and "View as web page" in PsiWeb. It starts PsiWeb with the 
 PsiWeb.app  (app/: EIKON UI - screen, keys, pen, menus, dialogs, settings)
     |  global chunk "PsiWebShared" (psiweb.h): the suite's PsiShared
     |  (serial/dial-up settings, core/ssh/psishared.h) + events, commands,
-    |  questions (password, save to file), a 640x240 16-grey screen
+    |  questions (password, save to file), the screen: 640x240 in 16
+    |  greys (5mx) or up to 640x480 in EPOC's 256 colours (netBook)
 psiweb.exe  (Links 2.30 in graphics mode, C, gcc 3.0)
     - links/psi_drv.c     the Links graphics driver: RGB565 frame -> 16 greys
-                          (links/psi_grey.c), keys, pen, commands, questions,
-                          picture memory
+                          (links/psi_grey.c) or 256 colours (links/psi_colour.c),
+                          keys, pen, commands, questions, picture memory
     - links/epoc/psi_os.c the select loop and pseudo-sockets over pwnet
     - engine/pwepoc.cpp   the chunk, PsiWeb.log, heartbeats
     - engine/pwupdate.c   the signed updater
@@ -159,6 +186,7 @@ Installed PsiWebs update from the **psiterm** repository's `dist/` (`PsiWeb-vers
 
 - **ARM harness** (`links/emu/run_links.py`, `links/emu/run_pages.sh`): runs the Psion-compiled engine in unicorn, with Python standing in for EPOC and the app, and a 10 MB heap. It counts instructions, records and replays network traffic (`NET=record|replay`), profiles, and answers the engine's questions (`auth USER PASS`, `save PATH` script lines).
 - **5mx emulator** (`core/tools/emu/`, run from this checkout): the real package on the real ROM. `node --experimental-strip-types core/tools/emu/mkcard.ts psiweb` makes the card, `core/tools/emu/run.sh NAME ...` runs it; `python3 core/tools/emu/net.py web` loads a page through an emulated modem (it needs the psiconnect checkout beside this one for the modem).
+- **netBook emulator** (`../psionEmulators`, with `../psion-netbook/tools/mkimage.mts --with PATH/PsiWeb.sis` to put a test build in a scratch ROM image, since programs on the card cannot start there): see `CLAUDE.md`. The ARM harness takes `--netbook` for colour screenshots at 640x480, and `--progress` to log the toolband's progress figure.
 - **PC build** (`links/build_host.sh`, `links/run_host.sh`): Links with the `psi` driver on Linux, for quick checks.
 
 ## The NetSurf engine
