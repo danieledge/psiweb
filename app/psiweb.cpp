@@ -200,7 +200,16 @@ CPwView::~CPwView()
 void CPwView::ConstructL(const TRect& aRect, const TPwSettings& aSettings)
 	{
 	iSettings = aSettings;
-	CreateBackedUpWindowL(iCoeEnv->RootWin(), EGray16);
+	// the screen: 16 greys (the 5mx) or 256 colours (the netBook, and any
+	// colour machine), up to 640x480; the engine draws for it (psiweb.h)
+	TDisplayMode mode = iCoeEnv->ScreenDevice()->DisplayMode();
+	iColour = mode == EColor256 || mode == EColor4K || mode == EColor64K || mode == EColor16M;
+	iMaxH = iCoeEnv->ScreenDevice()->SizeInPixels().iHeight;
+	if (iMaxH > PW_MAX_H)
+		iMaxH = PW_MAX_H;
+	TDisplayMode fbMode = iColour ? EColor256 : EGray16;
+	TInt stride = iColour ? PW_STRIDE8 : PW_STRIDE;
+	CreateBackedUpWindowL(iCoeEnv->RootWin(), fbMode);
 	SetRectL(aRect);
 	EnableDragEvents();
 	iPics = -1;
@@ -214,19 +223,23 @@ void CPwView::ConstructL(const TRect& aRect, const TPwSettings& aSettings)
 	TSize size = iPageArea.Size();
 	if (size.iWidth > PW_MAX_W) size.iWidth = PW_MAX_W;
 	size.iWidth &= ~1;	/* the engine packs two pixels a word: width must be even */
-	if (size.iHeight > PW_MAX_H) size.iHeight = PW_MAX_H;
+	if (size.iHeight > iMaxH) size.iHeight = iMaxH;
 	iBitmap = new(ELeave) CFbsBitmap;
-	User::LeaveIfError(iBitmap->Create(TSize(PW_MAX_W, PW_MAX_H), EGray16));
+	User::LeaveIfError(iBitmap->Create(TSize(PW_MAX_W, iMaxH), fbMode));
 
-	TInt r = iChunk.CreateGlobal(_L(PSI_SHARED_NAME), sizeof(PwShared), sizeof(PwShared));
+	// (only as big as this screen needs: fb is last in the chunk)
+	iChunkSize = PW_SHARED_SIZE(iMaxH, stride);
+	TInt r = iChunk.CreateGlobal(_L(PSI_SHARED_NAME), iChunkSize, iChunkSize);
 	if (r == KErrAlreadyExists)
 		r = iChunk.OpenGlobal(_L(PSI_SHARED_NAME), EFalse);
 	User::LeaveIfError(r);
 	iChunkOpen = ETrue;
 	iShared = (PwShared*)iChunk.Base();
-	Mem::FillZ(iShared, sizeof(PwShared));
+	Mem::FillZ(iShared, iChunkSize);
 	iShared->width = size.iWidth;
 	iShared->height = size.iHeight;
+	iShared->depth = iColour ? PW_DEPTH_COLOR256 : PW_DEPTH_GREY16;
+	iShared->stride = stride;
 
 	iTimer = CPeriodic::NewL(CActive::EPriorityStandard);
 	iTimer->Start(KTick, KTick, TCallBack(TickCallback, this));
@@ -264,14 +277,17 @@ void CPwView::StartEngineL()
 	if (iRunning)
 		return;
 	PwShared* s = iShared;
-	TInt w = s->width, h = s->height;
+	TInt w = s->width, h = s->height, depth = s->depth, stride = s->stride;
 	if (iBellWaiter)
 		iBellWaiter->Cancel();               // (before the bell it waits on is cleared)
 	iEngRinger.Close();                      // (a new engine: a new thread)
 	TickFast();                              // (and the tick follows it from the start)
-	Mem::FillZ(s, sizeof(PwShared) - sizeof(s->fb));
+	Mem::FillZ(s, PW_SHARED_SIZE(0, 0));
 	s->width = w;
 	s->height = h;
+	s->depth = depth;
+	s->stride = stride;
+	s->progress = -1;
 	s->magic = PW_MAGIC;
 	s->net.magic = PSI_SHARED_MAGIC;
 	s->net.bell_magic = PSI_BELL_MAGIC;      // (0.81) we ring eng_bell with every key, tap, command and quit
@@ -418,7 +434,7 @@ void CPwView::SetPageRectL(const TRect& aRect)
 	TSize size = iPageArea.Size();
 	if (size.iWidth > PW_MAX_W) size.iWidth = PW_MAX_W;
 	size.iWidth &= ~1;	/* the engine packs two pixels a word: width must be even */
-	if (size.iHeight > PW_MAX_H) size.iHeight = PW_MAX_H;
+	if (size.iHeight > iMaxH) size.iHeight = iMaxH;
 	iShared->width = size.iWidth;
 	iShared->height = size.iHeight;
 	if (running)
@@ -802,10 +818,10 @@ void CPwView::Tick()
 		y0 = 0;
 		y1 = s->height;
 		}
-	// the shared buffer has exactly an EGray16 scan line's layout
+	// the shared buffer has exactly an EGray16 (or EColor256) scan line's layout
 	for (TInt y = y0; y < y1; y++)
 		{
-		TPtr8 row(s->fb + y * PW_STRIDE, PW_STRIDE, PW_STRIDE);
+		TPtr8 row(s->fb + y * s->stride, s->stride, s->stride);
 		iBitmap->SetScanLine(row, y);
 		}
 	iShowMsg = EFalse;

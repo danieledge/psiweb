@@ -157,6 +157,8 @@ public:
 	void StopUpdate() { if (iShared) { iShared->net.quit = 1; RingEngine(); } }   // the updater gives up and says so
 	void RingEngine();                       // (0.81) something for the engine in the chunk: wake it
 	TBool PicturesShown() const;             // this page's pictures are shown (the Pictures button)
+	TBool Colour() const { return iColour; } // a colour screen (the netBook): EPOC's 256 colours
+	TInt MaxHeight() const { return iMaxH; } // the screen's height, at most PW_MAX_H
 private:
 	// the page's scroll bar: EIKON's, beside the page (the engine says where
 	// the page is: psiweb.h page_*)
@@ -189,6 +191,9 @@ private:
 	void StartInstallerL();
 private:
 	TPwSettings iSettings;
+	TBool iColour;                // the screen has colours: the page is EColor256
+	TInt iMaxH;                   // the screen's height (240 on the 5mx, 480 on the netBook)
+	TInt iChunkSize;              // PW_SHARED_SIZE for this screen
 	CFbsBitmap* iBitmap;
 	RChunk iChunk;
 	TBool iChunkOpen;
