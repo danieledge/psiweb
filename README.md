@@ -2,7 +2,7 @@
 
 [![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-support-FFDD00?logo=buymeacoffee&logoColor=000)](https://buymeacoffee.com/danedge)
 
-A web browser for the **Psion Series 5mx** and the **netBook** (in colour, on its whole 640x480 screen). Its engine is [Links 2](http://links.twibright.com/) (2.30, graphics mode), built with the 1999 EPOC R5 toolchain. It runs on the suite's shared networking ([psion-core](https://github.com/danieledge/psion-core), this repository's `core/` submodule): the same Wi-Fi modem or dial-up link as PsiTerm and PsiMail, and the suite's own TLS 1.3 client for HTTPS.
+A web browser for the **Psion Series 5mx**, the **netBook** and the **Series 7** (in colour on the last two, at 640x480). Its engine is [Links 2](http://links.twibright.com/) (2.30, graphics mode), built with the 1999 EPOC R5 toolchain. It runs on the suite's shared networking ([psion-core](https://github.com/danieledge/psion-core), this repository's `core/` submodule): the same Wi-Fi modem or dial-up link as PsiTerm and PsiMail, and the suite's own TLS 1.3 client for HTTPS.
 
 - Pages are plain documents: Links has **no CSS and no JavaScript**. Simple sites read well; big modern home pages come out as long lists.
 - Pictures (JPEG, PNG, GIF) are fetched **only when asked**: View > Show pictures (Ctrl+I) for the page showing, or Tools > Preferences > Pictures > On every page.
@@ -15,6 +15,36 @@ Up to 0.61 the engine was NetSurf. Its sources are still in the tree as a fallba
 **Status: alpha.** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
 
 [![Download PsiWeb.sis](https://img.shields.io/badge/Download-PsiWeb.sis-2ea44f?logo=github)](https://github.com/danieledge/psiterm/raw/main/dist/PsiWeb.sis)
+
+## What's new in 0.80
+
+Since 0.77, the last signed release.
+
+- Runs on the netBook and Series 7 in colour: pages and pictures in EPOC's 256 colours, on the whole 640x480 screen, with the toolband in place of the toolbar. The same PsiWeb.sis still gives 16 greys on the 5mx, with no extra memory used.
+- A toolband along the top with Back, Forward, Reload, Stop, Home, the address, a progress bar and Pictures. View > Show toolband (Shift+Ctrl+T). Shown at first on the netBook.
+- Tap the address, or press Ctrl+L, and type an address or words to search for.
+- The progress bar fills as the page loads, then as its pictures do.
+- Send log goes through the Atom modem's own proxy to PsiProxy, and only says "Log sent" if PsiProxy got it.
+- The program icon is in colour on the netBook.
+- Help and the welcome page cover the toolband and the netBook.
+
+## Screenshots
+
+PsiWeb 0.80 on the netBook (colour, 640x480) and the Series 5mx (16 greys, 640x240). Taken in emulators. Tap or click one to see it full size.
+
+<table>
+<tr><th>netBook</th><th>Series 5mx</th></tr>
+<tr><td colspan="2"><b>The welcome page, with the toolband</b></td></tr>
+<tr>
+<td><a href="docs/img/netbook-psiweb-welcome.png"><img src="docs/img/netbook-psiweb-welcome.png" alt="netBook: the welcome page under the toolband" width="400"></a></td>
+<td><a href="docs/img/5mx-psiweb-welcome.png"><img src="docs/img/5mx-psiweb-welcome.png" alt="Series 5mx: the welcome page under the toolband" width="400"></a></td>
+</tr>
+<tr><td><b>The File menu</b></td><td><b>Typing an address in the toolband</b></td></tr>
+<tr>
+<td><a href="docs/img/netbook-psiweb-menu.png"><img src="docs/img/netbook-psiweb-menu.png" alt="netBook: PsiWeb's File menu" width="400"></a></td>
+<td><a href="docs/img/5mx-psiweb-address.png"><img src="docs/img/5mx-psiweb-address.png" alt="Series 5mx: example.com typed in the toolband's address" width="400"></a></td>
+</tr>
+</table>
 
 ## Using it
 
@@ -113,9 +143,7 @@ The same `PsiWeb.sis` installs on the netBook. PsiWeb looks at the screen when i
 
 On the Series 5mx nothing changes unless you ask: 16 greys, the toolbar, 240 lines. The toolband is there too (Shift+Ctrl+T), at the cost of 25 lines.
 
-![PsiWeb on the netBook](docs/img/netbook-colour.png)
-
-![PsiWeb on the Series 5mx with the toolband](docs/img/5mx-toolband.png)
+See the screenshots at the top.
 
 #### One build for both
 
