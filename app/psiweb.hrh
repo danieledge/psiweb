@@ -86,7 +86,9 @@ enum TPwDialogControls
 	EPwDlgFavName,           // Add to favourites: Name
 	EPwDlgFavUrl,            // ...and Address
 	EPwDlgRecent,            // Open address: Recent
-	EPwDlgOrgList            // Favourites / History lists
+	EPwDlgOrgList,           // Favourites / History lists
+	EPwDlgAbout7,            // (0.82) About: the IJG's sentence
+	EPwDlgAbout8             // (0.82) About: the Symbian STDLIB notice
 	};
 
 // Organise favourites: its buttons
