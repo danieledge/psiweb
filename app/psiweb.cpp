@@ -84,7 +84,7 @@ static void SaveSharedLink(RFs& aFs, const TPwSettings& aSettings)
 
 _LIT(KEngineExe, "psiweb.exe");
 _LIT(KIniFile, "C:\\System\\Apps\\PsiWeb\\PsiWeb.ini");
-_LIT(KVersion, "0.80");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
+_LIT(KVersion, "0.81");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
 _LIT(KDefaultHome, "http://68k.news/");
 const TInt KZoomSteps[] = { 50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200 };
 const TInt KZoomCount = 11;
@@ -2187,12 +2187,13 @@ void CPwAppUi::PageInfoL()
 	else
 		lines[4] = _L("Direct");
 	// the prompts take about 120 px of the 640, the frame and margins more:
-	// the dialog's labels are bold, which the normal font's widths allow for
+	// the dialog's labels are bold, which the normal font's widths allow for.
+	// 300 px keeps it inside the size of Psion's own dialogs (about 370-560).
 	const CFont* font = iEikonEnv->NormalFont();
 	TPtrC ptrs[5];
 	for (TInt i = 0; i < 5; i++)
 		{
-		Ellipsis(lines[i], *font, 420);
+		Ellipsis(lines[i], *font, 300);
 		ptrs[i].Set(lines[i]);
 		}
 	CPwInfoDialog* dlg = new(ELeave) CPwInfoDialog(ptrs, 5);

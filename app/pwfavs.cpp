@@ -415,7 +415,8 @@ void CPwOpenDialog::PreLayoutDynInitL()
 		for (TInt k = 0; k < u.Length(); k++)
 			if (u[k] < 0x20)
 				u[k] = ' ';
-		ClipPx(u, *font, 330);       // (the line must fit beside its prompt)
+		// (the line's width is fixed: maxdisplaychar 20 in the resource)
+		ClipPx(u, *font, 20 * font->MaxNormalCharWidthInPixels());
 		items->AppendL(u.Left(u.Length() < 120 ? u.Length() : 120));
 		}
 	CleanupStack::Pop();
