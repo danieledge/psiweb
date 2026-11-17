@@ -1445,6 +1445,20 @@ static int psi_unblock(struct graphics_device *dev)
 	return 0;
 }
 
+/* (0.83) The screen, for a proxy: http.c sends it as "X-Psi-Screen:
+ * 640x240x16" (the 5mx's 16 greys) or "640x480x256" (the netBook's 256
+ * colours) on each request that goes to a proxy, so PsiProxy or the Atom
+ * can make pictures and pages for it. Width and height are the engine's
+ * frame, the part of the screen pages are drawn in. NULL before the screen
+ * is open. Never sent to a site directly. */
+const char *psi_screen_desc(void)
+{
+	static char d[24];
+	if (psi_w <= 0 || psi_h <= 0) return NULL;
+	snprintf(d, sizeof(d), "%dx%dx%d", psi_w, psi_h, psi_colour ? 256 : 16);
+	return d;
+}
+
 struct graphics_driver psi_driver = {
 	cast_uchar "psi",
 	psi_init_driver,

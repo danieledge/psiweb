@@ -141,6 +141,9 @@ The same `PsiWeb.sis` installs on the netBook. PsiWeb looks at the screen when i
 - **The whole screen.** The page has all 480 lines and, with the toolbar hidden, the whole width.
 - **The toolband** (View > Show toolband, Shift+Ctrl+T) along the top: Back, Forward, Reload, Stop and Home, the page's address, a bar that fills as the page comes (its bytes, then its pictures), and Pictures. Tap the address, or press Ctrl+L, and type: the whole address is chosen, so typing replaces it. Enter goes there (or searches for the words), Esc leaves it as it was. On the netBook the toolband is shown and the toolbar hidden at first; Ctrl+T brings the toolbar back, and the toolband then stops at it.
 
+- **Through a proxy** (0.83). Each request PsiWeb sends to a proxy says which screen it is for: `X-Psi-Screen: 640x480x256` on the netBook, `640x240x16` on the 5mx (the width and height of the page area, and the colours). It goes to the proxy only, never to a site. [PsiProxy](https://github.com/danieledge/psiproxy) 1.01 and the [PsiConnect Atom](https://github.com/danieledge/psiconnect) 2.8 use it: the netBook gets pictures in colour up to 560 pixels wide (and from PsiProxy tables that fit and lighter pages), the 5mx the same 16-grey output as before. A proxy that does not know the header ignores it.
+- **Known fault (0.83 and earlier, netBook only).** A JPEG whose whole file reaches the engine in one piece is drawn black: in the ARM harness (`--netbook`), any JPEG under about 8 KB; a 5mx, PNGs and GIFs are not affected. PsiProxy 1.01 sends small photos to the netBook as PNG for now. To be fixed in the engine's colour path (`links/psi_drv.c`, `jpeg.c`'s size-only pass).
+
 On the Series 5mx nothing changes unless you ask: 16 greys, the toolbar, 240 lines. The toolband is there too (Shift+Ctrl+T), at the cost of 25 lines.
 
 See the screenshots at the top.
