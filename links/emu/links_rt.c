@@ -377,6 +377,7 @@ struct timeval { long tv_sec, tv_usec; };
 int gettimeofday(struct timeval *tv, void *tz) { (void)tz; emu_hc(HC_GETTIMEOFDAY, (int)tv, 0, 0, 0); return 0; }
 int pwb_gettimeofday(struct timeval *tv, void *tz) { return gettimeofday(tv, tz); }
 long time(long *t) { struct timeval tv; gettimeofday(&tv, 0); if (t) *t = tv.tv_sec; return tv.tv_sec; }
+long pw_utc(void) { return time(0); }      /* engine/pwcert.c: certificates' dates (pwepoc.cpp on the Psion) */
 static int tmbuf[11];
 void *localtime(const long *t) { emu_hc(HC_LOCALTIME, (int)*t, (int)tmbuf, 0, 0); return tmbuf; }
 void *gmtime(const long *t) { emu_hc(HC_LOCALTIME, (int)*t, (int)tmbuf, 1, 0); return tmbuf; }

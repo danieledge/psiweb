@@ -78,7 +78,7 @@ Z_SRCS   := adler32 crc32 inflate inftrees inffast zutil
 LTC     := $(CORE)/ssh/db/libtomcrypt/src
 LTC_SRCS := stream/chacha/chacha_crypt stream/chacha/chacha_ivctr32 stream/chacha/chacha_keystream \
 	stream/chacha/chacha_setup stream/chacha/chacha_done mac/poly1305/poly1305 hashes/sha2/sha256 hashes/sha2/sha512 \
-	misc/zeromem misc/burn_stack misc/crypt/crypt_argchk misc/compare_testvector
+	hashes/sha2/sha384 misc/zeromem misc/burn_stack misc/crypt/crypt_argchk misc/compare_testvector
 
 LCFLAGS := $(ARCH) $(DEFS) $(LXFLAGS) -w -I$(LW)/epoc -I$(SRC) -I$(O)/inc -I$(PNG) -I$(JPG) -I$(ZL) \
 	$(LIBC) -include $(LW)/epoc/psicompat.h
@@ -88,6 +88,17 @@ CFLAGS_C := $(ARCH) $(DEFS) -fno-builtin -w $(LIBC)
 # Poly1305 and SHA-256 is a 4-byte memcpy call (-fno-builtin): over a third
 # of the cost of decrypting a page.
 LTCFLAGS := $(ARCH) $(DEFS) -std=gnu99 -fno-builtin -w -I$(WEB)/tls -I$(CORE)/web/tls -I$(CORE)/web/compat -I$(LTC)/headers $(LIBC) -DLTC_SOURCE -DLTC_NO_ASM
+# (0.84) the certificate check: psion-core's certcheck.c (PsiMail's), RSA with
+# libtommath (pmrsa.c), and engine/pwcert.c, what PsiWeb gives it
+TLSV    := $(CORE)/mail/engine/tlsv
+CAL     := $(CORE)/mail/engine/cal
+LTM     := $(CORE)/ssh/db/libtommath
+LTM_SRCS := $(notdir $(basename $(shell sed -n 's|^libtommath/||p' $(CORE)/ssh/ltm_sources.txt)))
+LTMFLAGS := $(ARCH) $(DEFS) -std=gnu99 -fno-builtin -w -I$(WEB)/tls -I$(LTM) -I$(CORE)/web/compat $(LIBC) -include $(CORE)/mail/compat/pmcompat.h
+# (certcheck.c with -march=armv4: its ECDSA's 32 x 32 -> 64 bit products as
+# UMULL, which the 5mx's ARM710T and the netBook's SA-1100 both have; the
+# rest of PsiWeb keeps -mcpu=arm710. ARMv4 without T: no BX, as the netBook needs)
+TLSVFLAGS := $(subst -mcpu=arm710,-march=armv4,$(LTCFLAGS)) -include $(CORE)/mail/compat/pmcompat.h -I$(CAL) -I$(CORE)/ssh '-DTLSV_APP_NAME="PsiWeb"'
 
 LINKS_OBJS := $(addprefix $(O)/links/,$(LINKS_SRCS:=.o))
 ifeq ($(STRIKES),1)
@@ -95,14 +106,16 @@ LINKS_OBJS += $(O)/links/strike_psi.o
 endif
 PSI_OBJS   := $(O)/psi/psi_drv.o $(O)/psi/psi_os.o $(O)/psi/pwgrey.o $(O)/psi/pwcolour.o $(O)/psi/psi_str.o $(O)/psi/psi_digest.o $(O)/psi/pwnet.o \
 	$(O)/psi/nsprintf.o $(O)/psi/tls13.o $(O)/psi/x25519.o $(O)/psi/pwrandom.o \
+	$(O)/psi/certcheck.o $(O)/psi/pmrsa.o $(O)/psi/pwcert.o \
 	$(addprefix $(O)/ltc/,$(subst /,__,$(LTC_SRCS:=.o)))
+LTM_LIB    := $(O)/libltm.a
 JPG_LIB    := $(O)/libjpeg.a
 PNG_LIB    := $(O)/libpng.a
 Z_LIB      := $(O)/libz.a
 EMU_OBJS   := $(O)/emu/links_rt.o $(O)/emu/emu_hc.o $(O)/emu/emu_back.o $(O)/emu/setjmp.o
 
 all: exe emu
-objs: $(LINKS_OBJS) $(PSI_OBJS) $(JPG_LIB) $(PNG_LIB) $(Z_LIB)
+objs: $(LINKS_OBJS) $(PSI_OBJS) $(JPG_LIB) $(PNG_LIB) $(Z_LIB) $(LTM_LIB)
 emu: $(O)/psiweb-emu.pe
 
 $(O)/inc/pnglibconf.h: $(LW)/epoc/pnglibconf.h
@@ -164,7 +177,7 @@ $(O)/links/strike_psi.o: $(O)/strike_psi.c $(HDRS) $(SRC)/links.h
 $(O)/psi/psi_drv.o: $(LW)/psi_drv.c $(HDRS) $(WEB)/fb/pwback.h $(SRC)/links.h $(WEB)/psiweb.h $(CORE)/ssh/psishared.h
 	@mkdir -p $(dir $@)
 	$(CC) -c $(LCFLAGS) -I$(WEB)/fb -I$(WEB) -I$(CORE)/ssh $< -o $@
-$(O)/psi/psi_os.o: $(LW)/epoc/psi_os.c $(HDRS) $(O)/inc/welcome.inc $(CORE)/web/engine/pwnet.h $(SRC)/links.h $(WEB)/psiweb.h $(CORE)/ssh/psishared.h
+$(O)/psi/psi_os.o: $(LW)/epoc/psi_os.c $(HDRS) $(O)/inc/welcome.inc $(CORE)/web/engine/pwnet.h $(WEB)/engine/pwcert.h $(SRC)/links.h $(WEB)/psiweb.h $(CORE)/ssh/psishared.h
 	@mkdir -p $(dir $@)
 	$(CC) -c $(LCFLAGS) -I$(WEB)/fb -I$(WEB) -I$(CORE)/web/engine -I$(CORE)/ssh $< -o $@
 $(O)/psi/pwgrey.o: $(LW)/psi_grey.c $(WEB)/fb/pwback.h $(CORE)/ssh/psigrey.h
@@ -188,6 +201,20 @@ $(O)/psi/pwnet.o: $(CORE)/web/engine/pwnet.c $(CORE)/ssh/psishared.h $(CORE)/web
 $(O)/psi/tls13.o: $(CORE)/ssh/tls13.c $(WEB)/tls/includes.h
 	@mkdir -p $(dir $@)
 	$(CC) -c $(LTCFLAGS) -I$(CORE)/ssh/db/src $< -o $@
+$(O)/psi/certcheck.o: $(TLSV)/certcheck.c $(TLSV)/roots.h $(TLSV)/ecverify.h $(CAL)/calport.h $(WEB)/tls/includes.h $(WEB)/tls/options.h
+	@mkdir -p $(dir $@)
+	$(CC) -c $(TLSVFLAGS) $< -o $@
+$(O)/psi/pmrsa.o: $(TLSV)/pmrsa.c
+	@mkdir -p $(dir $@)
+	$(CC) -c $(LTMFLAGS) $< -o $@
+$(O)/psi/pwcert.o: $(WEB)/engine/pwcert.c $(WEB)/engine/pwcert.h $(CAL)/calport.h
+	@mkdir -p $(dir $@)
+	$(CC) -c $(TLSVFLAGS) $< -o $@
+$(O)/ltm/%.o: $(LTM)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) -c $(LTMFLAGS) $< -o $@
+$(LTM_LIB): $(addprefix $(O)/ltm/,$(LTM_SRCS:=.o))
+	rm -f $@; $(AR) rcs $@ $^
 $(O)/psi/%.o: $(WEB)/tls/%.c $(WEB)/tls/includes.h $(WEB)/tls/options.h
 	@mkdir -p $(dir $@)
 	$(CC) -c $(LTCFLAGS) -I$(CORE)/ssh/db/src $< -o $@
@@ -227,9 +254,9 @@ $(O)/emu/setjmp.o: $(LW)/emu/setjmp.s
 	@mkdir -p $(dir $@)
 	arm-pe-as $< -o $@
 
-$(O)/psiweb-emu.pe: $(LINKS_OBJS) $(PSI_OBJS) $(EMU_OBJS) $(JPG_LIB) $(PNG_LIB) $(Z_LIB) $(LIBGCC)
+$(O)/psiweb-emu.pe: $(LINKS_OBJS) $(PSI_OBJS) $(EMU_OBJS) $(JPG_LIB) $(PNG_LIB) $(Z_LIB) $(LTM_LIB) $(LIBGCC)
 	arm-pe-ld -o $@ -e main -Map $(O)/psiweb-emu.map $(LINKS_OBJS) $(PSI_OBJS) $(EMU_OBJS) \
-		$(PNG_LIB) $(JPG_LIB) $(Z_LIB) $(LIBGCC)
+		$(PNG_LIB) $(JPG_LIB) $(Z_LIB) $(LTM_LIB) $(LIBGCC)
 	arm-pe-nm -n $@ > $(O)/psiweb-emu.syms
 	@ls -la $@
 
@@ -237,7 +264,7 @@ $(O)/psiweb-emu.pe: $(LINKS_OBJS) $(PSI_OBJS) $(EMU_OBJS) $(JPG_LIB) $(PNG_LIB) 
 CXXFLAGS := $(ARCH) $(DEFS) -Wno-ctor-dtor-privacy -fcheck-new -fvtable-thunks -w -I$(WEB) -I$(CORE)/ssh $(LIBC)
 DEV_OBJS := $(O)/dev/pwepoc.o $(O)/dev/psiglue.o $(O)/dev/pwupdate.o $(O)/dev/psi_heap.o $(O)/dev/psi_stubs.o
 SYSLIBS := $(REL)/estlib.lib $(REL)/euser.lib $(REL)/c32.lib $(REL)/efsrv.lib $(REL)/esock.lib $(REL)/insock.lib $(REL)/nifman.lib $(LIBGCC)
-EXE_OBJS = $(REL)/eexe.o $(LINKS_OBJS) $(PSI_OBJS) $(DEV_OBJS) $(PNG_LIB) $(JPG_LIB) $(Z_LIB) $(REL)/ecrt0.o $(SYSLIBS)
+EXE_OBJS = $(REL)/eexe.o $(LINKS_OBJS) $(PSI_OBJS) $(DEV_OBJS) $(PNG_LIB) $(JPG_LIB) $(Z_LIB) $(LTM_LIB) $(REL)/ecrt0.o $(SYSLIBS)
 
 $(O)/dev/pwepoc.o: $(WEB)/engine/pwepoc.cpp $(WEB)/psiweb.h $(WEB)/fb/pwback.h $(CORE)/ssh/psishared.h
 	@mkdir -p $(dir $@)
@@ -257,7 +284,7 @@ $(O)/dev/pwupdate.o: $(WEB)/engine/pwupdate.c $(CORE)/web/engine/pwnet.h $(WEB)/
 
 # petran: heap 256 KB to 10 MB (as NetSurf's), 256 KB stack (Links' table
 # layout recurses); UIDs as NetSurf's psiweb.exe, so PsiWeb.app starts it
-$(O)/psiweb.exe: $(LINKS_OBJS) $(PSI_OBJS) $(DEV_OBJS) $(JPG_LIB) $(PNG_LIB) $(Z_LIB) $(LIBGCC)
+$(O)/psiweb.exe: $(LINKS_OBJS) $(PSI_OBJS) $(DEV_OBJS) $(JPG_LIB) $(PNG_LIB) $(Z_LIB) $(LTM_LIB) $(LIBGCC)
 	arm-pe-ld -s -e _E32Startup --base-file $(O)/psiweb.bas -o $(O)/psiweb.tmp.exe $(EXE_OBJS)
 	arm-pe-dlltool --as=arm-pe-as --output-exp $(O)/psiweb.exp --base-file $(O)/psiweb.bas $(EXE_OBJS)
 	arm-pe-ld -s -e _E32Startup -Map $(O)/psiweb.map -o $(O)/psiweb.tmp.exe $(O)/psiweb.exp $(EXE_OBJS)

@@ -27,6 +27,7 @@
 
 #include "includes.h"          /* web/tls: libtomcrypt (SHA-256) */
 #include "../core/web/engine/pwnet.h"
+#include "pwcert.h"
 #include "../core/ssh/pgdevbox.h"
 #include "../psiweb.h"
 #include "../fb/pwback.h"
@@ -164,8 +165,11 @@ static int request(const char *name, const char *query, long rfrom, long rlen,
 	for (attempt = 0; attempt < 2; attempt++) {
 		int reused = pwn_is_open(R.host, R.port, R.tls);
 		if (!reused) {
-			if (pwn_connect(R.host, R.port, R.tls, why, whymax) != 0)
+			if (R.tls) pw_cert_host(R.host, R.port);     /* (0.84) checked as every HTTPS page */
+			if (pwn_connect(R.host, R.port, R.tls, why, whymax) != 0) {
+				if (R.tls && why[0]) pw_cert_why(R.host, why, whymax);
 				return pg_shared()->quit ? -2 : -1;
+			}
 		}
 		snprintf(req, sizeof(req),
 			"GET %s%s%s HTTP/1.1\r\nHost: %s\r\nUser-Agent: PsiWeb/%s\r\n"

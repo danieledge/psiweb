@@ -8,4 +8,7 @@
 #define m_realloc realloc
 #define m_free free
 static void m_burn(void *p, unsigned int n) { volatile unsigned char *q = p; while (n--) *q++ = 0; }
+/* libtommath's allocator hooks (0.84: the certificate check's RSA, pmrsa.c) */
+static void m_free_ltm(void *p, size_t size) { (void)size; free(p); }
+static void *m_realloc_ltm(void *p, size_t old, size_t size) { (void)old; return realloc(p, size); }
 #endif

@@ -63,6 +63,20 @@ extern "C" int pwb_gettimeofday(void* aTv, void*)
 	}
 
 
+// (0.84) seconds since 1970, UTC, for the certificates' dates
+// (engine/pwcert.c), from the Psion's universal time as PsiMail's pm_time
+extern "C" long pw_utc()
+	{
+	TTime now;
+	now.UniversalTime();
+	TTime epoch(TDateTime(1970, EJanuary, 0, 0, 0, 0, 0));
+	TTimeIntervalSeconds s;
+	if (now.SecondsFrom(epoch, s) != KErrNone)
+		return 0;
+	return s.Int();
+	}
+
+
 // ----- C:\System\Data\PsiWeb.log -------------------------------------------
 // One line per event, "mm:ss.t text", for finding out where a page stops:
 // status text, busy changes, link messages, fetch errors, frames drawn.

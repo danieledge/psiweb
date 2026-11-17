@@ -1,5 +1,6 @@
 /* options.h - the Dropbear options libtomcrypt's Dropbear config reads,
- * for PsiWeb's TLS (ChaCha20-Poly1305, SHA-256, X25519 only). */
+ * for PsiWeb's TLS (ChaCha20-Poly1305, SHA-2, X25519; RSA certificates checked
+ * with libtommath, outside Dropbear). */
 #ifndef PSIWEB_TLS_OPTIONS_H
 #define PSIWEB_TLS_OPTIONS_H
 #define DROPBEAR_SMALL_CODE 1
@@ -10,7 +11,7 @@
 #define DROPBEAR_ENABLE_GCM_MODE 0
 #define DROPBEAR_CHACHA20POLY1305 1
 #define DROPBEAR_SHA512 1
-#define DROPBEAR_SHA384 0
+#define DROPBEAR_SHA384 1          /* certificates signed with SHA-384 (certcheck.c) */
 #define DROPBEAR_SHA256 1
 #define DROPBEAR_SHA1 0
 #define DROPBEAR_ECC 0

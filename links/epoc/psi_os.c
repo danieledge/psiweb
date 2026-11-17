@@ -18,6 +18,7 @@
 
 #include "pwback.h"
 #include "../../core/web/engine/pwnet.h"
+#include "../../engine/pwcert.h"
 #include "psiweb.h"
 
 #undef read
@@ -282,8 +283,10 @@ int psi_sock_connect(unsigned char *host, int port, int tls, unsigned char **why
 	snprintf(msg, sizeof(msg), "Connecting to %s", (char *)host);
 	pwb_set_status(msg);
 	msg[0] = 0;
+	if (tls) pw_cert_host((const char *)host, port);     /* (0.84) the name its certificate must carry */
 	if (pwn_connect((const char *)host, port, tls, msg, sizeof(msg)) != 0) {
 		pfd[fd - PSI_FD0].kind = PF_FREE;
+		if (tls && msg[0]) pw_cert_why((const char *)host, msg, sizeof(msg));
 		if (!msg[0]) snprintf(msg, sizeof(msg), "Could not connect to %s", (char *)host);
 		pwb_set_status(msg);
 		{ void psi_conn_failed(const char *why); psi_conn_failed(msg); }

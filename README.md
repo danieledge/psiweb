@@ -16,6 +16,11 @@ Up to 0.61 the engine was NetSurf. Its sources are still in the tree as a fallba
 
 [![Download PsiWeb.sis](https://img.shields.io/badge/Download-PsiWeb.sis-2ea44f?logo=github)](https://github.com/danieledge/psiterm/raw/main/dist/PsiWeb.sis)
 
+## What's new in 0.84
+
+- HTTPS checks certificates. Without a proxy, a site whose certificate cannot be trusted (not from a known authority, out of date, for another name) is not loaded: *Certificate not trusted - host*. RSA and ECDSA (P-256 and P-384) certificates, so every site on the welcome page loads direct. See *Certificates* below.
+- PsiWeb's own updates from GitHub are checked the same way, as well as by their signature.
+
 ## What's new in 0.80
 
 Since 0.77, the last signed release.
@@ -82,7 +87,12 @@ The toolbar (Open, Back, Home, Pictures - pressed in while the page's pictures s
 
 **Tools > Preferences**: the home page and pictures.
 
-**A proxy (optional).** PsiWeb does not need one: without it (*Use proxy: No*, the standard), `http://` goes direct and `https://` uses PsiWeb's own TLS 1.3 client (X25519 + ChaCha20-Poly1305, with session resumption). Certificates are **not** checked, as in PsiTerm's updater. No proxy address is built in.
+**A proxy (optional).** PsiWeb does not need one: without it (*Use proxy: No*, the standard), `http://` goes direct and `https://` uses PsiWeb's own TLS 1.3 client (X25519 + ChaCha20-Poly1305, with session resumption). From 0.84 it checks each site's certificate, as PsiMail does (see *Certificates* below). No proxy address is built in.
+
+**Certificates** (0.84). Without a proxy, PsiWeb checks who it is talking to before it sends anything: the site's certificate chain must reach one of the root certificates built into it (psion-core's `mail/engine/tlsv/roots.h`, 28 roots: Let's Encrypt, Google, DigiCert, Sectigo, GlobalSign, Amazon, Microsoft, Go Daddy, Starfield), every certificate on the way must be in date, the site's own must carry the name in the address, and the site must prove it holds that certificate's key. If any of that fails the page is not loaded and PsiWeb says *Certificate not trusted - host*. There is no way round it from the Psion: no "load anyway", and no list of exceptions. (PsiWeb.log, with Tools > Keep a log ticked, has the reason: a different name, out of date, an authority PsiWeb does not know.)
+- RSA keys and ECDSA keys on P-256 and P-384 are checked: between them nearly every site (Let's Encrypt's E and Y certificates, as Wikipedia, Hacker News and FrogFind have; Google's and Cloudflare's; GlobalSign's, as CNN lite has). RSA is offered first, being the cheaper on the Psion. A key of another kind gives *Certificate cannot be checked - host*; a server that will not talk to PsiWeb's TLS at all, *Secure connection refused - host*. Through a proxy, either still loads.
+- It costs time. On a 5mx (15 MIPS) one check takes about 0.6 s for RSA-2048, 5 s for RSA-4096, 1.2 s for ECDSA P-256 and 3.6 s for P-384; on the netBook about a fifth of that. A new connection checks two (the site's certificate and its signature): about 1.2 s for an RSA site, 2.3 s for Google or Cloudflare, 4.7 s for a Let's Encrypt ECDSA site. The first time a chain's intermediate certificates are seen they are checked too, then remembered in `C:\System\Apps\PsiWeb\certs.txt`. A resumed connection checks nothing again.
+- The Psion's clock must be roughly right (certificates have dates). If it was never set (before 2024), dates are not checked.
 
 A proxy on a computer on your network makes browsing much quicker and lighter, which is why it is recommended. It is one of the shared Connection settings: *Tools > Connection settings > Network > Use proxy*, with its address and port, set once for all three apps. With it on, every request goes to the proxy as plain HTTP, `https://` ones too, and:
 - the computer does the TLS, so the Psion skips a handshake for each site, and can reach sites its own TLS cannot talk to;
@@ -131,7 +141,8 @@ Figures are ARM instructions counted in the emulator harness, at an assumed 15 M
 | www.bbc.co.uk with all 117 pictures (3.9 MB) | 32 s | 6.3 MB, at most 8.3 MB scrolling to the end |
 
 - The engine's heap is limited to 10 MB. On a long page, pictures away from the screen are let go and decoded again when they come back. A page that still does not fit stops where it is and says "Page too big".
-- `psiweb.exe` is about 1.9 MB. EPOC loads an EXE into RAM, so this comes on top of the heap.
+- `psiweb.exe` is about 2.1 MB (0.84's certificate check added 56 KB, of which ECDSA 11 KB). EPOC loads an EXE into RAM, so this comes on top of the heap.
+- HTTPS without a proxy, from 0.84 (first visit, then later ones): text.npr.org 7.0 s, then 2.0 s; wiby.me 5.1, 2.6; lite.duckduckgo.com 2.4, 1.8; www.cloudflare.com 13.2, 9.8; CNN lite 12.4, 8.8; Wikipedia 20.8, 13.6 (two connections). Through a proxy nothing changes.
 
 ### On the netBook
 
@@ -219,6 +230,7 @@ Installed PsiWebs update from the **psiterm** repository's `dist/` (`PsiWeb-vers
 - **5mx emulator** (`core/tools/emu/`, run from this checkout): the real package on the real ROM. `node --experimental-strip-types core/tools/emu/mkcard.ts psiweb` makes the card, `core/tools/emu/run.sh NAME ...` runs it; `python3 core/tools/emu/net.py web` loads a page through an emulated modem (it needs the psiconnect checkout beside this one for the modem).
 - **netBook emulator** (`../psionEmulators`, with `../psion-netbook/tools/mkimage.mts --with PATH/PsiWeb.sis` to put a test build in a scratch ROM image, since programs on the card cannot start there): see `CLAUDE.md`. The ARM harness takes `--netbook` for colour screenshots at 640x480, and `--progress` to log the toolband's progress figure.
 - **PC build** (`links/build_host.sh`, `links/run_host.sh`): Links with the `psi` driver on Linux, for quick checks.
+- **Certificates** (0.84): `test/cert/run.sh` builds psion-core's certificate check with `engine/pwcert.c` for the PC and checks it on chains fetched with openssl (trusted sites, another name, self-signed, expired, a refused handshake); `python3 core/tools/emu/net.py certbad` (`test/emu/cert.net.py`) has the real package in the 5mx emulator refuse a self-signed server behind the emulated modem.
 
 ## The NetSurf engine
 

@@ -1,7 +1,8 @@
 /* includes.h - stands in for Dropbear's includes.h when PsiWeb builds
  * PsiTerm's TLS client (ssh/tls13.c) and Dropbear's X25519
  * (ssh/db/src/curve25519.c) without the rest of Dropbear. The include
- * guards match Dropbear's, so its own includes.h and dbrandom.h are skipped. */
+ * guards match Dropbear's, so its own includes.h and dbrandom.h are skipped.
+ * Also included by certcheck.c (libtomcrypt's SHA-2 there). */
 #ifndef DROPBEAR_INCLUDES_H_
 #define DROPBEAR_INCLUDES_H_
 #define DROPBEAR_RANDOM_H_
@@ -12,6 +13,9 @@
 #define TLS_FAST_X25519 1
 #define TLS_RESUME 1
 #define TLS_FAST_CRYPTO 1     /* web/tls/aead.c */
+/* (0.84) the server's certificate is checked, as PsiMail's: psion-core's
+   core/mail/engine/tlsv/certcheck.c, with engine/pwcert.c */
+#define TLS_VERIFY 1
 #include <string.h>
 #include <stdlib.h>
 #include "tomcrypt.h"
