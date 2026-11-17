@@ -853,7 +853,23 @@ Display (docs/display.md, fonts):
  		}
  		bitmap_failed:
  		drv->register_bitmap(&(cimg->bmp));
-@@ -1181,6 +1356,12 @@
+@@ -982,6 +1157,15 @@
+ 		/* We must not perform end with chopped because some
+ 		 * unprocessed data still wait for us :)
+ 		 */
++#ifdef PSI_LAZY_IMAGES
++		/* PsiWeb: a JPEG asked only for its size (insert_image) has
++		   decoded nothing yet. Ending it here made a finished picture
++		   of its empty buffer: a JPEG under RESTART_SIZE that had all
++		   come was drawn black. insert_image drops the decoder, and
++		   img_draw_image decodes the picture and ends it. */
++		if (psi_size_only && cimg->image_type == IM_JPG && (cimg->state == 12 || cimg->state == 14))
++			return chopped;
++#endif
+ 		if (!chopped){
+ 			if (!((cimg->state^8)&9)) {
+ #ifdef HAVE_TIFF
+@@ -1181,6 +1365,12 @@
  
  	if (!(goi->goti.go.xw && goi->goti.go.yw))
  		return; /* At least one dimension is zero */
@@ -866,7 +882,7 @@ Display (docs/display.md, fonts):
  
  	memcpy(&r, &fdatac->ses->term->dev->clip, sizeof(struct rect));
  	if (fdatac->vs->g_display_link && fdatac->active && fdatac->vs->current_link != -1 && fdatac->vs->current_link == goi->goti.link_num) {
-@@ -1192,6 +1373,9 @@
+@@ -1192,6 +1382,9 @@
  
  	global_goi=goi;
  	global_cimg=goi->cimg;
@@ -876,7 +892,7 @@ Display (docs/display.md, fonts):
  	if (img_process_download(goi, fdatac)) goto ret; /* Choked with data, will not
  							* draw. */
  	/* Now we will only draw... */
-@@ -1209,6 +1393,9 @@
+@@ -1209,6 +1402,9 @@
  		draw_picture(fdatac, goi, x, y);
  	}
  ret:
@@ -886,7 +902,7 @@ Display (docs/display.md, fonts):
  	set_clip_area(fdatac->ses->term->dev, &r);
  #ifdef LINKS_TESTMODE_IMAGE_AUTO_EXIT
  	if (cimg->state & 1)
-@@ -1258,6 +1445,10 @@
+@@ -1258,6 +1454,10 @@
  		cimg->eof_hit = 0;
  		cimg->last_count = -1;
  		cimg->last_count2 = -1;
@@ -897,7 +913,7 @@ Display (docs/display.md, fonts):
  		if (cimg->wanted_xw >= 0 && cimg->wanted_yw >=0) cimg->state |= 2;
  		add_image_to_cache(cimg);
  	}
-@@ -1277,6 +1468,7 @@
+@@ -1277,6 +1477,7 @@
  
  	image=mem_calloc(sizeof(struct g_object_image));
  	global_goi = image;
@@ -905,7 +921,7 @@ Display (docs/display.md, fonts):
  	image->goti.go.mouse_event = g_text_mouse;
  	image->goti.go.draw = img_draw_image;
  	image->goti.go.destruct = img_destruct_image;
-@@ -1342,17 +1534,143 @@
+@@ -1342,17 +1543,143 @@
  	find_or_make_cached_image(image, im->url, d_opt->image_scale);
  	cimg = global_cimg;
  
