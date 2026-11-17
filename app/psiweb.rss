@@ -577,7 +577,7 @@ RESOURCE DIALOG r_pw_about_dialog
 		DLG_LINE { type=EEikCtLabel; id=EPwDlgAboutStatus; control=LABEL { standard_font=EEikLabelFontAnnotation; reserve_length=70; txt="-"; }; },
 		DLG_LINE { type=EEikCtLabel; id=EPwDlgAbout4; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="Links 2 browser engine (c) Mikulas Patocka & others - GPL v2 (no JavaScript)"; }; },
 		DLG_LINE { type=EEikCtLabel; id=EPwDlgAbout5; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="Source: github.com/danieledge/psiweb - PsiWeb's own code MIT - see COPYING.txt"; }; },
-		DLG_LINE { type=EEikCtLabel; id=EPwDlgAbout6; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="libpng, zlib, DejaVu fonts; TLS: LibTomCrypt, LibTomMath (public domain)"; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPwDlgAbout6; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="libpng, zlib, DejaVu fonts; TLS: LibTomCrypt, LibTomMath, TweetNaCl (public domain)"; }; },
 		DLG_LINE { type=EEikCtLabel; id=EPwDlgAbout7; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="This software is based in part on the work of the Independent JPEG Group"; }; },
 		DLG_LINE { type=EEikCtLabel; id=EPwDlgAbout8; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="This product includes software licensed from Symbian Ltd (c) Symbian Ltd 1998-9"; }; }
 		};
