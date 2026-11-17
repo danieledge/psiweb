@@ -19,3 +19,7 @@
 #define EMbmBandHomeMask 17
 #define EMbmBandPictures 18
 #define EMbmBandPicturesMask 19
+#define EMbmBandLock 20
+#define EMbmBandLockMask 21
+#define EMbmBandNoLock 22
+#define EMbmBandNoLockMask 23

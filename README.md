@@ -14,9 +14,23 @@ A web browser for the **Psion Series 5mx**, the **netBook** and the **Series 7**
 
 Up to 0.61 the engine was NetSurf. Its sources are still in the tree as a fallback (see *The NetSurf engine* below), until Links has been proved on the device. The whole port is described in [`links/PORTING.md`](links/PORTING.md).
 
-**Status: beta (0.85).** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
+**Status: beta (0.86).** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
 
 [![Download PsiWeb.sis](https://img.shields.io/badge/Download-PsiWeb.sis-2ea44f?logo=github)](https://github.com/danieledge/psiterm/raw/main/dist/PsiWeb.sis)
+
+## What's new in 0.86
+
+- **A start page with a speed dial.** PsiWeb opens on its own start page (Go > Start page, or the Start button): a search box, eight tiles that are your first eight favourites (a new PsiWeb gets Search, 68k.news, BBC News, Wikipedia, CNN lite, NPR text and Hacker News; the eighth is Add... until there are eight), the pages you saw last, and the way you are connected with *Change...* and *What works*. Keys 1 to 8 open the tiles while it shows (not while the search box has the cursor), or tap them. On the netBook the tiles are in EPOC's own colours with a Recent list; on the 5mx they are greys, with a line for each.
+- **Page styles on the Psion.** View > Page style: *Full* (the page as it comes, the standard), *Lighter* (scripts, styles, hidden parts and tracking pictures out), *Reader* (menus, sidebars, banners and link lists out too: an article first) and *Text only*. Shift+Ctrl+R goes round them for the page showing, at once. They use the PsiConnect Atom's own page simplifier, built into the engine. A line at the top of a lightened page says when its pictures were left out (*Show pictures*), when it was cut at the machine's limit (*Show the rest*: 512 KB on the 5mx, 2 MB on the netBook) and when it is drawn by scripts (*Try the reader service*, FrogFind).
+- **The route light.** On the toolband: *Direct*, *Atom* or *PsiProxy*, a padlock for a secure page checked on the way, and L, R or T for the page style. A tap opens Page information, which now says how the page came, whether it is secure and who checked it, its style, its size (and how much was kept) and the pictures left out.
+- **AES-128-GCM** as a second TLS 1.3 cipher (psion-core's `ssh/aesgcm.c`), for servers that offer AES only: eBay, the one site of 50 that PsiWeb could not reach direct, now connects. ChaCha20-Poly1305 stays first.
+- **Bars without a restart.** Showing or hiding the toolbar (Ctrl+T) or the toolband (Shift+Ctrl+T) lays the page out again at the new width, on the same page and place; the engine no longer restarts (no "Restarting the browser engine..." and no blank page).
+- **The toolbar**: Go to, Back, Start, Pictures. **The toolband**: Back, Forward, Reload (Stop while a page loads, one button), Start, the address, the route light, Pictures. The progress bar runs along the bottom of the address while a page loads, and is gone when idle (no empty gap beside the address).
+- **Address completion.** As you type in the toolband's address, the first favourite or recent page that begins the same way is offered, chosen, so typing on replaces it and Enter takes it.
+- **Help on the netBook** uses a dialog the size of the netBook's own large dialogs, its text taking the room; a new topic, *Page styles*.
+- Pictures are asked for as JPEG, PNG or GIF (the Accept header no longer offers WebP); the netBook's engine may grow to 20 MB (the 5mx stays at 10 MB).
+
+Measured (ARM harness, the same pages served locally so only the Psion's own work counts; millions of instructions, Full / Lighter / Reader): BBC home 43 / 54 / 48, BBC News 56 / 64 / 61, the Guardian 79 / 108 / 104, GitHub 33 / 45 / 36, Wikipedia 21 / 27 / 22, Hacker News 31 / 26 / 27. Links already parses a whole page quickly, so making it lighter first costs about as much as it saves: the styles are for reading (Reader puts an article first), not for speed, and Full stays the standard. Pages in Full draw exactly as in 0.83 (screenshots compared pixel for pixel on both machines).
 
 ## What's new in 0.85
 
@@ -48,10 +62,35 @@ Since 0.77, the last signed release.
 
 ## Screenshots
 
-PsiWeb 0.85 (the first rows) and 0.80 on the netBook (colour, 640x480) and the Series 5mx (16 greys, 640x240). Taken in emulators; the netBook's *Page not opened* in the ARM harness, as that emulator has no network. Tap or click one to see it full size.
+PsiWeb 0.86 and 0.85 (the first rows) and 0.80 on the netBook (colour, 640x480) and the Series 5mx (16 greys, 640x240). Taken in emulators; pages and the netBook's *Page not opened* in the ARM harness, as the netBook emulator has no network. Tap or click one to see it full size.
 
 <table>
 <tr><th>netBook</th><th>Series 5mx</th></tr>
+<tr><td colspan="2"><b>The start page and its speed dial (0.86)</b></td></tr>
+<tr>
+<td><a href="docs/img/netbook-psiweb-start.png"><img src="docs/img/netbook-psiweb-start.png" alt="netBook: the start page" width="400"></a></td>
+<td><a href="docs/img/5mx-psiweb-start.png"><img src="docs/img/5mx-psiweb-start.png" alt="Series 5mx: the start page" width="400"></a></td>
+</tr>
+<tr><td colspan="2"><b>BBC News in Full (0.86)</b></td></tr>
+<tr>
+<td><a href="docs/img/netbook-psiweb-bbc-full.png"><img src="docs/img/netbook-psiweb-bbc-full.png" alt="netBook: BBC News in the Full style, menus first" width="400"></a></td>
+<td><a href="docs/img/5mx-psiweb-bbc-full.png"><img src="docs/img/5mx-psiweb-bbc-full.png" alt="Series 5mx: BBC News in the Full style, menus first" width="400"></a></td>
+</tr>
+<tr><td colspan="2"><b>...and in Reader: the article first (0.86)</b></td></tr>
+<tr>
+<td><a href="docs/img/netbook-psiweb-bbc-reader.png"><img src="docs/img/netbook-psiweb-bbc-reader.png" alt="netBook: BBC News in the Reader style" width="400"></a></td>
+<td><a href="docs/img/5mx-psiweb-bbc-reader.png"><img src="docs/img/5mx-psiweb-bbc-reader.png" alt="Series 5mx: BBC News in the Reader style" width="400"></a></td>
+</tr>
+<tr><td><b>Help, the size of the netBook's own large dialogs (0.86)</b></td><td><b>View > Page style (0.86)</b></td></tr>
+<tr>
+<td><a href="docs/img/netbook-psiweb-help.png"><img src="docs/img/netbook-psiweb-help.png" alt="netBook: Help on PsiWeb" width="400"></a></td>
+<td><a href="docs/img/5mx-psiweb-page-style.png"><img src="docs/img/5mx-psiweb-page-style.png" alt="Series 5mx: the View menu's Page style cascade" width="400"></a></td>
+</tr>
+<tr><td><b>The toolband's address offering 68k.news (0.86)</b></td><td><b>Page information (0.86)</b></td></tr>
+<tr>
+<td><a href="docs/img/5mx-psiweb-address-completion.png"><img src="docs/img/5mx-psiweb-address-completion.png" alt="Series 5mx: the address completed as it is typed" width="400"></a></td>
+<td><a href="docs/img/5mx-psiweb-page-info.png"><img src="docs/img/5mx-psiweb-page-info.png" alt="Series 5mx: Page information" width="400"></a></td>
+</tr>
 <tr><td colspan="2"><b>Set up PsiWeb: how the Psion goes online</b></td></tr>
 <tr>
 <td><a href="docs/img/netbook-psiweb-setup.png"><img src="docs/img/netbook-psiweb-setup.png" alt="netBook: the first page of Set up PsiWeb" width="400"></a></td>
@@ -109,6 +148,8 @@ Install `dist/PsiWeb.sis` (to D: if you have a CF card). PsiWeb is on the Extras
 | Shift+Ctrl+D | add this page to Favourites |
 | Shift+Ctrl+Q | page information (title, address, status, free memory, the route) |
 | Shift+Ctrl+B | Bright screen (more contrast, the backlight kept on) |
+| Shift+Ctrl+R | the next page style (Full, Lighter, Reader, Text only) |
+| 1 to 8 | on the start page, open a tile |
 | Ctrl+U | disconnect (hang up and free the serial port) |
 | Ctrl+K | preferences: home page, pictures, search, text |
 | Shift+Ctrl+H | help on PsiWeb |
@@ -279,6 +320,7 @@ Installed PsiWebs update from the **psiterm** repository's `dist/` (`PsiWeb-vers
 - **netBook emulator** (`../psionEmulators`, with `../psion-netbook/tools/mkimage.mts --with PATH/PsiWeb.sis` to put a test build in a scratch ROM image, since programs on the card cannot start there): see `CLAUDE.md`. The ARM harness takes `--netbook` for colour screenshots at 640x480, and `--progress` to log the toolband's progress figure.
 - **PC build** (`links/build_host.sh`, `links/run_host.sh`): Links with the `psi` driver on Linux, for quick checks.
 - **Certificates** (0.84): `test/cert/run.sh` builds psion-core's certificate check with `engine/pwcert.c` for the PC and checks it on chains fetched with openssl (trusted sites, another name, self-signed, expired, a refused handshake); `python3 core/tools/emu/net.py certbad` (`test/emu/cert.net.py`) has the real package in the 5mx emulator refuse a self-signed server behind the emulated modem.
+- **Page styles** (0.86): `test/simp/check.sh` checks the simplifier in `links/simp/` is psiconnect's and runs psiconnect's simplifier tests; `links/emu/run_links.py --style N` runs a page in a style. AES-128-GCM: psion-core's `ssh/test/aesgcmtest.c`.
 - **Addresses and search** (0.85): `test/addr/addrtest.c` (what is words, what is an address, the search address); **Page not opened** (0.85): `test/problem/problemtest.c` (each failure's kind and the page, escaped and bounded). Each file's first lines say how to build it. The setup assistant's choices are tested in psion-core (`ssh/test/setuptest.cpp`).
 - **netBook emulator, no network.** That emulator has no modem or network card behind it, so pages there end in nothing; the *Page not opened* screenshots for the netBook come from the ARM harness with `--netbook`. Its taps do not reach dialog page tabs: use Up and Right.
 

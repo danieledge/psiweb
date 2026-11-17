@@ -495,6 +495,8 @@ void CPwAppUi::PageLoaded()
 	title.Trim();
 	iHist->AddFront(title, url);
 	iHistUntil = User::TickCount() + KPwHistWatch;
+	TRAPD(err, UpdateStartPageL());         // (0.87) its Recent pages
+	(void)err;
 	}
 
 // ...the title can reach the shared chunk a moment after the page: for a
@@ -561,6 +563,7 @@ void CPwAppUi::AddFavouriteL()
 		iEikonEnv->InfoMsg(_L("Not added - 40 favourites is the most"));
 	else
 		iEikonEnv->InfoMsg(_L("Added to favourites"));
+	UpdateStartPageL();                      // (0.87) the speed dial
 	}
 
 void CPwAppUi::OrganiseL()
@@ -573,6 +576,7 @@ void CPwAppUi::OrganiseL()
 	TInt pick = -1;
 	CPwListDialog* dlg = new(ELeave) CPwListDialog(*iFavs, ETrue, pick);
 	dlg->ExecuteLD(R_PW_ORGANISE_DIALOG);
+	UpdateStartPageL();                      // (0.87) the speed dial
 	}
 
 // a list to pick a page from (More favourites, Full history)
@@ -601,6 +605,7 @@ void CPwAppUi::ClearHistoryL()
 		{
 		iHist->Clear();
 		iHistUntil = 0;
+		UpdateStartPageL();
 		iEikonEnv->InfoMsg(_L("History cleared"));
 		}
 	}

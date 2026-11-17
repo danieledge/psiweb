@@ -187,8 +187,21 @@ def pictures():
         for x in range(N):
             if (x in (0, 15) and 1 <= y <= 14) or (y in (1, 14) and 0 <= x <= 15): a[y][x] = 'k'
     return a
+def lock(closed):
+    # (0.86) the route light's padlock: closed for a secure page checked on
+    # the way, nothing for a plain one
+    a = blank()
+    if not closed: return a
+    fill(a, lambda x, y: 3 <= x <= 13 and 7 <= y <= 14, 'y')
+    def shackle(x, y):
+        r = math.hypot(x-8, y-7)
+        return 3.0 <= r <= 4.6 and y <= 7.5
+    fill(a, shackle, 'd')
+    fill(a, lambda x, y: 7 <= x <= 9 and 9.5 <= y <= 12, 'k')
+    return outline(a)
 BAND_ICONS = [('BandBack', arrow(True)), ('BandForward', arrow(False)), ('BandReload', reload_()),
-         ('BandStop', stop()), ('BandHome', home()), ('BandPictures', pictures())]
+         ('BandStop', stop()), ('BandHome', home()), ('BandPictures', pictures()),
+         ('BandLock', lock(True)), ('BandNoLock', lock(False))]
 
 
 def parse(art):

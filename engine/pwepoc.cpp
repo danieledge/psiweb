@@ -554,10 +554,11 @@ extern "C" const char* pwb_first_url()
 		return s->start_url;
 		}
 	s->start_taken = 1;
-	return "about:welcome";
+	return "about:start";                // (0.87) the start page, with its speed dial
 	}
 extern "C" const char* pwb_res_dir() { return Pw()->res_dir; }
 extern "C" int pwb_load_images() { return Pw()->load_images; }
+extern "C" int pwb_style() { return Pw()->style; }
 extern "C" int pwb_zoom() { return Pw()->zoom; }
 extern "C" int pwb_depth() { return Pw()->depth == PW_DEPTH_COLOR256 ? 8 : 4; }
 extern "C" void* pwb_shared() { return Pw(); }

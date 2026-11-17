@@ -26,14 +26,18 @@ emulator tools. Core keeps the old relative paths (`core/ssh/psiglue.cpp`,
 ## Two processes
 
 1. **PsiWeb.app** (`app/`, an EIKON DLL): screen, keys, pen, menus, dialogs,
-   settings, favourites and history (`pwfavs.cpp`), help (`pwhelp.cpp`).
+   settings, favourites and history (`pwfavs.cpp`), help (`pwhelp.cpp`),
+   the start page (`pwstart.cpp`, 0.86), the setup assistant (psion-core's
+   `ssh/pgsetup.*`, 0.85).
 2. **psiweb.exe** (Links, plain C on ESTLIB): `links/psi_drv.c` (the graphics
    driver: RGB565 frame to 16 greys, keys, pen, commands, questions, picture
    memory), `links/psi_colour.c` (the frame to EPOC's 256 colours on a
    colour screen; `psi_pal.h` is EPOC's palette), `links/epoc/psi_os.c` (the select loop and pseudo-sockets over
    pwnet), `links/epoc/psi_heap.cpp` (the 10 MB heap), `engine/pwepoc.cpp`
    (the chunk, PsiWeb.log, heartbeats), `engine/pwupdate.c` (signed
-   updates), with `core/web/engine/pwnet.c` over `core/ssh/psiglue.cpp` and
+   updates), `engine/pwproblem.c` (the "Page not opened" page, 0.85),
+   `links/psi_style.c` with `links/simp/` (View > Page style: the
+   PsiConnect Atom's simplifier, kept identical to psiconnect's, 0.86), with `core/web/engine/pwnet.c` over `core/ssh/psiglue.cpp` and
    `core/ssh/tls13.c` (`tls/` holds the LibTomCrypt configuration;
    `core/web/tls` the arithmetic).
 
@@ -118,10 +122,14 @@ Use the `epoc-eikon-ui-guide` skill if it is available.
   infoprints (no "error", no "please", no full stops).
 - Toolbar on the right: title, four 24x20 pictures (`tools/mkicons.py`),
   the clock. Black on white, grey for secondary text, clipped with "...".
-- Toolband along the top (0.78; Shift+Ctrl+T): Back, Forward, Reload, Stop,
-  Home (16x16 colour pictures, named in the resource through
-  `app/pwicons.rh`), the address (an edwin: Ctrl+L or a tap), progress,
-  Pictures. Shown at first on a tall screen, hidden on the 5mx.
+- Toolband along the top (0.78; Shift+Ctrl+T): Back, Forward, Reload/Stop
+  (one button, 0.86), Start (16x16 colour pictures, named in the resource
+  through `app/pwicons.rh`), the address (an edwin: Ctrl+L or a tap) with
+  the progress bar along its foot, the route light, Pictures. Shown at
+  first on a tall screen, hidden on the 5mx. Showing or hiding a bar resizes
+  the engine's page (PW_CMD_RESIZE), no restart.
+- A change to `links/patches/*.diff` needs `build/links/links-2.30` removed
+  (fetch.sh applies the patches only to fresh sources).
 - Don't change the connection settings (the dialog, its fields, formats or
   defaults) unless the owner asks. `TPsiLink` is shared by every program.
 

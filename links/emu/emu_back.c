@@ -14,7 +14,7 @@ int emu_hc(int op, int a, int b, int c, int d);
 void emu_mem_report(void);
 enum {
 	HB = 200, HB_OPEN = HB, HB_PRESENT, HB_EVENT, HB_CMD, HB_STATUS, HB_TITLE,
-	HB_URL, HB_BUSY, HB_READY, HB_MS, HB_CONFIG, HB_UPDCFG, HB_IMAGES, HB_DEPTH,
+	HB_URL, HB_BUSY, HB_READY, HB_MS, HB_CONFIG, HB_UPDCFG, HB_IMAGES, HB_DEPTH, HB_STYLE,
 	HP = 300, HP_DIAL = HP, HP_HANGUP, HP_AVAIL, HP_READ, HP_WRITE, HP_WAIT, HP_ENTROPY
 };
 
@@ -79,6 +79,7 @@ const char *pwb_home_url(void) { return "about:blank"; }
 const char *pwb_first_url(void) { return "about:blank"; }
 const char *pwb_res_dir(void) { return "/tmp/psiwebemu/"; }
 int pwb_load_images(void) { return emu_hc(HB_IMAGES, 0, 0, 0, 0); }
+int pwb_style(void) { return emu_hc(HB_STYLE, 0, 0, 0, 0); }
 int pwb_zoom(void) { return 100; }
 unsigned long pwb_ms(void) { return (unsigned long)emu_hc(HB_MS, 0, 0, 0, 0); }
 

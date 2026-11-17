@@ -54,6 +54,8 @@ void FromUtf8(TDes& aDst, const char* aSrc);
 struct TPwSettings;
 // the route in the user's words: About, Page information (psiweb.cpp)
 void RouteWords(const TPwSettings& aSettings, TDes& aOut);
+// (0.86) the page style in use: the one chosen, or the standard, Full
+TInt StyleNow(const TPwSettings& aSettings);
 
 // Favourites and History (pwfavs.cpp): one entry is a title and an address.
 // They are kept in their own files (Favourites.dat, History.dat) beside
@@ -117,7 +119,7 @@ struct TPwSettings
 	TInt iToolband;        // (0.78) View > Show toolband: the address, Back, Forward...
 	TInt iDisplay;         // KPwDisplay* bits (docs/display.md)
 	TInt iSearch;          // (0.85) Search with: PW_SEARCH_* (pwaddr.h)
-	TInt iStyle;           // (0.86) Page style: PW_STYLE_* (psiweb_cmds.h)
+	TInt iStyle;           // (0.86) Page style: PW_STYLE_* (psiweb_cmds.h); -1 the route's standard
 	TInt iFlags;           // (0.85) KPwFlag* bits
 	};
 
@@ -402,8 +404,9 @@ class CPwSetupDialog : public CPgSetupDialog
 	{
 public:
 	CPwSetupDialog(TPwSettings& aSettings, TInt aTestDialog, TInt aTestFirstLine)
-		: CPgSetupDialog(aTestDialog, aTestFirstLine), iSettings(aSettings), iPicturesChosen(EFalse) {}
+		: CPgSetupDialog(aTestDialog, aTestFirstLine), iSettings(aSettings), iPicturesChosen(EFalse), iStyleChosen(EFalse) {}
 	static TInt StandardPictures(const PgSuChoice& aChoice, TBool aTall);
+	static TInt StandardStyle(const PgSuChoice& aChoice);
 private:
 	void AppPreLayoutL();
 	void AppControlChangedL(TInt aControlId);
@@ -412,6 +415,7 @@ private:
 	void ShowPicturesNoteL();
 	TPwSettings& iSettings;
 	TBool iPicturesChosen;     // the person set Pictures: the route no longer changes it
+	TBool iStyleChosen;        // (0.86) ...and Page style
 	};
 
 class CPwPrefsDialog : public CEikDialog
@@ -422,6 +426,18 @@ private:
 	void PreLayoutDynInitL();
 	TBool OkToExitL(TInt aButtonId);
 	TPwSettings& iSettings;
+	};
+
+// (0.87) how far the page has come, along the toolband address's lower
+// edge while it loads (nothing when idle: no empty gap beside the address)
+class CPwBar : public CCoeControl
+	{
+public:
+	void ConstructL(const CCoeControl& aParent);
+	void SetValue(TInt aPercent) { iValue = aPercent < 0 ? 0 : aPercent > 100 ? 100 : aPercent; }
+private:
+	void Draw(const TRect& aRect) const;
+	TInt iValue;
 	};
 
 class CPwAppUi : public CEikAppUi, public MCoeControlObserver
@@ -438,6 +454,11 @@ public:
 	void PageLoaded();                  // a page has loaded: History (pwfavs.cpp)
 	void PageTick();                    // ...and its title may arrive a moment later
 	void EngineCommandL(TInt aCmd);     // (0.85) a "Page not opened" page's links (PW_APP_*)
+	void SetStyleL(TInt aStyle);        // (0.86) View > Page style
+	void UpdateStartPageL();            // (0.87) the start page (pwstart.cpp)
+	void OpenTileL(TInt aIndex);        // (0.87) ...its tile 1 to 8
+	void SeedFavouritesL();             // (0.87) a new PsiWeb's favourites: its first tiles
+	void RouteLightL();                 // (0.86) the toolband's route light follows the page
 private:
 	// Favourites and History (pwfavs.cpp)
 	TBool HavePage() const;
@@ -481,17 +502,21 @@ private:
 	TRect PageRect();                   // the bars laid out as they are shown: the page's room
 	TBool TallScreen() const;           // 480 lines (the netBook): the toolband at first, not the toolbar
 	void StartAddressL();               // a tap on the address, or Ctrl+L
+	void CompleteAddressL();            // (0.87) the address offered as it is typed
 	void HandleControlEventL(CCoeControl* aControl, TCoeEvent aEventType);
 	void SetAddressL(const TDesC& aText);
 	void ShowAddressCursorL(TBool aShow);   // the address's cursor and selection, as if it had the focus
 	CPwView* iView;
 	CEikEdwin* iAddress;                // the toolband's address and progress (NULL: no toolband)
-	CEikProgressInfo* iProgress;
+	CPwBar* iBar;                       // (0.87) the progress bar along the address
+	TBool iBandBusy;                    // (0.87) Reload shows Stop
 	TBool iEditing;                     // the address is being typed in
 	TBuf<PW_URL_MAX> iShownUrl;         // the page it shows
 	TBool iAddressStale;                // ...to be shown again, whatever it was
 	TBool iPenTaken;                    // the pen's down-to-up is the address's first tap
 	TInt iShownProgress;                // what the bar shows (-1: hidden)
+	TBuf<16> iRouteShown;               // (0.86) what the route light says
+	TInt iLockShown;                    // ...and whether its padlock is shut (-1: not yet)
 	};
 
 class CPwDocument : public CEikDocument

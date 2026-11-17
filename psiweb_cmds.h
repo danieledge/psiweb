@@ -25,7 +25,12 @@ enum
 	                                   page (the app's scroll bar: page_y) */
 	PW_CMD_PUTLOG                   /* 0.71: Tools > Send log to server: POST PsiWeb.old
 	                                   and PsiWeb.log to the proxy (pwupdate.c
-	                                   pw_putlog_run); log_state / log_msg say how it went */
+	                                   pw_putlog_run); log_state / log_msg say how it went */,
+	PW_CMD_RESTYLE                  /* 0.86: the page style (style) changed: lay the
+	                                   page showing out again */,
+	PW_CMD_RESIZE                   /* 0.87: the page area changed (a bar shown or
+	                                   hidden): width and height say how big; the
+	                                   page is laid out again, with no restart */
 	};
 
 /* app_cmd (psiweb.h, 0.85): what a "Page not opened" page's links ask */
@@ -33,7 +38,9 @@ enum
 	{
 	PW_APP_NONE = 0,
 	PW_APP_TEST,                    /* about:cmd-test: Test the connection */
-	PW_APP_SETUP                    /* about:cmd-setup: Set up PsiWeb */
+	PW_APP_SETUP,                   /* about:cmd-setup: Set up PsiWeb */
+	PW_APP_HELP,                    /* (0.87) about:cmd-help: Help, What works */
+	PW_APP_FAVS                     /* (0.87) about:cmd-favs: Organise favourites (the tiles) */
 	};
 
 /* style (psiweb.h, 0.86): the page style, View > Page style */

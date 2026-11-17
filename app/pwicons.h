@@ -13,6 +13,8 @@ enum TPwIconId
 	EMbmBandStop = 14, EMbmBandStopMask = 15,
 	EMbmBandHome = 16, EMbmBandHomeMask = 17,
 	EMbmBandPictures = 18, EMbmBandPicturesMask = 19,
-	EMbmCount = 20
+	EMbmBandLock = 20, EMbmBandLockMask = 21,
+	EMbmBandNoLock = 22, EMbmBandNoLockMask = 23,
+	EMbmCount = 24
 	};
 #endif

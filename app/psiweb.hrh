@@ -43,6 +43,14 @@ enum TPwCommands
 	EPwCmdLogMenu,           // (0.85) Tools > Log (the cascade's own id)
 	EPwCmdRetry,             // (0.85) a "Page not opened" page: Try again
 	EPwCmdTestConn,          // (0.85) ...Test the connection
+	EPwCmdStyleMenu,         // (0.86) View > Page style (the cascade's own id)
+	EPwCmdStyleFull,         // (0.86) ...Full, Lighter, Reader, Text only, in PW_STYLE_* order
+	EPwCmdStyleLighter,
+	EPwCmdStyleReader,
+	EPwCmdStyleText,
+	EPwCmdStyleNext,         // (0.86) Shift+Ctrl+R: the next page style
+	EPwCmdRouteLight,        // (0.86) the toolband's route light: Page information
+	EPwCmdReloadStop,        // (0.87) the toolband's Reload, which is Stop while a page loads
 	EPwCmdFav0 = 0x1100,     // the favourites on the menu: 16 slots
 	EPwCmdHist0 = 0x1120     // the History cascade's pages: 16 slots
 	};
@@ -71,6 +79,7 @@ enum TPwDialogControls
 	EPwDlgInfo3,
 	EPwDlgInfo4,
 	EPwDlgInfo5,
+	EPwDlgInfo6,             // (0.86) Page information: the page's style and size
 	EPwDlgUpdSource,
 	EPwDlgUpdHost,
 	EPwDlgUpdPort,
@@ -98,7 +107,10 @@ enum TPwDialogControls
 	EPwDlgSearch,            // (0.85) Preferences: Search with
 	EPwDlgSuPictures,        // (0.85) Set up PsiWeb > Pages
 	EPwDlgSuPicturesNote,
-	EPwDlgSuSearch
+	EPwDlgSuSearch,
+	EPwDlgStyle,             // (0.86) Preferences: Page style
+	EPwDlgSuStyle,           // (0.86) Set up PsiWeb > Pages: Page style
+	EPwDlgSuStyleNote
 	};
 
 // Organise favourites: its buttons

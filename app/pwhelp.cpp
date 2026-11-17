@@ -87,6 +87,30 @@ static const TPwHelpTopic KHelpTopics[] =
 	  "addresses you read.",
 	  0, 0 },
 
+	{ "Page styles",
+	  "View > Page style chooses how much of a page PsiWeb keeps before it lays the page out. "
+	  "Shift+Ctrl+R goes round them for the page showing, and the choice stays for the pages after.\n"
+	  "\n"
+	  "Full: the page as it comes.\n"
+	  "Lighter: scripts, style sheets, hidden parts and tracking pictures taken out, which is most "
+	  "of a modern page's size; it looks the same in PsiWeb.\n"
+	  "Reader: the page's text, with its menus, sidebars, banners and lists of links taken out "
+	  "too. Best for an article on a news site. A page that is all menus may come out nearly "
+	  "empty: choose Lighter or Full for it.\n"
+	  "Text only: as Lighter, with each picture's description in place of the picture.\n"
+	  "\n"
+	  "Full is the standard. The others are for reading, not for speed: on the Psion, making a "
+	  "page lighter takes about as long as it saves. The Atom modem helper and PsiProxy on a "
+	  "computer lighten pages before they arrive. The style is shown in the route light on the toolband (L, R or T) "
+	  "and in Page information, with how much of the page was kept.\n"
+	  "\n"
+	  "A line at the top of a page says when something was left out: a page cut short at the "
+	  "machine's limit (Show the rest), pictures left out (Show pictures), or a page drawn by "
+	  "scripts, which PsiWeb cannot run (Try the reader service, FrogFind: someone else's service, "
+	  "which sees the address).",
+	  "The netBook keeps up to 2 MB of a lightened page.",
+	  "The Series 5mx keeps up to 512 KB of a lightened page." },
+
 	{ "Reading pages",
 	  "Up and Down scroll a line; Fn+Up and Fn+Down (Pg Up and Pg Dn) a screen; Go > Top of page and "
 	  "End of page go to the ends. Tap a link to follow it, a field to type in it, a button to press "
@@ -100,9 +124,10 @@ static const TPwHelpTopic KHelpTopics[] =
 	  "showing, and takes them away again; the button stays pressed in while they show. Pictures "
 	  "on every page is set in Tools > Preferences.\n"
 	  "\n"
-	  "View > Page information (Shift+Ctrl+Q) shows the page's title and address, what the engine "
-	  "is doing, the free memory and how the page came (Direct, the Atom modem helper or PsiProxy "
-	  "on a computer).\n"
+	  "View > Page information (Shift+Ctrl+Q, or a tap on the route light) shows the page's title "
+	  "and address, what the engine is doing, the free memory, how the page came (Direct, the Atom "
+	  "modem helper or PsiProxy on a computer) and whether it is secure and checked, and the "
+	  "page's style, its size and the pictures left out.\n"
 	  "\n"
 	  "A file PsiWeb cannot show can be saved to a disk (up to 4 MB): the bottom left shows how "
 	  "much has come, and Esc stops it. On a long page with pictures, those far from the screen "
@@ -166,6 +191,7 @@ static const TPwHelpTopic KHelpTopics[] =
 	  "Ctrl+M / Shift+Ctrl+M, or the Zoom icons: zoom in / out\n"
 	  "Ctrl+I: show pictures (this page, on or off)\n"
 	  "Ctrl+T / Shift+Ctrl+T: toolbar / toolband\n"
+	  "Shift+Ctrl+R: the next page style\n"
 	  "Shift+Ctrl+B: Bright screen\n"
 	  "Shift+Ctrl+Q: page information\n"
 	  "Shift+Ctrl+D: add to favourites\n"
@@ -179,7 +205,7 @@ static const TInt KHelpCount = sizeof(KHelpTopics) / sizeof(KHelpTopics[0]);
 void CPwAppUi::HelpL()
 	{
 	CPwHelpDialog* dlg = new(ELeave) CPwHelpDialog(0);
-	dlg->ExecuteLD(R_PW_HELP_DIALOG);
+	dlg->ExecuteLD(TallScreen() ? R_PW_HELP_DIALOG_TALL : R_PW_HELP_DIALOG);   // (0.87) the netBook's is the size of its own big dialogs
 	}
 
 void CPwHelpDialog::PreLayoutDynInitL()

@@ -115,12 +115,31 @@ void psi_about_func(struct connection *c)
 	unsigned char *u = c->url;
 	extern const char *psi_problem_page(void);
 	extern void psi_app_command(int cmd);
+	PwShared *ps = (PwShared *)pwb_shared();
 	if (!casecmp(u, cast_uchar "about:welcome", 13)) page = psi_welcome;
+	else if (!casecmp(u, cast_uchar "about:start", 11) && ps && ps->start_page[0]) {
+		/* (0.87) the start page PsiWeb.app made (a copy: it may change it) */
+		static char start_copy[sizeof(ps->start_page)];
+		memcpy(start_copy, ps->start_page, sizeof(start_copy));
+		start_copy[sizeof(start_copy) - 1] = 0;
+		page = start_copy;
+	}
+	else if (!casecmp(u, cast_uchar "about:start", 11)) page = psi_welcome;
 	else if (!casecmp(u, cast_uchar "about:blank", 11)) page = "<html><body></body></html>";
 	else if (!casecmp(u, cast_uchar "about:problem", 13)) page = psi_problem_page();	/* (0.85) */
-	else if (!casecmp(u, cast_uchar "about:cmd-test", 14) || !casecmp(u, cast_uchar "about:cmd-setup", 15)) {
-		/* (0.85) a "Page not opened" page's links: the app acts, the page stays */
-		psi_app_command(u[10] == 't' ? PW_APP_TEST : PW_APP_SETUP);
+	else if (!casecmp(u, cast_uchar "about:cmd-rest", 14) || !casecmp(u, cast_uchar "about:cmd-pictures", 18)) {
+		/* (0.86) a simplified page's notes (psi_style.c): the page stays */
+		extern void psi_note_command(int which);
+		psi_note_command(u[10] == 'r' ? 1 : 2);
+		setcstate(c, S_INTERRUPTED);
+		abort_connection(c);
+		return;
+	}
+	else if (!casecmp(u, cast_uchar "about:cmd-test", 14) || !casecmp(u, cast_uchar "about:cmd-setup", 15)
+		|| !casecmp(u, cast_uchar "about:cmd-help", 14) || !casecmp(u, cast_uchar "about:cmd-favs", 14)) {
+		/* (0.85) a "Page not opened" page's links, (0.87) the start page's:
+		   the app acts, the page stays */
+		psi_app_command(u[10] == 't' ? PW_APP_TEST : u[10] == 's' ? PW_APP_SETUP : u[10] == 'h' ? PW_APP_HELP : PW_APP_FAVS);
 		setcstate(c, S_INTERRUPTED);
 		abort_connection(c);
 		return;

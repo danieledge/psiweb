@@ -16,6 +16,9 @@
 /* (0.84) the server's certificate is checked, as PsiMail's: psion-core's
    core/mail/engine/tlsv/certcheck.c, with engine/pwcert.c */
 #define TLS_VERIFY 1
+/* (0.86) TLS_AES_128_GCM_SHA256 as a second cipher (core/ssh/aesgcm.c), for
+   servers that offer TLS 1.3 with AES only */
+#define TLS_AES_GCM 1
 #include <string.h>
 #include <stdlib.h>
 #include "tomcrypt.h"

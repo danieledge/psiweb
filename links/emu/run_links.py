@@ -4,6 +4,7 @@ driver, ARM code from the 1999 EPOC GCC) in an ARM emulator on a PC.
 
 A copy of web/emu/run_psiweb.py (NetSurf's harness) with, in addition:
   --images         the app's "Show pictures" setting is on at start
+  --style N        View > Page style: 0 Full, 1 Lighter, 2 Reader, 3 Text only (0.86)
   --netbook        the netBook's screen: 640x480 in EPOC's 256 colours (screenshots in colour)
   --progress       log the toolband's progress figure (psiweb.h progress) as it changes
   --heap-limit N   psiweb's heap limit in bytes (default 10 MB, as on the
@@ -64,6 +65,7 @@ PROXY = None
 if "--proxy" in args:
     PROXY = args[args.index("--proxy") + 1]
 IMAGES = "--images" in args
+STYLE = int(optval("--style") or 0)
 # --netbook: the netBook's screen, 640x480 in EPOC's 256 colours
 NETBOOK = "--netbook" in args
 PROGRESS = "--progress" in args       # log the progress figure as it changes
@@ -75,7 +77,7 @@ PROFILE_N = int(os.environ.get("PROFILE_N", "40"))
 JSON = None
 if "--json" in args:
     JSON = args[args.index("--json") + 1]
-OPTVALS = [args[i + 1] for i, a in enumerate(args) if a in ("--proxy", "--trace", "--heap-limit", "--json", "--callers", "--record", "--replay", "--incl", "--rate") and i + 1 < len(args)]
+OPTVALS = [args[i + 1] for i, a in enumerate(args) if a in ("--proxy", "--trace", "--heap-limit", "--json", "--callers", "--record", "--replay", "--incl", "--rate", "--style") and i + 1 < len(args)]
 SCRIPT = [a for a in args if not a.startswith("--") and a not in OPTVALS][0]
 
 MAP = open(os.path.join(BUILD, "psiweb-emu.map")).read()
@@ -464,6 +466,7 @@ def hc(op, a, b, c, d):
         return 0
     if op == 212: return 1 if IMAGES else 0          # pwb_load_images
     if op == 213: return 8 if NETBOOK else 4         # pwb_depth
+    if op == 214: return STYLE                       # pwb_style (0.86)
     if op == 25:                                     # memory report
         mem.update(in_use=a, peak=b, arena=c, n=d)
         log("[heap] in use %d KB, peak %d KB" % (a // 1024, b // 1024)); return 0

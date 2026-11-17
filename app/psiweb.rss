@@ -58,9 +58,9 @@ RESOURCE TOOLBAR r_pw_toolbar
 			length=KEikStdFileNameLabelHeight;
 			control=LABEL { txt="PsiWeb"; horiz_align=EEikLabelAlignHCenter; vert_align=EEikLabelAlignVCenter; };
 			},
-		TBAR_BUTTON { id=EPwCmdOpen; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Open"; flags=EEikToolBarCtrlHasSetMinLength; length=KEikStdToolBarButtonHeight; },
+		TBAR_BUTTON { id=EPwCmdOpen; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Go to"; flags=EEikToolBarCtrlHasSetMinLength; length=KEikStdToolBarButtonHeight; },
 		TBAR_BUTTON { id=EPwCmdBack; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Back"; flags=EEikToolBarCtrlHasSetMinLength; length=KEikStdToolBarButtonHeight; },
-		TBAR_BUTTON { id=EPwCmdHome; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Home"; flags=EEikToolBarCtrlHasSetMinLength; length=KEikStdToolBarButtonHeight; },
+		TBAR_BUTTON { id=EPwCmdStart; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Start"; flags=EEikToolBarCtrlHasSetMinLength; length=KEikStdToolBarButtonHeight; },
 		TBAR_BUTTON { id=EPwCmdImages; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Pictures"; flags=EEikToolBarCtrlHasSetMinLength; length=KEikStdToolBarButtonHeight; },
 		TBAR_CTRL
 			{
@@ -100,9 +100,8 @@ RESOURCE TOOLBAND r_pw_toolband
 		{
 		TBAR_BUTTON { id=EPwCmdBack; flags=EEikToolBarCtrlHasSetMinLength; length=EEikStdTwoStateIconicToolBandButtonWidth; bmpfile="*"; bmpid=EMbmBandBack; bmpmask=EMbmBandBackMask; },
 		TBAR_BUTTON { id=EPwCmdForward; flags=EEikToolBarCtrlHasSetMinLength; length=EEikStdTwoStateIconicToolBandButtonWidth; bmpfile="*"; bmpid=EMbmBandForward; bmpmask=EMbmBandForwardMask; },
-		TBAR_BUTTON { id=EPwCmdReload; flags=EEikToolBarCtrlHasSetMinLength; length=EEikStdTwoStateIconicToolBandButtonWidth; bmpfile="*"; bmpid=EMbmBandReload; bmpmask=EMbmBandReloadMask; },
-		TBAR_BUTTON { id=EPwCmdStop; flags=EEikToolBarCtrlHasSetMinLength; length=EEikStdTwoStateIconicToolBandButtonWidth; bmpfile="*"; bmpid=EMbmBandStop; bmpmask=EMbmBandStopMask; },
-		TBAR_BUTTON { id=EPwCmdHome; flags=EEikToolBarCtrlHasSetMinLength; length=EEikStdTwoStateIconicToolBandButtonWidth; bmpfile="*"; bmpid=EMbmBandHome; bmpmask=EMbmBandHomeMask; },
+		TBAR_BUTTON { id=EPwCmdReloadStop; flags=EEikToolBarCtrlHasSetMinLength; length=EEikStdTwoStateIconicToolBandButtonWidth; bmpfile="*"; bmpid=EMbmBandReload; bmpmask=EMbmBandReloadMask; },
+		TBAR_BUTTON { id=EPwCmdStart; flags=EEikToolBarCtrlHasSetMinLength; length=EEikStdTwoStateIconicToolBandButtonWidth; bmpfile="*"; bmpid=EMbmBandHome; bmpmask=EMbmBandHomeMask; },
 		TBAR_CTRL { type=EEikCtSpacer; flags=EEikToolBarCtrlHasSetMinLength; length=6; control=SPACER; },
 		TBAR_CTRL
 			{
@@ -113,14 +112,10 @@ RESOURCE TOOLBAND r_pw_toolband
 			control=EDWIN { flags=EEikEdwinNoLineOrParaBreaks|EEikEdwinNoAutoSelection|EEikEdwinJustAutoCurEnd; width=20; lines=1; maxlength=500; };
 			},
 		TBAR_CTRL { type=EEikCtSpacer; flags=EEikToolBarCtrlHasSetMinLength; length=6; control=SPACER; },
-		TBAR_CTRL
-			{
-			type=EEikCtProgInfo;
-			id=EPwCtlProgress;
-			flags=EEikToolBarCtrlHasSetMinLength;
-			length=64;
-			control=PROGRESSINFO { text_type=EEikProgressTextNone; finalval=100; width=64; height=13; };
-			},
+		// (0.86) the route light: how the page came (Direct, Atom, PsiProxy),
+		// a padlock for a secure page checked on the way, the page style's
+		// letter when it is not Full; a tap is Page information
+		TBAR_BUTTON { id=EPwCmdRouteLight; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Direct"; flags=EEikToolBarCtrlHasSetMinLength; length=EEikStdShortTextPopoutToolBandButtonWidth; bmpfile="*"; bmpid=EMbmBandNoLock; bmpmask=EMbmBandNoLockMask; },
 		TBAR_CTRL { type=EEikCtSpacer; flags=EEikToolBarCtrlHasSetMinLength; length=6; control=SPACER; },
 		TBAR_BUTTON { id=EPwCmdImages; flags=EEikToolBarCtrlHasSetMinLength; length=EEikStdTwoStateIconicToolBandButtonWidth; bmpfile="*"; bmpid=EMbmBandPictures; bmpmask=EMbmBandPicturesMask; }
 		};
@@ -154,6 +149,7 @@ RESOURCE HOTKEYS r_pw_hotkeys
 		{
 		HOTKEY { command=EPwCmdZoomOut; key='m'; },
 		HOTKEY { command=EPwCmdReading; key='b'; },
+		HOTKEY { command=EPwCmdStyleNext; key='r'; },
 		HOTKEY { command=EPwCmdToggleToolband; key='t'; },
 		HOTKEY { command=EPwCmdAddFav; key='d'; },
 		HOTKEY { command=EPwCmdPageInfo; key='q'; },
@@ -204,9 +200,24 @@ RESOURCE MENU_PANE r_pw_view_menu
 		MENU_ITEM { command=EPwCmdZoomIn; txt="Zoom in"; },
 		MENU_ITEM { command=EPwCmdZoomOut; txt="Zoom out"; },
 		MENU_ITEM { command=EPwCmdZoomNormal; txt="Normal size"; flags=EEikMenuItemSeparatorAfter; },
+		MENU_ITEM { command=EPwCmdStyleMenu; cascade=r_pw_style_menu; txt="Page style"; },
 		MENU_ITEM { command=EPwCmdImages; txt="Show pictures"; flags=EEikMenuItemCheckBox; },
 		MENU_ITEM { command=EPwCmdShowMenu; cascade=r_pw_show_menu; txt="Show"; flags=EEikMenuItemSeparatorAfter; },
 		MENU_ITEM { command=EPwCmdPageInfo; txt="Page information..."; }
+		};
+	}
+
+// View > Page style (0.86): the page as it comes, or made lighter on the
+// Psion before it is laid out (links/psi_style.c); one is ticked.
+// Shift+Ctrl+R goes round them for the page showing
+RESOURCE MENU_PANE r_pw_style_menu
+	{
+	items=
+		{
+		MENU_ITEM { command=EPwCmdStyleFull; txt="Full"; flags=EEikMenuItemRadioStart; },
+		MENU_ITEM { command=EPwCmdStyleLighter; txt="Lighter"; flags=EEikMenuItemRadioMiddle; },
+		MENU_ITEM { command=EPwCmdStyleReader; txt="Reader"; flags=EEikMenuItemRadioMiddle; },
+		MENU_ITEM { command=EPwCmdStyleText; txt="Text only"; flags=EEikMenuItemRadioEnd; }
 		};
 	}
 
@@ -406,6 +417,11 @@ RESOURCE ARRAY r_pw_setup_pages_lines
 	{
 	items=
 		{
+		DLG_LINE { type=EEikCtChoiceList; prompt="Page style"; id=EPwDlgSuStyle;
+			control=CHOICELIST { maxdisplaychar=16; array_id=r_pw_style_array; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPwDlgSuStyleNote; control=LABEL { standard_font=EEikLabelFontAnnotation;
+			horiz_align=EEikLabelAlignHLeft; reserve_length=72;
+			txt="Reader puts an article first - Shift+Ctrl+R changes the page showing"; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="Pictures"; id=EPwDlgSuPictures;
 			control=CHOICELIST { maxdisplaychar=16; array_id=r_pw_pictures_array; }; },
 		DLG_LINE { type=EEikCtLabel; id=EPwDlgSuPicturesNote; control=LABEL { standard_font=EEikLabelFontAnnotation;
@@ -471,6 +487,7 @@ RESOURCE DIALOG r_pw_prefs_dialog
 		{
 		DLG_LINE { type=EEikCtEdwin; prompt="Home page"; id=EPwDlgHome; control=EDWIN { width=20; maxlength=200; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="Pictures"; id=EPwDlgPictures; control=CHOICELIST { array_id=r_pw_pictures_array; }; },
+		DLG_LINE { type=EEikCtChoiceList; prompt="Page style"; id=EPwDlgStyle; control=CHOICELIST { array_id=r_pw_style_array; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="Search with"; id=EPwDlgSearch; control=CHOICELIST { array_id=r_pw_search_array; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="Text"; id=EPwDlgText; control=CHOICELIST { array_id=r_pw_text_array; }; }
 		};
@@ -507,7 +524,8 @@ RESOURCE DIALOG r_pw_info_dialog
 		DLG_LINE { type=EEikCtLabel; prompt="Address"; id=EPwDlgInfo2; control=LABEL { txt=""; }; },
 		DLG_LINE { type=EEikCtLabel; prompt="Status"; id=EPwDlgInfo3; control=LABEL { txt=""; }; },
 		DLG_LINE { type=EEikCtLabel; prompt="Free memory"; id=EPwDlgInfo4; control=LABEL { txt=""; }; },
-		DLG_LINE { type=EEikCtLabel; prompt="Connection"; id=EPwDlgInfo5; control=LABEL { txt=""; }; }
+		DLG_LINE { type=EEikCtLabel; prompt="Route"; id=EPwDlgInfo5; control=LABEL { txt=""; }; },
+		DLG_LINE { type=EEikCtLabel; prompt="Page"; id=EPwDlgInfo6; control=LABEL { txt=""; }; }
 		};
 	}
 
@@ -547,6 +565,12 @@ RESOURCE ARRAY r_pw_link_array
 
 // Preferences and Set up > Search with: words typed for an address go to
 // the search page chosen (CPwAppUi::SearchUrl), in this order
+// Page style (0.86), in PW_STYLE_* order
+RESOURCE ARRAY r_pw_style_array
+	{
+	items={ LBUF { txt="Full"; }, LBUF { txt="Lighter"; }, LBUF { txt="Reader"; }, LBUF { txt="Text only"; } };
+	}
+
 RESOURCE ARRAY r_pw_search_array
 	{
 	items={ LBUF { txt="DuckDuckGo"; }, LBUF { txt="FrogFind"; } };
@@ -626,6 +650,22 @@ RESOURCE DIALOG r_pw_help_dialog
 			control=CHOICELIST { array_id=r_pw_empty_array; }; },
 		DLG_LINE { type=EEikCtRichTextEditor; prompt=""; id=EPwDlgHelpText;
 			control=RTXTED { width=520; height=118; numlines=7; textlimit=8000; flags=EEikEdwinNoAutoSelection|EEikEdwinReadOnly; }; }
+		};
+	}
+
+// (0.87) the same on a tall screen (the netBook, the Series 7): the size of
+// Psion's own large dialogs there, the viewer taking the room
+RESOURCE DIALOG r_pw_help_dialog_tall
+	{
+	title="Help on PsiWeb";
+	flags=EEikDialogFlagWait|EEikDialogFlagNotifyEsc;
+	buttons=R_EIK_BUTTONS_CONTINUE;
+	items=
+		{
+		DLG_LINE { type=EEikCtChoiceList; prompt="Topic"; id=EPwDlgHelpTopic;
+			control=CHOICELIST { array_id=r_pw_empty_array; }; },
+		DLG_LINE { type=EEikCtRichTextEditor; prompt=""; id=EPwDlgHelpText;
+			control=RTXTED { width=560; height=300; numlines=16; textlimit=8000; flags=EEikEdwinNoAutoSelection|EEikEdwinReadOnly; }; }
 		};
 	}
 

@@ -106,7 +106,8 @@ LINKS_OBJS += $(O)/links/strike_psi.o
 endif
 PSI_OBJS   := $(O)/psi/psi_drv.o $(O)/psi/psi_os.o $(O)/psi/pwgrey.o $(O)/psi/pwcolour.o $(O)/psi/psi_str.o $(O)/psi/psi_digest.o $(O)/psi/pwnet.o \
 	$(O)/psi/nsprintf.o $(O)/psi/tls13.o $(O)/psi/x25519.o $(O)/psi/pwrandom.o \
-	$(O)/psi/certcheck.o $(O)/psi/pmrsa.o $(O)/psi/pwcert.o $(O)/psi/pwproblem.o \
+	$(O)/psi/certcheck.o $(O)/psi/pmrsa.o $(O)/psi/pwcert.o $(O)/psi/pwproblem.o $(O)/psi/aesgcm.o \
+	$(O)/psi/psi_style.o $(O)/psi/psi_simp.o $(O)/psi/htmlsimp.o \
 	$(addprefix $(O)/ltc/,$(subst /,__,$(LTC_SRCS:=.o)))
 LTM_LIB    := $(O)/libltm.a
 JPG_LIB    := $(O)/libjpeg.a
@@ -198,7 +199,7 @@ $(O)/psi/nsprintf.o: $(CORE)/web/compat/nsprintf.c
 $(O)/psi/pwnet.o: $(CORE)/web/engine/pwnet.c $(CORE)/ssh/psishared.h $(CORE)/web/engine/pwnet.h
 	@mkdir -p $(dir $@)
 	$(CC) -c $(CFLAGS_C) -std=gnu99 -I$(CORE)/ssh -I$(CORE)/web/compat -include $(CORE)/web/compat/nscompat.h $< -o $@
-$(O)/psi/tls13.o: $(CORE)/ssh/tls13.c $(WEB)/tls/includes.h
+$(O)/psi/tls13.o: $(CORE)/ssh/tls13.c $(CORE)/ssh/aesgcm.h $(WEB)/tls/includes.h
 	@mkdir -p $(dir $@)
 	$(CC) -c $(LTCFLAGS) -I$(CORE)/ssh/db/src $< -o $@
 $(O)/psi/certcheck.o: $(TLSV)/certcheck.c $(TLSV)/roots.h $(TLSV)/ecverify.h $(CAL)/calport.h $(WEB)/tls/includes.h $(WEB)/tls/options.h
@@ -210,6 +211,22 @@ $(O)/psi/pmrsa.o: $(TLSV)/pmrsa.c
 $(O)/psi/pwcert.o: $(WEB)/engine/pwcert.c $(WEB)/engine/pwcert.h $(CAL)/calport.h
 	@mkdir -p $(dir $@)
 	$(CC) -c $(TLSVFLAGS) $< -o $@
+# (0.86) View > Page style: the engine's side, and the Atom's simplifier
+# (C++, built without exceptions or RTTI, with psi_str.c's quick memchr: links/simp/README.md)
+SIMPFLAGS := $(ARCH) $(DEFS) -fno-builtin -w $(LIBC) -I$(CORE)/web/compat -fno-exceptions -fno-rtti -Dmemchr=psi_memchr
+$(O)/psi/psi_style.o: $(LW)/psi_style.c $(LW)/simp/psi_simp.h $(HDRS) $(WEB)/fb/pwback.h $(SRC)/links.h $(WEB)/psiweb.h $(WEB)/psiweb_cmds.h
+	@mkdir -p $(dir $@)
+	$(CC) -c $(LCFLAGS) -I$(WEB)/fb -I$(WEB) -I$(LW) -I$(CORE)/ssh $< -o $@
+$(O)/psi/psi_simp.o: $(LW)/simp/psi_simp.cpp $(LW)/simp/psi_simp.h $(LW)/simp/htmlsimp.h
+	@mkdir -p $(dir $@)
+	$(CC) -c $(SIMPFLAGS) $< -o $@
+$(O)/psi/htmlsimp.o: $(LW)/simp/htmlsimp.cpp $(LW)/simp/htmlsimp.h
+	@mkdir -p $(dir $@)
+	$(CC) -c $(SIMPFLAGS) -O2 $< -o $@
+# (0.86) AES-128-GCM, TLS 1.3's second cipher
+$(O)/psi/aesgcm.o: $(CORE)/ssh/aesgcm.c $(CORE)/ssh/aesgcm.h
+	@mkdir -p $(dir $@)
+	$(CC) -c $(CFLAGS_C) -O2 $< -o $@
 # (0.85) the "Page not opened" page
 $(O)/psi/pwproblem.o: $(WEB)/engine/pwproblem.c $(WEB)/engine/pwproblem.h $(CORE)/ssh/pgsetup.h
 	@mkdir -p $(dir $@)
@@ -286,14 +303,14 @@ $(O)/dev/pwupdate.o: $(WEB)/engine/pwupdate.c $(CORE)/web/engine/pwnet.h $(WEB)/
 	@mkdir -p $(dir $@)
 	$(CC) -c $(LTCFLAGS) -I$(CORE)/ssh -I$(CORE)/web/engine $< -o $@
 
-# petran: heap 256 KB to 10 MB (as NetSurf's), 256 KB stack (Links' table
+# petran: heap 256 KB to 20 MB (0.86; psi_heap.cpp keeps the 5mx to 10 MB, as before), 256 KB stack (Links' table
 # layout recurses); UIDs as NetSurf's psiweb.exe, so PsiWeb.app starts it
 $(O)/psiweb.exe: $(LINKS_OBJS) $(PSI_OBJS) $(DEV_OBJS) $(JPG_LIB) $(PNG_LIB) $(Z_LIB) $(LTM_LIB) $(LIBGCC)
 	arm-pe-ld -s -e _E32Startup --base-file $(O)/psiweb.bas -o $(O)/psiweb.tmp.exe $(EXE_OBJS)
 	arm-pe-dlltool --as=arm-pe-as --output-exp $(O)/psiweb.exp --base-file $(O)/psiweb.bas $(EXE_OBJS)
 	arm-pe-ld -s -e _E32Startup -Map $(O)/psiweb.map -o $(O)/psiweb.tmp.exe $(O)/psiweb.exp $(EXE_OBJS)
 	python3 $(V4BX_PY) --check $(O)/psiweb.tmp.exe     # (no BX: the netBook has none)
-	WINEDEBUG=-all wine $(E)/tools/petran.exe $(O)/psiweb.tmp.exe $@ -nocall -uid1 0x1000007a -uid2 0x00000000 -uid3 0x01000A7B -heap 0x40000 0xa00000 -stack 0x40000
+	WINEDEBUG=-all wine $(E)/tools/petran.exe $(O)/psiweb.tmp.exe $@ -nocall -uid1 0x1000007a -uid2 0x00000000 -uid3 0x01000A7B -heap 0x40000 0x1400000 -stack 0x40000
 	@ls -la $@
 exe: $(O)/psiweb.exe
 

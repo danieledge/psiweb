@@ -85,7 +85,7 @@ static void SaveSharedLink(RFs& aFs, const TPwSettings& aSettings)
 
 _LIT(KEngineExe, "psiweb.exe");
 _LIT(KIniFile, "C:\\System\\Apps\\PsiWeb\\PsiWeb.ini");
-_LIT(KVersion, "0.85");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
+_LIT(KVersion, "0.86");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
 _LIT(KDefaultHome, "http://68k.news/");
 const TInt KZoomSteps[] = { 50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200 };
 const TInt KZoomCount = 11;
@@ -290,6 +290,15 @@ void CPwView::StartEngineL()
 	s->stride = stride;
 	s->progress = -1;
 	s->magic = PW_MAGIC;
+	{
+	// (0.87) the start page, made again into the cleared chunk
+	CPwAppUi* ui = (CPwAppUi*)iEikonEnv->EikAppUi();
+	if (ui)
+		{
+		TRAPD(err, ui->UpdateStartPageL());
+		(void)err;
+		}
+	}
 	s->net.magic = PSI_SHARED_MAGIC;
 	s->net.bell_magic = PSI_BELL_MAGIC;      // (0.81) we ring eng_bell with every key, tap, command and quit
 	UseSharedLink(iCoeEnv->FsSession(), iSettings);   // may have changed in another app
@@ -305,6 +314,7 @@ void CPwView::StartEngineL()
 	CopyToC(s->proxy_host, sizeof(s->proxy_host), iSettings.iProxyHost);
 	s->proxy_port = iSettings.iProxyPort;
 	s->load_images = iSettings.iImages;
+	s->style = StyleNow(iSettings);          // (0.86) View > Page style
 	s->zoom = iSettings.iZoom;
 	s->display = (iSettings.iDisplay & KPwDisplayScaledText) ? PW_DISPLAY_SCALED_TEXT : 0;
 	s->net.log_on = (iSettings.iDisplay & KPwKeepLog) ? 1 : 0;   // (0.77) Tools > Keep a log; the engine reads it at each line
@@ -416,20 +426,12 @@ void CPwView::RestartL(TBool aSamePage)
 	StartEngineL();
 	}
 
-// The page area changed (the toolbar was shown or hidden): the engine draws
-// at the size it was started with, so it starts again, on the same page
+// The page area changed (the toolbar or toolband was shown or hidden).
+// (0.87) The engine lays the page out again at the new size, on the same
+// page and place (PW_CMD_RESIZE): no restart, no blank page. It was given
+// room for the whole screen when it started.
 void CPwView::SetPageRectL(const TRect& aRect)
 	{
-	TBool running = iRunning;
-	TBuf<PW_URL_MAX> url;
-	if (running)
-		{
-		FromUtf8(url, iShared->url);
-		if (url.Compare(_L("about:blank")) == 0)
-			url.Zero();
-		StartBusy(_L("Restarting the browser engine..."));
-		StopEngine();
-		}
 	SetRectL(aRect);
 	LayoutL();
 	TSize size = iPageArea.Size();
@@ -438,14 +440,13 @@ void CPwView::SetPageRectL(const TRect& aRect)
 	if (size.iHeight > iMaxH) size.iHeight = iMaxH;
 	iShared->width = size.iWidth;
 	iShared->height = size.iHeight;
-	if (running)
+	if (iRunning)
 		{
-		if (url.Length())
-			iStartUrl = url;
-		StartEngineL();
+		TBuf<24> arg;
+		arg.Format(_L("%dx%d"), size.iWidth, size.iHeight);
+		Command(PW_CMD_RESIZE, arg);
 		}
-	else
-		DrawNow();
+	DrawNow();
 	}
 
 // ----- the page's scroll bar --------------------------------------------------------
@@ -1370,6 +1371,16 @@ TKeyResponse CPwView::OfferKeyEventL(const TKeyEvent& aKeyEvent, TEventCode aTyp
 		Command(PW_CMD_STOP, KNullDesC);
 		return EKeyWasConsumed;
 		}
+	// (0.87) the start page: 1 to 8 open its tiles, unless a text field
+	// (its search box) has the cursor. (They pick from the numbered list on
+	// the page, as Screen greys' 1 to 4 do; they are not shortcuts.)
+	if (code >= '1' && code <= '8' && !(mods & (EModifierCtrl | EModifierShift | EModifierFunc))
+		&& iRunning && !iShared->field_active && !iShared->busy
+		&& TPtrC8((const TUint8*)iShared->url).Compare(_L8("about:start")) == 0)
+		{
+		ui->OpenTileL(code - '1');
+		return EKeyWasConsumed;
+		}
 	Key(code, mods);
 	return EKeyWasConsumed;
 	}
@@ -1410,7 +1421,7 @@ void CPwView::HandlePointerEventL(const TPointerEvent& aEvent)
 
 void CPwInfoDialog::PreLayoutDynInitL()
 	{
-	for (TInt i = 0; i < 5; i++)
+	for (TInt i = 0; i < 6; i++)
 		{
 		if (i < iCount)
 			SetLabelL(EPwDlgInfo1 + i, iLines[i]);
@@ -1560,6 +1571,7 @@ void CPwPrefsDialog::PreLayoutDynInitL()
 	((CEikChoiceList*)Control(EPwDlgPictures))->SetCurrentItem(iSettings.iImages ? 1 : 0);
 	((CEikChoiceList*)Control(EPwDlgText))->SetCurrentItem((iSettings.iDisplay & KPwDisplayScaledText) ? 1 : 0);
 	SetChoiceListCurrentItem(EPwDlgSearch, iSettings.iSearch == PW_SEARCH_FROGFIND ? 1 : 0);
+	SetChoiceListCurrentItem(EPwDlgStyle, StyleNow(iSettings));
 	}
 
 TBool CPwPrefsDialog::OkToExitL(TInt aButtonId)
@@ -1580,6 +1592,8 @@ TBool CPwPrefsDialog::OkToExitL(TInt aButtonId)
 	iSettings.iHome.Trim();
 	iSettings.iImages = ((CEikChoiceList*)Control(EPwDlgPictures))->CurrentItem() == 1;
 	iSettings.iSearch = ChoiceListCurrentItem(EPwDlgSearch) == 1 ? PW_SEARCH_FROGFIND : PW_SEARCH_DDG;
+	if (ChoiceListCurrentItem(EPwDlgStyle) != StyleNow(iSettings))
+		iSettings.iStyle = ChoiceListCurrentItem(EPwDlgStyle);   // (0.86) chosen: no longer the route's standard
 	if (((CEikChoiceList*)Control(EPwDlgText))->CurrentItem() == 1)
 		iSettings.iDisplay |= KPwDisplayScaledText;
 	else
@@ -1597,6 +1611,7 @@ void CPwAppUi::ConstructL()
 	TPwSettings settings;
 	LoadSettings(settings);
 	iShownProgress = -1;
+	iLockShown = -1;
 	TRAPD(pics, ToolbarPicturesL());
 	(void)pics;                              // (no PsiWeb.mbm: words only)
 	// the Pictures buttons stay pressed in while the page's pictures show
@@ -1611,17 +1626,15 @@ void CPwAppUi::ConstructL()
 	if (iToolBand)
 		{
 		iAddress = (CEikEdwin*)iToolBand->ControlById(EPwCtlAddress);
-		iProgress = (CEikProgressInfo*)iToolBand->ControlById(EPwCtlProgress);
 		if (iAddress)
 			{
 			iAddress->SetBorder(TEikBorder::EShallowSunken);
 			iAddress->SetObserver(this);
 			}
-		if (iProgress)
-			{
-			iProgress->SetFinalValue(100);
-			iProgress->MakeVisible(EFalse);  // (only while a page loads)
-			}
+		// (0.87) how far the page has come: a bar along the address's
+		// lower edge while it loads, nothing when idle
+		iBar = new(ELeave) CPwBar;
+		iBar->ConstructL(*iToolBand);
 		}
 	if (iToolBar && !settings.iToolbar)
 		iToolBar->MakeVisible(EFalse);       // remembered from last time
@@ -1633,8 +1646,10 @@ void CPwAppUi::ConstructL()
 	ShowPicturesState(settings.iImages);
 	iFavs = CPwList::NewL(iCoeEnv->FsSession(), _L("C:\\System\\Apps\\PsiWeb\\Favourites.dat"), KPwMaxFavs);
 	iHist = CPwList::NewL(iCoeEnv->FsSession(), _L("C:\\System\\Apps\\PsiWeb\\History.dat"), KPwMaxHist);
+	SeedFavouritesL();                       // (0.87) a new PsiWeb: its first tiles
 	iView = new(ELeave) CPwView;
 	iView->ConstructL(PageRect(), settings);
+	UpdateStartPageL();                      // (0.87) before the engine's first page
 	if (iToolBand && iToolBand->IsVisible())
 		iToolBand->DrawNow();
 	AddToStackL(iView);
@@ -1765,7 +1780,7 @@ void CPwAppUi::ToolbarPicturesL()
 	{
 	ButtonPictureL(iToolBar, EPwCmdOpen, EMbmToolOpen);
 	ButtonPictureL(iToolBar, EPwCmdBack, EMbmToolBack);
-	ButtonPictureL(iToolBar, EPwCmdHome, EMbmToolHome);
+	ButtonPictureL(iToolBar, EPwCmdStart, EMbmToolHome);   // (0.87) Start, the start page
 	ButtonPictureL(iToolBar, EPwCmdImages, EMbmToolPictures);
 	// (the toolband's pictures are named in its resource: pwicons.rh)
 	}
@@ -1875,24 +1890,70 @@ void CPwAppUi::ChromeTick()
 			(void)err;
 			}
 		}
+	TRAPD(lightErr, RouteLightL());
+	(void)lightErr;
 	TInt p = iView->EngineRunning() && s->busy ? s->progress : -1;
 	if (p > 100)
 		p = 100;
-	if (p != iShownProgress && iProgress)
+	if (p != iShownProgress && iBar)
 		{
 		if (p < 0)
-			{
-			iProgress->MakeVisible(EFalse);
-			iToolBand->DrawNow();        // (the band's own grey where it was)
-			}
+			iBar->MakeVisible(EFalse);   // (the address shows again beneath)
 		else
 			{
+			// along the address's lower edge, inside its border
+			TRect a(iAddress->Position(), iAddress->Size());
+			a.Shrink(2, 2);
+			TRAPD(e3, iBar->SetExtentL(TPoint(a.iTl.iX, a.iBr.iY - 3), TSize(a.Width(), 3)));
+			(void)e3;
+			iBar->SetValue(p);
 			if (iShownProgress < 0)
-				iProgress->MakeVisible(ETrue);
-			iProgress->SetAndDraw(p);
+				iBar->MakeVisible(ETrue);
+			iBar->DrawNow();
 			}
 		iShownProgress = p;
 		}
+	// (0.87) Reload is Stop while a page loads: its picture says which
+	TBool busy = iView->EngineRunning() && s->busy;
+	if (busy != iBandBusy)
+		{
+		iBandBusy = busy;
+		CEikCommandButton* b = (CEikCommandButton*)iToolBand->ControlById(EPwCmdReloadStop);
+		if (b)
+			{
+			TRAPD(e4, {
+				CFbsBitmap* bmp = iEikonEnv->CreateBitmapL(Application()->BitmapStoreName(), busy ? EMbmBandStop : EMbmBandReload);
+				CleanupStack::PushL(bmp);
+				CFbsBitmap* mask = iEikonEnv->CreateBitmapL(Application()->BitmapStoreName(), busy ? EMbmBandStopMask : EMbmBandReloadMask);
+				CleanupStack::Pop();
+				b->SetPictureL(bmp, mask);
+				b->DrawNow();
+				});
+			(void)e4;
+			}
+		}
+	}
+
+// ----- (0.87) the progress bar along the address ------------------------------
+
+void CPwBar::ConstructL(const CCoeControl& aParent)
+	{
+	CreateWindowL(&aParent);
+	MakeVisible(EFalse);
+	ActivateL();
+	}
+
+void CPwBar::Draw(const TRect& /*aRect*/) const
+	{
+	CWindowGc& gc = SystemGc();
+	TRect r(Rect());
+	TInt done = r.Width() * iValue / 100;
+	gc.SetPenStyle(CGraphicsContext::ENullPen);
+	gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
+	gc.SetBrushColor(TRgb::Gray4(1));        // the dark grey (85), or EPOC's on a colour screen
+	gc.DrawRect(TRect(r.iTl, TSize(done, r.Height())));
+	gc.SetBrushColor(TRgb::Gray4(3));
+	gc.DrawRect(TRect(TPoint(r.iTl.iX + done, r.iTl.iY), r.iBr));
 	}
 
 // Ctrl+L or a tap on the address: type an address (or words to search
@@ -1972,7 +2033,62 @@ TBool CPwAppUi::AddressKeyL(const TKeyEvent& aKeyEvent, TEventCode aType)
 		return ETrue;
 		}
 	iAddress->OfferKeyEventL(aKeyEvent, aType);
+	// (0.87) a letter typed: the first favourite or recent address that
+	// begins the same way is offered after it, chosen, so typing on
+	// replaces it and Enter takes it
+	if (aKeyEvent.iCode >= 0x20 && aKeyEvent.iCode < 0x100 && aKeyEvent.iCode != 0x7f)
+		CompleteAddressL();
 	return ETrue;
+	}
+
+// (0.87) Address completion: an address without its "http://", "https://"
+// or "www." that begins with what was typed (in any case)
+static TPtrC Bare(const TDesC& aUrl)
+	{
+	TPtrC u(aUrl);
+	if (Clip(u, 8).CompareF(_L("https://")) == 0) u.Set(u.Mid(8));
+	else if (Clip(u, 7).CompareF(_L("http://")) == 0) u.Set(u.Mid(7));
+	if (Clip(u, 4).CompareF(_L("www.")) == 0) u.Set(u.Mid(4));
+	return u;
+	}
+
+static TBool Offers(const TDesC& aUrl, const TDesC& aTyped, TPtrC& aShown)
+	{
+	TPtrC full(aUrl), bare(Bare(aUrl));
+	if (aTyped.Length() < full.Length() && Clip(full, aTyped.Length()).CompareF(aTyped) == 0)
+		{
+		aShown.Set(full);
+		return ETrue;
+		}
+	if (aTyped.Length() < bare.Length() && Clip(bare, aTyped.Length()).CompareF(aTyped) == 0)
+		{
+		aShown.Set(bare);
+		return ETrue;
+		}
+	return EFalse;
+	}
+
+void CPwAppUi::CompleteAddressL()
+	{
+	if (!iAddress || !iFavs || !iHist)
+		return;
+	TBuf<PW_URL_MAX> typed;
+	iAddress->GetText(typed);
+	if (typed.Length() < 2 || iAddress->CursorPos() != typed.Length() || typed.Locate(' ') >= 0)
+		return;                              // (words to search for: nothing offered)
+	TPtrC shown;
+	TBool found = EFalse;
+	for (TInt i = 0; i < iFavs->Count() && !found; i++)
+		found = Offers(iFavs->At(i).iUrl, typed, shown);
+	for (TInt j = 0; j < iHist->Count() && !found; j++)
+		found = Offers(iHist->At(j).iUrl, typed, shown);
+	if (!found)
+		return;
+	TBuf<PW_URL_MAX> all(typed);
+	all.Append(Clip(shown.Mid(typed.Length()), all.MaxLength() - all.Length()));   // (Left() longer than the text panics: USER 22)
+	iAddress->SetTextL(&all);
+	iAddress->SetSelectionL(all.Length(), typed.Length());
+	iAddress->DrawNow();
 	}
 
 // the address asks for the focus (a tap on it)
@@ -1994,6 +2110,7 @@ CPwAppUi::~CPwAppUi()
 	delete iFavs;
 	delete iHist;
 	delete iSetupIdle;
+	delete iBar;
 	}
 
 void CPwAppUi::LoadSettings(TPwSettings& aSettings)
@@ -2014,7 +2131,7 @@ void CPwAppUi::LoadSettings(TPwSettings& aSettings)
 	aSettings.iToolband = TallScreen() ? 1 : 0;
 	aSettings.iDisplay = 0;           // sharp text, Reading mode off (docs/display.md)
 	aSettings.iSearch = PW_SEARCH_DDG;
-	aSettings.iStyle = 0;
+	aSettings.iStyle = -1;            // (0.86) the route's standard
 	aSettings.iFlags = 0;
 	RFile file;
 	if (file.Open(iCoeEnv->FsSession(), KIniFile, EFileRead) != KErrNone)
@@ -2066,8 +2183,11 @@ void CPwAppUi::LoadSettings(TPwSettings& aSettings)
 						}
 					if (pos < d.Length())            // (0.85) Search with
 						aSettings.iSearch = d[pos++] == PW_SEARCH_FROGFIND ? PW_SEARCH_FROGFIND : PW_SEARCH_DDG;
-					if (pos < d.Length())            // (0.86) Page style
-						aSettings.iStyle = d[pos++] & 3;
+					if (pos < d.Length())            // (0.86) Page style: 0 the route's standard, else style + 1
+						{
+						TInt b = d[pos++];
+						aSettings.iStyle = b >= 1 && b <= 4 ? b - 1 : -1;
+						}
 					if (pos < d.Length())            // (0.85) KPwFlag* bits
 						aSettings.iFlags = d[pos++] & KPwFlagKeepCookies;
 					}
@@ -2112,7 +2232,7 @@ void CPwAppUi::SaveSettings(const TPwSettings& aSettings)
 	d.Append((TUint8)aSettings.iDisplay);   // (0.81)
 	d.Append((TUint8)(2 | (aSettings.iToolband ? 1 : 0)));   // (0.78)
 	d.Append((TUint8)aSettings.iSearch);    // (0.85)
-	d.Append((TUint8)aSettings.iStyle);     // (0.86)
+	d.Append((TUint8)(aSettings.iStyle >= 0 ? aSettings.iStyle + 1 : 0));     // (0.86)
 	d.Append((TUint8)aSettings.iFlags);     // (0.85)
 	TInt r = file.Write(d);
 	if (r == KErrNone)
@@ -2153,6 +2273,8 @@ void CPwAppUi::DynInitMenuPaneL(TInt aMenuId, CEikMenuPane* aMenuPane)
 			!(st.iDisplay & KPwKeepLog) || !st.iUseProxy || st.iProxyHost.Length() == 0);
 		aMenuPane->SetItemButtonState(EPwCmdKeepLog, (st.iDisplay & KPwKeepLog) ? EEikMenuItemSymbolOn : 0);
 		}
+	else if (aMenuId == R_PW_STYLE_MENU)
+		aMenuPane->SetItemButtonState(EPwCmdStyleFull + StyleNow(iView->Settings()), EEikMenuItemSymbolOn);
 	else if (aMenuId == R_PW_SHOW_MENU)
 		{
 		aMenuPane->SetItemButtonState(EPwCmdToggleToolbar,
@@ -2225,14 +2347,16 @@ void RouteWords(const TPwSettings& aS, TDes& aOut)
 void CPwAppUi::PageInfoL()
 	{
 	PwShared* s = iView->Shared();
-	TBuf<160> lines[5];
+	TBuf<160> lines[6];
 	FromUtf8(lines[0], s->title);
 	lines[0].Trim();
 	if (lines[0].Length() == 0)
 		lines[0] = _L("(no title)");
 	FromUtf8(lines[1], s->url);
-	if (lines[1].Compare(_L("about:blank")) == 0)
-		lines[1] = _L("(no page open)");
+	if (lines[1].Compare(_L("about:problem")) == 0)
+		FromUtf8(lines[1], s->problem_url);
+	else if (Clip(lines[1], 6).Compare(_L("about:")) == 0)
+		lines[1] = _L("(PsiWeb's own page)");
 	FromUtf8(lines[2], s->status);
 	lines[2].Trim();
 	if (lines[2].Length() == 0)
@@ -2240,18 +2364,41 @@ void CPwAppUi::PageInfoL()
 	TMemoryInfoV1Buf mem;
 	UserHal::MemoryInfo(mem);
 	lines[3].Format(_L("%d KB"), mem().iFreeRamInBytes / 1024);
+	// (0.86) the route and how secure the page is
 	RouteWords(iView->Settings(), lines[4]);
+	TBool https = Clip(lines[1], 6).Compare(_L("https:")) == 0;
+	if (https && s->page_secure == PW_SECURE_CHECKED)
+		lines[4].Append(_L(" - secure, checked by this Psion"));
+	else if (https && s->page_secure == PW_SECURE_HELPER)
+		lines[4].Append(_L(" - secure, checked by the web helper"));
+	else if (Clip(lines[1], 5).Compare(_L("http:")) == 0)
+		lines[4].Append(_L(" - not secure (http)"));
+	// (0.86) the page's style and size, and its pictures
+	static const TText* const KNames[] = { _S("Full"), _S("Lighter"), _S("Reader"), _S("Text only") };
+	TInt style = s->page_style >= 0 && s->page_style <= 3 ? s->page_style : 0;
+	lines[5].Copy(TPtrC(KNames[style]));
+	if (s->page_bytes > 0)
+		{
+		if (style != PW_STYLE_FULL && s->page_kept != s->page_bytes)
+			lines[5].AppendFormat(_L(" - %d KB of %d KB kept"), (s->page_kept + 1023) / 1024, (s->page_bytes + 1023) / 1024);
+		else
+			lines[5].AppendFormat(_L(" - %d KB"), (s->page_bytes + 1023) / 1024);
+		}
+	if (s->page_pics_out > 0)
+		lines[5].AppendFormat(s->page_pics_out == 1 ? _L(", 1 picture left out") : _L(", %d pictures left out"), s->page_pics_out);
+	if (s->page_scripts)
+		lines[5].Append(_L(", drawn by scripts"));
 	// the prompts take about 120 px of the 640, the frame and margins more:
 	// the dialog's labels are bold, which the normal font's widths allow for.
 	// 300 px keeps it inside the size of Psion's own dialogs (about 370-560).
 	const CFont* font = iEikonEnv->NormalFont();
-	TPtrC ptrs[5];
-	for (TInt i = 0; i < 5; i++)
+	TPtrC ptrs[6];
+	for (TInt i = 0; i < 6; i++)
 		{
 		Ellipsis(lines[i], *font, 300);
 		ptrs[i].Set(lines[i]);
 		}
-	CPwInfoDialog* dlg = new(ELeave) CPwInfoDialog(ptrs, 5);
+	CPwInfoDialog* dlg = new(ELeave) CPwInfoDialog(ptrs, 6);
 	dlg->ExecuteLD(R_PW_INFO_DIALOG);
 	}
 
@@ -2363,6 +2510,10 @@ void CPwAppUi::HandleCommandL(TInt aCommand)
 	case EPwCmdReload:
 		iView->Command(PW_CMD_RELOAD, KNullDesC);
 		break;
+	case EPwCmdReloadStop:
+		// (0.87) the toolband's one button: Stop while a page loads, else Reload
+		iView->Command(iView->EngineRunning() && sh->busy ? PW_CMD_STOP : PW_CMD_RELOAD, KNullDesC);
+		break;
 	case EPwCmdStop:
 		// dimmed on the menu when nothing is loading, but the key still arrives
 		if (iView->EngineRunning() && !sh->busy)
@@ -2464,7 +2615,19 @@ void CPwAppUi::HandleCommandL(TInt aCommand)
 		iEikonEnv->InfoMsg((st.iDisplay & KPwDisplayReading) ? _L("Reading mode on") : _L("Reading mode off"));
 		break;
 	case EPwCmdPageInfo:
+	case EPwCmdRouteLight:
 		PageInfoL();
+		break;
+	case EPwCmdStyleFull:
+	case EPwCmdStyleLighter:
+	case EPwCmdStyleReader:
+	case EPwCmdStyleText:
+		SetStyleL(aCommand - EPwCmdStyleFull);
+		break;
+	case EPwCmdStyleNext:
+		SetStyleL((StyleNow(st) + 1) % 4);
+		break;
+	case EPwCmdStyleMenu:
 		break;
 	case EPwCmdAddFav:
 		AddFavouriteL();
@@ -2488,7 +2651,7 @@ void CPwAppUi::HandleCommandL(TInt aCommand)
 		SetupL();
 		break;
 	case EPwCmdStart:
-		iView->OpenUrlL(_L("about:welcome"));
+		iView->OpenUrlL(_L("about:start"));
 		break;
 	case EPwCmdShowMenu:
 	case EPwCmdLogMenu:
@@ -2499,6 +2662,8 @@ void CPwAppUi::HandleCommandL(TInt aCommand)
 		if (dlg->ExecuteLD(R_PW_CONN_DIALOG))
 			{
 			SaveSettings(st);
+			UseSharedLink(iCoeEnv->FsSession(), st);
+			UpdateStartPageL();
 			RestartEngineL();
 			}
 		break;
@@ -2509,6 +2674,7 @@ void CPwAppUi::HandleCommandL(TInt aCommand)
 		if (dlg->ExecuteLD(R_PW_PREFS_DIALOG))
 			{
 			SaveSettings(st);
+			UpdateStartPageL();
 			ShowPicturesState(st.iImages);   // (pictures on every page, or not)
 			RestartEngineL();
 			}
@@ -2620,7 +2786,18 @@ void CPwSetupDialog::AppPreLayoutL()
 	TInt pics = iHadFile ? iSettings.iImages : StandardPictures(Choice(), iTall);
 	SetChoiceListCurrentItem(EPwDlgSuPictures, pics ? 1 : 0);
 	SetChoiceListCurrentItem(EPwDlgSuSearch, iSettings.iSearch == PW_SEARCH_FROGFIND ? 1 : 0);
+	SetChoiceListCurrentItem(EPwDlgSuStyle, iHadFile && iSettings.iStyle >= 0 ? iSettings.iStyle : StandardStyle(Choice()));
 	ShowPicturesNoteL();
+	}
+
+// (0.86) Page style's standard: Full, on every route. (Measured in the ARM
+// harness: Links parses a whole page so quickly that simplifying it first on
+// the Psion costs as much as it saves - Lighter about 10 to 25% more, Reader
+// about the same - so the styles are for reading, not for speed: Reader puts
+// an article first. A helper lightens pages before they arrive anyway.)
+TInt CPwSetupDialog::StandardStyle(const PgSuChoice& /*aChoice*/)
+	{
+	return PW_STYLE_FULL;
 	}
 
 void CPwSetupDialog::ShowPicturesNoteL()
@@ -2637,10 +2814,14 @@ void CPwSetupDialog::AppControlChangedL(TInt aControlId)
 		iPicturesChosen = ETrue;
 		ShowPicturesNoteL();
 		}
+	else if (aControlId == EPwDlgSuStyle)
+		iStyleChosen = ETrue;
 	}
 
 void CPwSetupDialog::AppChoiceChangedL()
 	{
+	if (!iStyleChosen)
+		SetChoiceListCurrentItem(EPwDlgSuStyle, StandardStyle(Choice()));
 	if (iPicturesChosen)
 		return;
 	SetChoiceListCurrentItem(EPwDlgSuPictures, StandardPictures(Choice(), iTall) ? 1 : 0);
@@ -2651,6 +2832,8 @@ void CPwSetupDialog::AppSaveL()
 	{
 	iSettings.iImages = ChoiceListCurrentItem(EPwDlgSuPictures) == 1;
 	iSettings.iSearch = ChoiceListCurrentItem(EPwDlgSuSearch) == 1 ? PW_SEARCH_FROGFIND : PW_SEARCH_DDG;
+	TInt style = ChoiceListCurrentItem(EPwDlgSuStyle);
+	iSettings.iStyle = iStyleChosen || style != StandardStyle(Choice()) ? style : -1;
 	}
 
 TInt CPwAppUi::SetupCallback(TAny* aSelf)
@@ -2677,6 +2860,7 @@ void CPwAppUi::SetupL()
 	if (ok)
 		{
 		ShowPicturesState(st.iImages);
+		UpdateStartPageL();
 		RestartEngineL();
 		}
 	}
@@ -2689,10 +2873,93 @@ void CPwAppUi::EngineCommandL(TInt aCmd)
 		SetupL();
 		return;
 		}
+	if (aCmd == PW_APP_HELP)              // (0.87) the start page's What works
+		{
+		CPwHelpDialog* dlg = new(ELeave) CPwHelpDialog(2);
+		dlg->ExecuteLD(TallScreen() ? R_PW_HELP_DIALOG_TALL : R_PW_HELP_DIALOG);
+		return;
+		}
+	if (aCmd == PW_APP_FAVS)              // (0.87) the start page's Add...
+		{
+		if (iFavs->Count() == 0)
+			AddFavouriteL();
+		else
+			OrganiseL();
+		UpdateStartPageL();
+		return;
+		}
 	TPsiLink link;
 	link.SetDefaults();
 	link.Load(iCoeEnv->FsSession());
 	PgLinkTestL(link.iBaudIndex, link.iRtsCts, link.iNetMode, link.iPppStart, R_PW_TEST_DIALOG, EPwDlgTest1);
+	}
+
+TInt StyleNow(const TPwSettings& aS)
+	{
+	if (aS.iStyle >= PW_STYLE_FULL && aS.iStyle <= PW_STYLE_TEXT)
+		return aS.iStyle;
+	return PW_STYLE_FULL;
+	}
+
+// (0.86) View > Page style and Shift+Ctrl+R: kept as the choice from now
+// on, and the page showing laid out again at once (no restart)
+void CPwAppUi::SetStyleL(TInt aStyle)
+	{
+	TPwSettings& st = iView->Settings();
+	st.iStyle = aStyle;
+	SaveSettings(st);
+	PwShared* s = iView->Shared();
+	if (s)
+		s->style = aStyle;
+	if (iView->EngineRunning())
+		iView->Command(PW_CMD_RESTYLE, KNullDesC);
+	static const TText* const KNames[] = { _S("Full"), _S("Lighter"), _S("Reader"), _S("Text only") };
+	iEikonEnv->InfoMsg(TPtrC(KNames[aStyle & 3]));
+	}
+
+// (0.86) The route light: Direct, Atom or PsiProxy; the padlock shut when
+// the page came by https and was checked on the way (by this Psion or the
+// helper); the style's letter when it is not Full (L, R, T)
+void CPwAppUi::RouteLightL()
+	{
+	CEikCommandButton* b = iToolBand ? (CEikCommandButton*)iToolBand->ControlById(EPwCmdRouteLight) : NULL;
+	PwShared* s = iView ? iView->Shared() : NULL;
+	if (!b || !s || !iToolBand->IsVisible())
+		return;
+	const TPwSettings& st = iView->Settings();
+	TBuf<16> t;
+	if (!st.iUseProxy || st.iProxyHost.Length() == 0)
+		t = _L("Direct");
+	else
+		{
+		TBuf8<64> h;
+		h.Copy(Clip(st.iProxyHost, 60));
+		h.ZeroTerminate();
+		t = pg_su_is_atom_host((const char*)h.Ptr()) ? _L("Atom") : _L("PsiProxy");
+		}
+	TInt style = iView->EngineRunning() && s->busy == 0 ? s->page_style : StyleNow(st);
+	if (style > PW_STYLE_FULL && style <= PW_STYLE_TEXT)
+		{
+		t.Append(' ');
+		t.Append(TChar("LRT"[style - 1]));
+		}
+	TBool url = iView->EngineRunning() && Clip(iShownUrl, 6).Compare(_L("https:")) == 0;
+	TInt lock = url && s->page_secure != PW_SECURE_NO ? 1 : 0;
+	if (t == iRouteShown && lock == iLockShown)
+		return;
+	iRouteShown = t;
+	b->SetTextL(t);
+	if (lock != iLockShown)
+		{
+		iLockShown = lock;
+		CFbsBitmap* bmp = iEikonEnv->CreateBitmapL(Application()->BitmapStoreName(), lock ? EMbmBandLock : EMbmBandNoLock);
+		CleanupStack::PushL(bmp);
+		CFbsBitmap* mask = iEikonEnv->CreateBitmapL(Application()->BitmapStoreName(), lock ? EMbmBandLockMask : EMbmBandNoLockMask);
+		CleanupStack::Pop();
+		b->SetPictureL(bmp, mask);
+		}
+	b->LayoutComponentsL();
+	b->DrawNow();
 	}
 
 // (0.85) Opens what was typed: an address as it is, words through the

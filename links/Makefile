@@ -36,7 +36,8 @@ Z_SRCS   := adler32 crc32 inflate inftrees inffast zutil deflate trees
 
 LINKS_OBJS := $(addprefix $(O)/links/,$(LINKS_SRCS:=.o))
 # (psi_grey.c, as in the ARM build: psi_drv.c uses its table of greys)
-PSI_OBJS   := $(O)/psi/psi_drv.o $(O)/psi/psi_mem.o $(O)/psi/pwhost.o $(O)/psi/psi_grey.o $(O)/psi/psi_colour.o $(O)/psi/psi_digest.o
+PSI_OBJS   := $(O)/psi/psi_drv.o $(O)/psi/psi_mem.o $(O)/psi/pwhost.o $(O)/psi/psi_grey.o $(O)/psi/psi_colour.o $(O)/psi/psi_digest.o \
+	$(O)/psi/psi_style.o $(O)/psi/psi_simp.o $(O)/psi/htmlsimp.o $(O)/psi/pwproblem.o
 JPG_LIB    := $(O)/libjpeg.a
 PNG_LIB    := $(O)/libpng.a
 Z_LIB      := $(O)/libz.a
@@ -67,6 +68,19 @@ $(O)/links/%.o: $(SRC)/%.c $(HDRS) $(WEB)/links/host/config2.h $(SRC)/links.h $(
 $(O)/psi/psi_drv.o: psi_drv.c $(HDRS) $(WEB)/fb/pwback.h $(SRC)/links.h
 	@mkdir -p $(dir $@)
 	$(CC) -c $(LCFLAGS) -I$(WEB)/fb -I$(WEB) $< -o $@
+# (0.85, 0.86) the Page not opened page, View > Page style and the simplifier
+$(O)/psi/psi_style.o: psi_style.c simp/psi_simp.h $(HDRS) $(WEB)/fb/pwback.h $(SRC)/links.h
+	@mkdir -p $(dir $@)
+	$(CC) -c $(LCFLAGS) -I$(WEB)/fb -I$(WEB) -I. $< -o $@
+$(O)/psi/psi_simp.o: simp/psi_simp.cpp simp/psi_simp.h simp/htmlsimp.h
+	@mkdir -p $(dir $@)
+	g++ -m32 -c $(OPT) -w -fno-exceptions -fno-rtti $< -o $@
+$(O)/psi/htmlsimp.o: simp/htmlsimp.cpp simp/htmlsimp.h
+	@mkdir -p $(dir $@)
+	g++ -m32 -c $(OPT) -w -fno-exceptions -fno-rtti $< -o $@
+$(O)/psi/pwproblem.o: $(WEB)/engine/pwproblem.c $(WEB)/engine/pwproblem.h
+	@mkdir -p $(dir $@)
+	$(CC) -c $(OPT) -w -std=gnu99 -I$(CORE)/ssh $< -o $@
 $(O)/psi/psi_mem.o: psi_mem.c
 	@mkdir -p $(dir $@)
 	$(CC) -c $(OPT) -Wall $< -o $@

@@ -46,6 +46,7 @@ enum {
 
 static unsigned short *psi_fb;
 static int psi_w, psi_h;
+static int psi_max_w, psi_max_h;	/* (0.87) the frame's room: the whole screen, for PW_CMD_RESIZE */
 static int dirty, dx0, dy0, dx1, dy1;
 static struct timer *poll_timer;
 static uttime last_active;		/* input, a command or an answer last taken */
@@ -718,6 +719,12 @@ static void report_page(void)
 	s->page_y = y;
 	s->page_vh = vh;
 	s->page_pics = ses ? psi_show_pictures(ses) : 0;
+	/* (0.87) a text field has the cursor: keys are typed into it */
+	s->field_active = 0;
+	if (fd && fd->f_data && fd->vs && fd->vs->current_link >= 0 && fd->vs->current_link < fd->f_data->nlinks) {
+		int t = fd->f_data->links[fd->vs->current_link].type;
+		s->field_active = t == L_FIELD || t == L_AREA;
+	}
 	s->progress = page_progress(ses, !list_empty(queue) || !list_empty(downloads));
 #endif
 }
@@ -1063,6 +1070,23 @@ int psi_show_pictures(struct session *ses)
 	return !strcmp(cast_const_char cur_loc(ses)->url, cast_const_char psi_pics_url);
 }
 
+/* psi_style.c: pictures for this address? (the page being laid out may
+   not be the one in the history yet) */
+int psi_pictures_for(unsigned char *url)
+{
+	if (dds.display_images) return 1;
+	return psi_pics_url && url && !strcmp(cast_const_char url, cast_const_char psi_pics_url);
+}
+
+/* (0.86) a simplified page's notes: Show the rest, Show pictures
+   (about:cmd-rest, about:cmd-pictures, psi_os.c), done at the next poll */
+static int psi_note_due;
+void psi_note_command(int which)
+{
+	psi_note_due = which;
+	psi_cmd_sent = get_time();
+}
+
 /* ---------- input ---------- */
 
 static void send_key(int key, int flags)
@@ -1230,7 +1254,7 @@ static void run_command(int cmd, char *arg)
 	case PW_CMD_HOME: {
 		const char *h = pwb_home_url();
 		/* (no home page set: NetSurf's about:welcome is ours too) */
-		psi_goto(ses, h && *h ? h : "about:welcome");
+		psi_goto(ses, h && *h ? h : "about:start");
 		break;
 	}
 	case PW_CMD_BACK:	load_start(); go_back(ses, 1); break;
@@ -1267,6 +1291,31 @@ static void run_command(int cmd, char *arg)
 			psi_pics_url = stracpy(cur_loc(ses)->url);
 			load_start();
 		}
+		html_interpret_recursive(ses->screen);
+		draw_formatted(ses);
+		break;
+	case PW_CMD_RESIZE: {
+		/* (0.87) a bar shown or hidden: the page laid out again at the new
+		   size, on the same page and place - no restart */
+		int w = 0, h = 0;
+		char *x = strchr(arg, 'x');
+		w = atoi(arg);
+		if (x) h = atoi(x + 1);
+		if (w < 64 || h < 64) break;
+		if (w > psi_max_w) w = psi_max_w;
+		if (h > psi_max_h) h = psi_max_h;
+		w &= ~1;
+		if (w == psi_w && h == psi_h) break;
+		psi_w = w;
+		psi_h = h;
+		memset(psi_fb, 0xff, (size_t)psi_w * psi_h * 2);
+		resize_virtual_devices(w, h);
+		mark(0, 0, w, h);
+		break;
+	}
+	case PW_CMD_RESTYLE:
+		/* (0.86) View > Page style: the page showing, laid out again in the
+		   new style (psi_style.c reads it) */
 		html_interpret_recursive(ses->screen);
 		draw_formatted(ses);
 		break;
@@ -1360,6 +1409,20 @@ static void poll_fn(void *p)
 		}
 	}
 
+	if (psi_note_due) {
+		struct session *ses = psi_ses();
+		int which = psi_note_due;
+		psi_note_due = 0;
+		if (ses && !list_empty(ses->history)) {
+			if (which == 1) {
+				void psi_style_rest(unsigned char *url);
+				psi_style_rest(cur_loc(ses)->url);
+				html_interpret_recursive(ses->screen);
+				draw_formatted(ses);
+			} else
+				run_command(PW_CMD_IMAGES, "1");
+		}
+	}
 	if (psi_problem_due) {
 		struct session *ses = psi_ses();
 		psi_problem_due = 0;
@@ -1430,12 +1493,16 @@ static unsigned char *psi_init_driver(unsigned char *param, unsigned char *displ
 		pwb_close();
 		return stracpy(cast_uchar "psi: no memory for the colours\n");
 	}
-	psi_fb = malloc((size_t)w * h * 2);
+	/* (0.87) room for the whole screen, so a bar shown or hidden only
+	   changes the size drawn (PW_CMD_RESIZE), with no restart */
+	psi_max_w = w > 640 ? w : 640;
+	psi_max_h = h > (psi_colour ? 480 : 240) ? h : (psi_colour ? 480 : 240);
+	psi_fb = malloc((size_t)psi_max_w * psi_max_h * 2);
 	if (!psi_fb) {
 		pwb_close();
 		return stracpy(cast_uchar "psi: no memory for the screen\n");
 	}
-	memset(psi_fb, 0xff, (size_t)w * h * 2);
+	memset(psi_fb, 0xff, (size_t)psi_max_w * psi_max_h * 2);
 	PW_TRACE("drv: fb ok");
 
 	psi_driver.x = w;

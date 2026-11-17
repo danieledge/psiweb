@@ -1,0 +1,48 @@
+--- a/session.c
++++ b/session.c
+@@ -1259,6 +1259,15 @@
+ 	return 0;
+ }
+ 
++/* PsiWeb 0.86: View > Page style - the page made lighter on the Psion before
++   it is parsed (psi_style.c). (A macro: format_html's body is inside pr().) */
++#ifdef PSI_NO_BARS
++unsigned char *psi_style_page(struct cache_entry *ce, unsigned char *start, size_t *len);
++#define PSI_STYLE_PAGE(ce, s, l, plain) do { if (!(plain)) (s) = psi_style_page((ce), (s), (l)); } while (0)
++#else
++#define PSI_STYLE_PAGE(ce, s, l, plain) do { } while (0)
++#endif
++
+ static struct f_data *format_html(struct f_data_c *fd, struct object_request *rq, unsigned char *url, struct document_options *opt, int *cch)
+ {
+ 	struct f_data *f;
+@@ -1279,6 +1288,7 @@
+ 		if (fd->af) foreach(struct additional_file, af, laf, fd->af->af) if (af->need_reparse > 0) af->need_reparse = 0;
+ 
+ 		get_file(rq, &start, &len);
++		PSI_STYLE_PAGE(f->rq->ce, start, &len, opt->plain);
+ 		if (jsint_get_source(fd, &start, &len)) f->uncacheable = 1;
+ 		if (len > MAXINT) len = MAXINT;
+ 		if (opt->plain == 2) {
+--- a/http.c
++++ b/http.c
+@@ -673,11 +673,19 @@
+ {
+ 	if (c->doh) {
+ 		add_to_str(hdr, l, cast_uchar "Accept: application/dns-message\r\n");
++#ifdef PSI_NO_BARS
++	} else {
++		/* PsiWeb 0.86: the pictures PsiWeb can draw, so a server that
++		   chooses by Accept sends JPEG, PNG or GIF, not WebP or AVIF */
++		add_to_str(hdr, l, cast_uchar "Accept: text/html,application/xhtml+xml;q=0.9,image/jpeg,image/png,image/gif;q=0.8,*/*;q=0.5\r\n");
++	}
++#else
+ 	} else if (SCRUB_HEADERS) {
+ 		add_to_str(hdr, l, cast_uchar "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8\r\n");
+ 	} else {
+ 		add_to_str(hdr, l, cast_uchar "Accept: */*\r\n");
+ 	}
++#endif
+ }
+ 
+ static void add_accept_language(unsigned char **hdr, int *l, struct http_connection_info *info)
