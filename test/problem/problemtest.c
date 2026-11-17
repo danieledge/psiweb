@@ -38,6 +38,8 @@ int main(void)
 	CHECK(pw_problem_kind("x", "the server refused the connection") == PW_PROB_REFUSED);
 	CHECK(pw_problem_kind("x", "timed out") == PW_PROB_TIMEOUT);
 	CHECK(pw_problem_kind("x", "Could not connect - no answer from the modem") == PW_PROB_NO_LINK);
+	/* (0.90) the Atom modem's own TLS (engine/pwatom.h) did not come up: not "the modem", not "older security" */
+	CHECK(pw_problem_kind("x", "Secure connection not made by the Atom modem - example.com") == PW_PROB_ATOM_TLS);
 
 	for (k = 0; k < PW_PROB_COUNT; k++) {
 		const PwRoute *r = k % 3 == 0 ? &direct : k % 3 == 1 ? &atom : &pp;
@@ -51,6 +53,8 @@ int main(void)
 	}
 	pw_problem_html(page, sizeof(page), "https://www.ebay.co.uk/", PW_PROB_TLS, "", &direct);
 	CHECK(strstr(page, "www.ebay.co.uk") && strstr(page, "PsiProxy on a computer") && strstr(page, "Route: Direct, on the network card"));
+	pw_problem_html(page, sizeof(page), "https://example.com/", PW_PROB_ATOM_TLS, "", &direct);
+	CHECK(strstr(page, "example.com") && strstr(page, "Atom modem could not make a secure connection") && !strstr(page, "older security"));
 	pw_problem_html(page, sizeof(page), "http://x.org/", PW_PROB_REFUSED, "", &atom);
 	CHECK(strstr(page, "Route: Atom modem helper, through the modem"));
 	pw_problem_html(page, sizeof(page), "http://x.org/", PW_PROB_REFUSED, "", &pp);

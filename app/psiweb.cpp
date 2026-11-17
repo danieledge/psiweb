@@ -69,6 +69,20 @@ static void UseSharedLink(RFs& aFs, TPwSettings& aSettings)
 	aSettings.iProxyPort = link.iProxyPort;
 	}
 
+// (0.90) "Modem provides TLS" (PsiLink.ini iModemTls, set in PsiMail's
+// Connection settings or its setup assistant for the Atom modem): on the
+// modem route the Atom then makes direct https connections and checks their
+// certificates, and the engine speaks plain HTTP to it (engine/pwatom.h).
+// Read here, not kept in TPwSettings, whose size must not change.
+static TInt SharedModemTls(RFs& aFs, const TPwSettings& aSettings)
+	{
+	TPsiLink link;
+	link.SetDefaults();
+	if (!link.Load(aFs))
+		return 0;
+	return !aSettings.iNetMode && link.iModemTls ? 1 : 0;
+	}
+
 // Writes the link lines; the proxy in PsiLink.ini is left as it is (the
 // Connection settings dialog writes that itself)
 static void SaveSharedLink(RFs& aFs, const TPwSettings& aSettings)
@@ -89,7 +103,7 @@ static void SaveSharedLink(RFs& aFs, const TPwSettings& aSettings)
 
 _LIT(KEngineExe, "psiweb.exe");
 _LIT(KIniFile, "C:\\System\\Apps\\PsiWeb\\PsiWeb.ini");
-_LIT(KVersion, "0.89");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
+_LIT(KVersion, "0.90");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
 _LIT(KDefaultHome, "http://68k.news/");
 const TInt KZoomSteps[] = { 50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200 };
 const TInt KZoomCount = 11;
@@ -312,6 +326,7 @@ void CPwView::StartEngineL()
 	s->net.baud_index = iSettings.iBaudIndex;
 	s->net.rtscts = iSettings.iRtsCts;
 	s->net.net_mode = iSettings.iNetMode;
+	s->net.modem_tls = SharedModemTls(iCoeEnv->FsSession(), iSettings);   // (0.90) engine/pwatom.h
 	CopyToC(s->net.ppp_start, sizeof(s->net.ppp_start), iSettings.iPppStart);
 	s->net.port = 80;
 	CopyToC(s->net.dial_prefix, sizeof(s->net.dial_prefix), _L("ATDT"));
@@ -2560,6 +2575,8 @@ void CPwAppUi::PageInfoL()
 	TBool https = Clip(lines[1], 6).Compare(_L("https:")) == 0;
 	if (https && s->page_secure == PW_SECURE_CHECKED)
 		lines[4].Append(_L(" - secure, checked by this Psion"));
+	else if (https && s->page_secure == PW_SECURE_MODEM)
+		lines[4] = _L("Direct, checked by the Atom modem");   // (0.90) short, to fit: the Atom made the TLS connection
 	else if (https && s->page_secure == PW_SECURE_HELPER)
 		lines[4].Append(_L(" - secure, checked by the web helper"));
 	else if (Clip(lines[1], 5).Compare(_L("http:")) == 0)
@@ -3289,6 +3306,12 @@ void CPwAppUi::RouteLightL()
 		}
 	TBool url = iView->EngineRunning() && Clip(iShownUrl, 6).Compare(_L("https:")) == 0;
 	TInt lock = url && s->page_secure != PW_SECURE_NO ? 1 : 0;
+	// (0.90) a direct https page whose TLS and certificate check the Atom
+	// modem did (engine/pwatom.h): the light says Atom, the padlock shut, as
+	// for the Atom modem helper - the Atom checked it, not this Psion.
+	// ("Atom TLS" did not fit the button.)
+	if (lock && s->page_secure == PW_SECURE_MODEM && t.Left(6) == _L("Direct"))
+		t.Replace(0, 6, _L("Atom"));
 	if (t == iRouteShown && lock == iLockShown)
 		return;
 	iRouteShown = t;

@@ -31,6 +31,7 @@
 #include "../core/ssh/pgdevbox.h"
 #include "../psiweb.h"
 #include "../fb/pwback.h"
+#include "pwatom.h"
 
 extern PsiShared *pg_shared(void);
 extern int dropbear_ed25519_verify(const unsigned char *m, unsigned long mlen,
@@ -128,7 +129,7 @@ static void setup_route(void)
 	} else {
 		snprintf(R.host, sizeof(R.host), GH_HOST);
 		R.port = 443;
-		R.tls = 1;
+		R.tls = !pw_atom_tls(pg_shared(), R.port);   /* (0.90) the Atom's TLS (pwatom.h); the update's signature is checked either way */
 		snprintf(R.vhost, sizeof(R.vhost), GH_HOST);
 		snprintf(R.prefix, sizeof(R.prefix), "%s", gh_path);
 	}

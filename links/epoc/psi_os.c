@@ -21,6 +21,7 @@
 #include "../../engine/pwcert.h"
 #include "psiweb.h"
 #include "psiweb_cmds.h"
+#include "../../engine/pwatom.h"
 
 #undef read
 #undef write
@@ -32,6 +33,7 @@
 extern int pg_net_avail(void);
 extern int pg_wait(int ms, int want_net, int want_kbd);
 extern int tls_pending(void);
+extern PsiShared *pg_shared(void);
 
 /* ------------------------------------------------------------ main */
 
@@ -305,7 +307,7 @@ static void end_live(void)
 int psi_sock_connect(unsigned char *host, int port, int tls, unsigned char **why)
 {
 	char msg[160];
-	int fd, i;
+	int fd, i, atom;
 
 	end_live();
 	fd = palloc(PF_SOCK);
@@ -313,10 +315,19 @@ int psi_sock_connect(unsigned char *host, int port, int tls, unsigned char **why
 	snprintf(msg, sizeof(msg), "Connecting to %s", (char *)host);
 	pwb_set_status(msg);
 	msg[0] = 0;
+	/* (0.90) the Atom modem with "Modem provides TLS": it makes the TLS
+	   connection and checks the certificate, the line carries plain HTTP
+	   (engine/pwatom.h). Otherwise PsiWeb's own TLS and check. */
+	atom = tls && pw_atom_tls(pg_shared(), port);
+	if (atom) tls = 0;
 	if (tls) pw_cert_host((const char *)host, port);     /* (0.84) the name its certificate must carry */
 	if (pwn_connect((const char *)host, port, tls, msg, sizeof(msg)) != 0) {
 		pfd[fd - PSI_FD0].kind = PF_FREE;
 		if (tls && msg[0]) pw_cert_why((const char *)host, msg, sizeof(msg));
+		/* the Atom says only NO CARRIER when its TLS fails (the
+		   certificate, the name, or no such site): it logs which */
+		if (atom && !strncmp(msg, "NO CARRIER", 10))
+			snprintf(msg, sizeof(msg), "Secure connection not made by the Atom modem - %s", (char *)host);
 		if (!msg[0]) snprintf(msg, sizeof(msg), "Could not connect to %s", (char *)host);
 		pwb_set_status(msg);
 		{ void psi_conn_failed(const char *why); psi_conn_failed(msg); }

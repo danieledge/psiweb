@@ -57,6 +57,7 @@ fetch cloudflare www.cloudflare.com $ECDSA
 fetch cloudflare-rsa www.cloudflare.com $RSA
 fetch google www.google.com $ECDSA
 fetch cnnlite lite.cnn.com $ECDSA
+fetch example example.com $ECDSA
 openssl req -x509 -newkey rsa:2048 -nodes -keyout "$B/self.key" -out "$B/self.pem" -days 30 \
 	-subj "/CN=localhost" -addext "subjectAltName=DNS:localhost" 2>/dev/null
 python3 "$HERE/mkmsg.py" "$B/self.pem" "$B/self.msg"
@@ -83,6 +84,8 @@ check "cloudflare (ECDSA, GTS R4)"    "trusted" $C "$B/cloudflare.msg" www.cloud
 check "cloudflare (RSA)"              "trusted" $C "$B/cloudflare-rsa.msg" www.cloudflare.com
 check "google (ECDSA)"                "trusted" $C "$B/google.msg" www.google.com
 check "cnn lite (ECDSA P-384 leaf)"   "trusted" $C "$B/cnnlite.msg" lite.cnn.com
+check "example.com (ECDSA, SSL.com 2022)" "trusted" $C "$B/example.msg" example.com
+check "example.com, signature spoilt" "Certificate not trusted - example.com" $C "$B/example-spoilt.msg" example.com
 check "wikipedia, signature spoilt"   "Certificate not trusted - en.m.wikipedia.org" $C "$B/wikipedia-spoilt.msg" en.m.wikipedia.org
 check "cloudflare, signature spoilt"  "Certificate not trusted - www.cloudflare.com" $C "$B/cloudflare-spoilt.msg" www.cloudflare.com
 check "npr, signature spoilt"         "Certificate not trusted - text.npr.org" $C "$B/npr-spoilt.msg" text.npr.org

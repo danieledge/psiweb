@@ -22,6 +22,7 @@
 #include "psiweb_cmds.h"
 #ifdef PSI_EPOC
 #include "psiweb.h"
+#include "../engine/pwatom.h"
 #endif
 #include "simp/psi_simp.h"
 
@@ -141,7 +142,9 @@ static void report(int style, int raw, int kept, int pics_out, int scripts, unsi
 	s->page_pics_out = pics_out;
 	s->page_scripts = scripts;
 	if (casecmp(url, cast_uchar "https:", 6)) s->page_secure = PW_SECURE_NO;
-	else s->page_secure = s->use_proxy && s->proxy_host[0] ? PW_SECURE_HELPER : PW_SECURE_CHECKED;
+	else if (s->use_proxy && s->proxy_host[0]) s->page_secure = PW_SECURE_HELPER;
+	else if (pw_atom_tls(&s->net, get_port(url))) s->page_secure = PW_SECURE_MODEM;   /* (0.90) engine/pwatom.h */
+	else s->page_secure = PW_SECURE_CHECKED;
 #else
 	(void)style; (void)raw; (void)kept; (void)pics_out; (void)scripts; (void)url;
 #endif

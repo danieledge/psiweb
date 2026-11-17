@@ -70,7 +70,8 @@ enum
 	{
 	PW_SECURE_NO = 0,               /* plain http */
 	PW_SECURE_CHECKED,              /* https, the certificate checked on this Psion */
-	PW_SECURE_HELPER                /* https, fetched and checked by the web helper */
+	PW_SECURE_HELPER,               /* https, fetched and checked by the web helper */
+	PW_SECURE_MODEM                 /* (0.90) https direct, the TLS and the certificate check done by the Atom modem (engine/pwatom.h) */
 	};
 
 /* log_state (psiweb.h) */

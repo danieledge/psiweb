@@ -9,6 +9,8 @@ A copy of web/emu/run_psiweb.py (NetSurf's harness) with, in addition:
                    System/Apps/PsiWeb/cookies.txt
   --busy           log the busy message's figures (0.89: psiweb.h load_host,
                    load_kb, pics_done, pics_all) as they change
+  --atom-tls       (0.90) the Atom modem's TLS on port 443, with "Modem provides TLS"
+                   on (implies --modem): see ATOM_TLS below
   --netbook        the netBook's screen: 640x480 in EPOC's 256 colours (screenshots in colour)
   --progress       log the toolband's progress figure (psiweb.h progress) as it changes
   --heap-limit N   psiweb's heap limit in bytes (default 10 MB, as on the
@@ -72,6 +74,15 @@ if VCLOCK:
 # closing shows up only as "NO CARRIER" in the data, never as a closed
 # flag, and pg_net_avail counts only bytes already taken from the port
 MODEM = "--modem" in args
+# (0.90) --atom-tls: the PsiConnect Atom with AT$TLS=1 and the Psion's
+# "Modem provides TLS" on: a dial to port 443 is made over TLS here, checked
+# against the PC's roots and the name (as the Atom checks against its
+# Mozilla roots), and the ARM code gets the plain bytes inside; implies
+# --modem. A dial to 443 that the ARM code then wraps in TLS itself fails,
+# as it did on the Psion before 0.90.
+ATOM_TLS = "--atom-tls" in args
+if ATOM_TLS:
+    MODEM = True
 PROXY = None
 if "--proxy" in args:
     PROXY = args[args.index("--proxy") + 1]
@@ -411,7 +422,8 @@ def rx_fill(timeout):
         if MODEM and not net["rx"] and timeout > 0:
             sleep(min(timeout, 0.05))
         return
-    r, _, _ = select.select([s], [], [], timeout)
+    # (an Atom TLS socket may hold decrypted bytes select cannot see)
+    r = [s] if getattr(s, "pending", None) and s.pending() else select.select([s], [], [], timeout)[0]
     if r:
         d = s.recv(8192)
         if d:
@@ -445,6 +457,18 @@ def pg_dial(host, port, why, maxlen):
         NETLOG["conns"].append({"host": host, "port": port, "ev": []})
     try:
         net["sock"] = socket.create_connection((host, port), timeout=15)
+        if ATOM_TLS and port == 443:
+            # the Atom's TLS termination: a failed handshake or check is
+            # only NO CARRIER on the line, as from the Atom
+            import ssl
+            try:
+                net["sock"] = ssl.create_default_context().wrap_socket(net["sock"], server_hostname=host)
+                log("atom tls %s: %s" % (host, net["sock"].version()))
+            except (ssl.SSLError, OSError) as e:
+                log("atom tls %s: failed: %s" % (host, e))
+                net["sock"].close(); net["sock"] = None
+                wr(why, b"NO CARRIER\0")
+                return u32(-1)
         net["sock"].settimeout(None)
         return 0
     except OSError as e:
@@ -535,6 +559,7 @@ def hc(op, a, b, c, d):
     if op == 213: return 8 if NETBOOK else 4         # pwb_depth
     if op == 214: return STYLE                       # pwb_style (0.86)
     if op == 215: return 1 if KEEP_COOKIES else 0    # pwb_keep_cookies (0.89)
+    if op == 216: return 1 if ATOM_TLS else 0        # modem_tls (0.90)
     if op == 25:                                     # memory report
         mem.update(in_use=a, peak=b, arena=c, n=d)
         log("[heap] in use %d KB, peak %d KB" % (a // 1024, b // 1024)); return 0

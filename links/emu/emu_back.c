@@ -14,7 +14,7 @@ int emu_hc(int op, int a, int b, int c, int d);
 void emu_mem_report(void);
 enum {
 	HB = 200, HB_OPEN = HB, HB_PRESENT, HB_EVENT, HB_CMD, HB_STATUS, HB_TITLE,
-	HB_URL, HB_BUSY, HB_READY, HB_MS, HB_CONFIG, HB_UPDCFG, HB_IMAGES, HB_DEPTH, HB_STYLE, HB_COOKIES,
+	HB_URL, HB_BUSY, HB_READY, HB_MS, HB_CONFIG, HB_UPDCFG, HB_IMAGES, HB_DEPTH, HB_STYLE, HB_COOKIES, HB_MODEMTLS,
 	HP = 300, HP_DIAL = HP, HP_HANGUP, HP_AVAIL, HP_READ, HP_WRITE, HP_WAIT, HP_ENTROPY
 };
 
@@ -38,6 +38,7 @@ static void emu_config(void)
 	if (done) return;
 	done = 1;
 	emu_hc(HB_CONFIG, (int)&g_sh.use_proxy, (int)g_sh.proxy_host, (int)&g_sh.proxy_port, (int)&g_sh.net.net_mode);
+	g_sh.net.modem_tls = emu_hc(HB_MODEMTLS, 0, 0, 0, 0);   /* (0.90) run_links.py --atom-tls */
 }
 void *pwb_shared(void) { emu_config(); return &g_sh; }
 /* for the harness's "auth" and "save" script lines (run_links.py): the
