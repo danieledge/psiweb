@@ -69,7 +69,7 @@ $(O)/web/nsfb_epoc.o: fb/nsfb_epoc.c fb/pwback.h
 # (the netBook's colours: the Links engine's, as pwepoc.cpp presents with it)
 $(O)/web/pwcolour.o: links/psi_colour.c links/psi_pal.h fb/pwback.h
 	@mkdir -p $(dir $@)
-	$(CC) -c $(CFLAGS_C) -std=gnu99 -Ifb $< -o $@
+	$(TCC) -c $(TFLAGS) -Ifb $< -o $@
 $(O)/web/%.o: fb/%.c fb/pwback.h
 	@mkdir -p $(dir $@)
 	$(TCC) -c $(TFLAGS) $< -o $@

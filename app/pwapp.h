@@ -121,6 +121,8 @@ struct TPwSettings
 	TInt iSearch;          // (0.85) Search with: PW_SEARCH_* (pwaddr.h)
 	TInt iStyle;           // (0.86) Page style: PW_STYLE_* (psiweb_cmds.h); -1 the route's standard
 	TInt iFlags;           // (0.85) KPwFlag* bits
+	TBuf<24> iFullServer;  // (0.88) File > Open in full browser: PsiTerm's saved server
+	TBuf<40> iFullCommand; // ...and the program run there with the address (carbonyl, w3m)
 	};
 
 // TPwSettings::iFlags, one byte after the toolband's in PsiWeb.ini (0.85)
@@ -418,6 +420,19 @@ private:
 	TBool iStyleChosen;        // (0.86) ...and Page style
 	};
 
+// (0.88) File > Open in full browser: which of PsiTerm's saved servers, and
+// the program that shows the page there
+class CPwFullDialog : public CEikDialog
+	{
+public:
+	CPwFullDialog(TPwSettings& aSettings, const TDesC& aUrl) : iSettings(aSettings), iUrl(aUrl) {}
+private:
+	void PreLayoutDynInitL();
+	TBool OkToExitL(TInt aButtonId);
+	TPwSettings& iSettings;
+	const TDesC& iUrl;
+	};
+
 class CPwPrefsDialog : public CEikDialog
 	{
 public:
@@ -499,6 +514,7 @@ private:
 	static TInt SetupCallback(TAny* aSelf);
 	CIdle* iSetupIdle;                  // the first-time setup, once the window is up
 	void GoL(const TDesC& aTyped);      // (0.85) an address, or words to search for
+	void FullBrowserL();                // (0.88) File > Open in full browser (PsiTerm)
 	TRect PageRect();                   // the bars laid out as they are shown: the page's room
 	TBool TallScreen() const;           // 480 lines (the netBook): the toolband at first, not the toolbar
 	void StartAddressL();               // a tap on the address, or Ctrl+L
@@ -516,6 +532,7 @@ private:
 	TBool iPenTaken;                    // the pen's down-to-up is the address's first tap
 	TInt iShownProgress;                // what the bar shows (-1: hidden)
 	TBuf<16> iRouteShown;               // (0.86) what the route light says
+	TUint iFullBusyAt;                  // (0.88) "Opening in PsiTerm..." went up (0: not up)
 	TInt iLockShown;                    // ...and whether its padlock is shut (-1: not yet)
 	};
 

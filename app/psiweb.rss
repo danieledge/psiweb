@@ -180,6 +180,7 @@ RESOURCE MENU_PANE r_pw_file_menu
 	items=
 		{
 		MENU_ITEM { command=EPwCmdOpen; txt="Open address..."; },
+		MENU_ITEM { command=EPwCmdFullBrowser; txt="Open in full browser..."; },
 		MENU_ITEM { command=EPwCmdReload; txt="Reload"; },
 		MENU_ITEM { command=EPwCmdStop; txt="Stop"; extratxt="Esc"; flags=EEikMenuItemSeparatorAfter; },
 		MENU_ITEM { command=EPwCmdConnect; txt="Connect..."; },
@@ -478,6 +479,27 @@ RESOURCE ARRAY r_pw_conn_proxy_lines
 // PsiMail). Screen greys... opens the greys screen shared with PsiTerm and
 // PsiMail (ssh/psigreyui.cpp; docs/display.md) on top; the dialog is still
 // there when it closes.
+// (0.88) File > Open in full browser: the page showing, in a real browser
+// (Carbonyl, or w3m) on one of PsiTerm's saved servers, shown in PsiTerm.
+// The server is a name from PsiTerm's list; the program is run there with
+// the address. Help > Ways to connect says how to install them.
+RESOURCE DIALOG r_pw_full_dialog
+	{
+	title="Open in full browser";
+	flags=EEikDialogFlagWait;
+	buttons=R_EIK_BUTTONS_CANCEL_OK;
+	items=
+		{
+		DLG_LINE { type=EEikCtEdwin; prompt="PsiTerm server"; id=EPwDlgFullServer;
+			control=EDWIN { width=16; maxlength=24; }; },
+		DLG_LINE { type=EEikCtEdwin; prompt="Program there"; id=EPwDlgFullCommand;
+			control=EDWIN { width=16; maxlength=40; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPwDlgFullNote; control=LABEL { standard_font=EEikLabelFontAnnotation;
+			horiz_align=EEikLabelAlignHLeft; reserve_length=72;
+			txt="A server saved in PsiTerm - carbonyl draws the page as Chrome would"; }; }
+		};
+	}
+
 RESOURCE DIALOG r_pw_prefs_dialog
 	{
 	title="Preferences";

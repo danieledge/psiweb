@@ -48,6 +48,17 @@ int main(void)
 	char out[64];
 	if (pw_addr_make((const unsigned char*)longw, (int)strlen(longw), 0, out, sizeof(out)) != -1) { printf("FAIL long\n"); gFail++; }
 	if (pw_addr_make((const unsigned char*)"a b", 3, 0, out, 0) != -1) { printf("FAIL zero room\n"); gFail++; }
+	/* (0.88) the full browser's command: one word for the shell */
+	{
+		char c[101];
+		const char *u = "https://x.org/a'b;rm -rf ~$(id)`x`\n";
+		int r = pw_shell_command("carbonyl", (const unsigned char *)u, (int)strlen(u), c, sizeof(c));
+		if (r < 0 || strcmp(c, "carbonyl 'https://x.org/a'\\''b;rm -rf ~$(id)`x`'")) { printf("FAIL shell \"%s\"\n", c); gFail++; }
+		char lng[300];
+		memset(lng, 'a', sizeof(lng) - 1); lng[sizeof(lng) - 1] = 0;
+		if (pw_shell_command("w3m", (const unsigned char *)lng, 299, c, sizeof(c)) != -1) { printf("FAIL shell long\n"); gFail++; }
+		if (pw_shell_command("w3m", (const unsigned char *)"\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'", 24, c, 40) != -1) { printf("FAIL shell quotes\n"); gFail++; }
+	}
 	printf(gFail ? "addrtest: %d failed\n" : "addrtest: all passed\n", gFail);
 	return gFail != 0;
 	}

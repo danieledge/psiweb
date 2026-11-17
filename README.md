@@ -14,9 +14,15 @@ A web browser for the **Psion Series 5mx**, the **netBook** and the **Series 7**
 
 Up to 0.61 the engine was NetSurf. Its sources are still in the tree as a fallback (see *The NetSurf engine* below), until Links has been proved on the device. The whole port is described in [`links/PORTING.md`](links/PORTING.md).
 
-**Status: beta (0.87).** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
+**Status: beta (0.88).** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
 
 [![Download PsiWeb.sis](https://img.shields.io/badge/Download-PsiWeb.sis-2ea44f?logo=github)](https://github.com/danieledge/psiterm/raw/main/dist/PsiWeb.sis)
+
+## What's new in 0.88
+
+- **A fourth way: a full browser elsewhere.** File > Open in full browser hands the page showing (or the one that would not open) to PsiTerm, which connects to one of its saved servers, by name, and runs a browser there with the address: [Carbonyl](https://github.com/fathyb/carbonyl), Chrome drawn in a terminal, so pages drawn by scripts, logins and all open there, or w3m (offered on the 5mx, whose screen suits it). The server's own login is used; the address goes to its shell as one quoted word. Needs PsiTerm 1.15. Install Carbonyl on any Linux or Mac computer with Node: `npm install --global carbonyl` (or `docker run --rm -ti fathyb/carbonyl URL`); w3m with `apt install w3m` or `brew install w3m`. Help > Ways to connect says the same.
+- **NetSurf "Full layout" trial on the netBook: stopped at its gate.** The plan allowed a NetSurf engine for the netBook only if BBC and the Guardian laid out with their own style sheets in under 20 MB of heap and under 10 s at 150 MIPS (1,500 million instructions). In the old NetSurf harness (`emu/run_psiweb.py`, the engine as it was at 0.61, rebuilt with today's core) BBC took 1,995 million instructions and peaked at 20.0 MB, the harness's limit, and showed only its first heading; the Guardian was still fetching style sheets and pictures after seven minutes. Both miss, so NetSurf stays out, as the plan says (the build rule for its colour code, broken since 0.80, is mended in `Makefile`).
+- Not done: several connections at once on the network card (the plan's D11, an L-sized change to psion-core's pwnet that was not among the decisions); left for when the network card has been measured on a real netBook.
 
 ## What's new in 0.87
 
@@ -69,10 +75,15 @@ Since 0.77, the last signed release.
 
 ## Screenshots
 
-PsiWeb 0.87, 0.86 and 0.85 (the first rows) and 0.80 on the netBook (colour, 640x480) and the Series 5mx (16 greys, 640x240). Taken in emulators; pages and the netBook's *Page not opened* in the ARM harness, as the netBook emulator has no network. Tap or click one to see it full size.
+PsiWeb 0.88 to 0.85 (the first rows) and 0.80 on the netBook (colour, 640x480) and the Series 5mx (16 greys, 640x240). Taken in emulators; pages and the netBook's *Page not opened* in the ARM harness, as the netBook emulator has no network. Tap or click one to see it full size.
 
 <table>
 <tr><th>netBook</th><th>Series 5mx</th></tr>
+<tr><td><b>Open in full browser (0.88)</b></td><td><b>...handed to PsiTerm (1.15)</b></td></tr>
+<tr>
+<td><a href="docs/img/5mx-psiweb-full-browser.png"><img src="docs/img/5mx-psiweb-full-browser.png" alt="Series 5mx: the Open in full browser dialog" width="400"></a></td>
+<td><a href="docs/img/5mx-psiweb-full-browser-psiterm.png"><img src="docs/img/5mx-psiweb-full-browser-psiterm.png" alt="Series 5mx: PsiTerm opened by PsiWeb, with no saved server of that name yet" width="400"></a></td>
+</tr>
 <tr><td><b>A lighter edition offered, Wikipedia (0.87)</b></td><td><b>Preferences, with Cookies (0.87)</b></td></tr>
 <tr>
 <td><a href="docs/img/netbook-psiweb-lighter-edition.png"><img src="docs/img/netbook-psiweb-lighter-edition.png" alt="netBook: the full Wikipedia site with the offer of its mobile edition" width="400"></a></td>
@@ -338,7 +349,8 @@ Installed PsiWebs update from the **psiterm** repository's `dist/` (`PsiWeb-vers
 - **PC build** (`links/build_host.sh`, `links/run_host.sh`): Links with the `psi` driver on Linux, for quick checks.
 - **Certificates** (0.84): `test/cert/run.sh` builds psion-core's certificate check with `engine/pwcert.c` for the PC and checks it on chains fetched with openssl (trusted sites, another name, self-signed, expired, a refused handshake); `python3 core/tools/emu/net.py certbad` (`test/emu/cert.net.py`) has the real package in the 5mx emulator refuse a self-signed server behind the emulated modem.
 - **Page styles** (0.86): `test/simp/check.sh` checks the simplifier in `links/simp/` is psiconnect's and runs psiconnect's simplifier tests; `links/emu/run_links.py --style N` runs a page in a style. AES-128-GCM: psion-core's `ssh/test/aesgcmtest.c`.
-- **Addresses and search** (0.85): `test/addr/addrtest.c` (what is words, what is an address, the search address); **Page not opened** (0.85): `test/problem/problemtest.c` (each failure's kind and the page, escaped and bounded). Each file's first lines say how to build it. The setup assistant's choices are tested in psion-core (`ssh/test/setuptest.cpp`).
+- **Addresses and search** (0.85): `test/addr/addrtest.c` (what is words, what is an address, the search address, and from 0.88 the full browser's quoted command); **Page not opened** (0.85): `test/problem/problemtest.c` (each failure's kind and the page, escaped and bounded). Each file's first lines say how to build it. The setup assistant's choices are tested in psion-core (`ssh/test/setuptest.cpp`).
+- **The full browser** (0.88): `node --experimental-strip-types core/tools/emu/mkcard.ts fullbrowser` makes a card with PsiWeb and PsiTerm (`test/emu/fullbrowser.card.ts`, PsiTerm's `pkg/` from its checkout beside this one); PsiWeb is the second program on the Extras bar there.
 - **netBook emulator, no network.** That emulator has no modem or network card behind it, so pages there end in nothing; the *Page not opened* screenshots for the netBook come from the ARM harness with `--netbook`. Its taps do not reach dialog page tabs: use Up and Right.
 
 ## The NetSurf engine

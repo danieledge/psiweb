@@ -134,4 +134,43 @@ static inline int pw_addr_make(const unsigned char* aText, int aLen, int aEngine
 	return n;
 	}
 
+/* (0.88) File > Open in full browser: "PROGRAM 'ADDRESS'" for a server's
+ * shell, the address one word whatever it holds: each ' becomes '\'' (end
+ * the quote, a quoted quote, start again) and control characters are left
+ * out, so nothing in an address can run as a command. aOut has aMax bytes
+ * with its 0. Returns the length, or -1 if it did not fit (the caller says
+ * so; it is never cut, which could leave a quote open). */
+static inline int pw_shell_command(const char *aProgram, const unsigned char *aUrl, int aLen, char *aOut, int aMax)
+	{
+	int n = 0, i;
+	if (aMax <= 0) return -1;
+	for (i = 0; aProgram[i]; i++)
+		{
+		if (n >= aMax - 1) return -1;
+		aOut[n++] = aProgram[i];
+		}
+	if (n + 2 >= aMax) return -1;
+	aOut[n++] = ' ';
+	aOut[n++] = '\'';
+	for (i = 0; i < aLen; i++)
+		{
+		unsigned c = aUrl[i];
+		if (c < 0x20 || c == 0x7f) continue;
+		if (c == '\'')
+			{
+			if (n + 4 >= aMax - 1) return -1;
+			aOut[n++] = '\''; aOut[n++] = '\\'; aOut[n++] = '\''; aOut[n++] = '\'';
+			}
+		else
+			{
+			if (n >= aMax - 2) return -1;
+			aOut[n++] = (char)c;
+			}
+		}
+	if (n >= aMax - 1) return -1;
+	aOut[n++] = '\'';
+	aOut[n] = 0;
+	return n;
+	}
+
 #endif

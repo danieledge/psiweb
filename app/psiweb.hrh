@@ -51,6 +51,7 @@ enum TPwCommands
 	EPwCmdStyleNext,         // (0.86) Shift+Ctrl+R: the next page style
 	EPwCmdRouteLight,        // (0.86) the toolband's route light: Page information
 	EPwCmdReloadStop,        // (0.87) the toolband's Reload, which is Stop while a page loads
+	EPwCmdFullBrowser,       // (0.88) File > Open in full browser...
 	EPwCmdFav0 = 0x1100,     // the favourites on the menu: 16 slots
 	EPwCmdHist0 = 0x1120     // the History cascade's pages: 16 slots
 	};
@@ -111,7 +112,10 @@ enum TPwDialogControls
 	EPwDlgStyle,             // (0.86) Preferences: Page style
 	EPwDlgSuStyle,           // (0.86) Set up PsiWeb > Pages: Page style
 	EPwDlgSuStyleNote,
-	EPwDlgCookies            // (0.87) Preferences: Cookies
+	EPwDlgCookies,           // (0.87) Preferences: Cookies
+	EPwDlgFullServer,        // (0.88) Open in full browser: the server
+	EPwDlgFullCommand,       // ...the program
+	EPwDlgFullNote
 	};
 
 // Organise favourites: its buttons

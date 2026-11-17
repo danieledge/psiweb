@@ -16,6 +16,9 @@
 #include <eiktbar.h>
 #include <eikimage.h>
 #include <apgcli.h>
+#include <apgtask.h>
+#include <apacmdln.h>
+#include <eikdll.h>
 #include <eikcfdlg.h>
 #include <eikseced.h>
 #include <eikon.rsg>
@@ -85,7 +88,7 @@ static void SaveSharedLink(RFs& aFs, const TPwSettings& aSettings)
 
 _LIT(KEngineExe, "psiweb.exe");
 _LIT(KIniFile, "C:\\System\\Apps\\PsiWeb\\PsiWeb.ini");
-_LIT(KVersion, "0.87");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
+_LIT(KVersion, "0.88");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
 _LIT(KDefaultHome, "http://68k.news/");
 const TInt KZoomSteps[] = { 50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200 };
 const TInt KZoomCount = 11;
@@ -1699,6 +1702,11 @@ void CPwAppUi::HandleWsEventL(const TWsEvent& aEvent, CCoeControl* aDestination)
 		{
 		iForeground = aEvent.Type() == EEventFocusGained;
 		UpdateReading();
+		if (iFullBusyAt)                     // (0.88) PsiTerm came in front: "Opening in PsiTerm..." goes
+			{
+			iEikonEnv->BusyMsgCancel();
+			iFullBusyAt = 0;
+			}
 		}
 	else if (aEvent.Type() == EEventKey && aEvent.Key()->iRepeats > 0
 		&& (aEvent.Key()->iModifiers & EModifierCtrl) && (aEvent.Key()->iCode == 20 || aEvent.Key()->iCode == 't' || aEvent.Key()->iCode == 'T'))
@@ -2143,6 +2151,8 @@ void CPwAppUi::LoadSettings(TPwSettings& aSettings)
 	aSettings.iSearch = PW_SEARCH_DDG;
 	aSettings.iStyle = -1;            // (0.86) the route's standard
 	aSettings.iFlags = 0;
+	aSettings.iFullServer.Zero();     // (0.88) none until chosen
+	aSettings.iFullCommand = TallScreen() ? _L("carbonyl") : _L("w3m");   // (the 5mx's screen suits w3m)
 	RFile file;
 	if (file.Open(iCoeEnv->FsSession(), KIniFile, EFileRead) != KErrNone)
 		{
@@ -2200,6 +2210,19 @@ void CPwAppUi::LoadSettings(TPwSettings& aSettings)
 						}
 					if (pos < d.Length())            // (0.85) KPwFlag* bits
 						aSettings.iFlags = d[pos++] & KPwFlagKeepCookies;
+					// (0.88) Open in full browser: the server, the program
+					if (pos < d.Length() && pos + 1 + d[pos] <= d.Length() && d[pos] <= 24)
+						{
+						len = d[pos++];
+						aSettings.iFullServer.Copy(d.Mid(pos, len));
+						pos += len;
+						if (pos < d.Length() && pos + 1 + d[pos] <= d.Length() && d[pos] <= 40 && d[pos] > 0)
+							{
+							len = d[pos++];
+							aSettings.iFullCommand.Copy(d.Mid(pos, len));
+							pos += len;
+							}
+						}
 					}
 				}
 			}
@@ -2244,6 +2267,12 @@ void CPwAppUi::SaveSettings(const TPwSettings& aSettings)
 	d.Append((TUint8)aSettings.iSearch);    // (0.85)
 	d.Append((TUint8)(aSettings.iStyle >= 0 ? aSettings.iStyle + 1 : 0));     // (0.86)
 	d.Append((TUint8)aSettings.iFlags);     // (0.85)
+	tmp.Copy(aSettings.iFullServer);        // (0.88)
+	d.Append((TUint8)tmp.Length());
+	d.Append(tmp);
+	tmp.Copy(aSettings.iFullCommand);
+	d.Append((TUint8)tmp.Length());
+	d.Append(tmp);
 	TInt r = file.Write(d);
 	if (r == KErrNone)
 		r = file.Flush();
@@ -2660,6 +2689,9 @@ void CPwAppUi::HandleCommandL(TInt aCommand)
 	case EPwCmdSetup:
 		SetupL();
 		break;
+	case EPwCmdFullBrowser:
+		FullBrowserL();
+		break;
 	case EPwCmdStart:
 		iView->OpenUrlL(_L("about:start"));
 		break;
@@ -2970,6 +3002,127 @@ void CPwAppUi::RouteLightL()
 		}
 	b->LayoutComponentsL();
 	b->DrawNow();
+	}
+
+// (0.88) Route 4, a full browser elsewhere: the page showing, opened by
+// PsiTerm on one of its saved servers with a program that draws it there
+// (Carbonyl: Chrome in a terminal; w3m). PsiTerm is started, or handed the
+// request if it runs already, with "ssh:<server>\t<command>"
+// (CPsiTermAppUi::ProcessCommandParametersL). The address goes in single
+// quotes, any quote in it made safe, so the server's shell takes it as one
+// word and runs nothing in it.
+const TUid KUidPsiTerm = { 0x01000A77 };
+
+void CPwFullDialog::PreLayoutDynInitL()
+	{
+	SetEdwinTextL(EPwDlgFullServer, &iSettings.iFullServer);
+	SetEdwinTextL(EPwDlgFullCommand, &iSettings.iFullCommand);
+	}
+
+TBool CPwFullDialog::OkToExitL(TInt /*aButtonId*/)
+	{
+	TBuf<24> server;
+	GetEdwinText(server, EPwDlgFullServer);
+	server.Trim();
+	TBuf<40> cmd;
+	GetEdwinText(cmd, EPwDlgFullCommand);
+	cmd.Trim();
+	if (server.Length() == 0)
+		{
+		iEikonEnv->InfoMsg(_L("No server entered"));
+		TryChangeFocusToL(EPwDlgFullServer);
+		return EFalse;
+		}
+	if (cmd.Length() == 0)
+		{
+		iEikonEnv->InfoMsg(_L("No program entered"));
+		TryChangeFocusToL(EPwDlgFullCommand);
+		return EFalse;
+		}
+	for (TInt i = 0; i < server.Length(); i++)
+		if (server[i] < ' ' || server[i] == '\t')
+			{
+			iEikonEnv->InfoMsg(_L("Not a server's name"));
+			TryChangeFocusToL(EPwDlgFullServer);
+			return EFalse;
+			}
+	iSettings.iFullServer = server;
+	iSettings.iFullCommand = cmd;
+	return ETrue;
+	(void)iUrl;
+	}
+
+void CPwAppUi::FullBrowserL()
+	{
+	// the page showing, or the one that would not open here (a page that
+	// needs more than PsiWeb has is what the full browser is for)
+	PwShared* s = iView->Shared();
+	TBuf<PW_URL_MAX> url;
+	if (iView->EngineRunning())
+		FromUtf8(url, s->url);
+	if (url.Compare(_L("about:problem")) == 0)
+		FromUtf8(url, s->problem_url);
+	url.Trim();
+	if (url.Length() == 0 || Clip(url, 6).Compare(_L("about:")) == 0)
+		{
+		iEikonEnv->InfoMsg(_L("Not available - no page open"));
+		return;
+		}
+	TPwSettings& st = iView->Settings();
+	CPwFullDialog* dlg = new(ELeave) CPwFullDialog(st, url);
+	if (!dlg->ExecuteLD(R_PW_FULL_DIALOG))
+		return;
+	SaveSettings(st);
+	// the command: program 'address' (PsiTerm runs a saved server's command
+	// of at most 100 characters)
+	TBuf8<200> line;
+	line.Copy(_L8("ssh:"));
+	TBuf8<24> server;
+	server.Copy(st.iFullServer);
+	line.Append(server);
+	line.Append('\t');
+	TBuf8<40> prog;
+	prog.Copy(st.iFullCommand);
+	prog.ZeroTerminate();
+	TBuf8<PW_URL_MAX> u8;
+	u8.Copy(Clip(url, u8.MaxLength()));
+	char cmdc[101];                          // (PsiTerm runs at most 100 characters)
+	TInt cn = pw_shell_command((const char*)prog.Ptr(), u8.Ptr(), u8.Length(), cmdc, sizeof(cmdc));
+	if (cn < 0)
+		{
+		iEikonEnv->InfoMsg(_L("Address too long for the full browser"));
+		return;
+		}
+	TPtrC8 cmd((const TUint8*)cmdc, cn);
+	line.Append(cmd);
+	// PsiTerm running: hand it the request; else start it with it
+	TApaTaskList tasks(iEikonEnv->WsSession());
+	TApaTask task = tasks.FindApp(KUidPsiTerm);
+	if (task.Exists())
+		{
+		task.SendMessage(KUidPsiTerm, line);
+		task.BringToForeground();
+		return;
+		}
+	RApaLsSession ls;
+	User::LeaveIfError(ls.Connect());
+	CleanupClosePushL(ls);
+	TApaAppInfo info;
+	TInt r = ls.GetAppInfo(info, KUidPsiTerm);
+	CleanupStack::PopAndDestroy();          // ls
+	if (r != KErrNone)
+		{
+		iEikonEnv->InfoWinL(_L("PsiTerm is not installed"), _L("The full browser runs in PsiTerm, on a server it has saved"));
+		return;
+		}
+	CApaCommandLine* cl = CApaCommandLine::NewLC();
+	cl->SetLibraryNameL(info.iFullName);
+	cl->SetCommandL(EApaCommandRun);
+	cl->SetTailEndL(line);
+	EikDll::StartAppL(*cl);
+	CleanupStack::PopAndDestroy();          // cl
+	iEikonEnv->BusyMsgL(_L("Opening in PsiTerm..."), EHLeftVBottom, TTimeIntervalMicroSeconds32(0));
+	iFullBusyAt = User::TickCount();
 	}
 
 // (0.85) Opens what was typed: an address as it is, words through the
