@@ -36,6 +36,7 @@ extern "C" {
 #include "psidisp.h"
 #include <psiweb.rsg>
 #include "psiweb.hrh"
+#include "pgsetup.h"           // (0.85) the setup assistant (core/ssh)
 
 const TUid KUidPsiWeb = { 0x01000A7A };
 
@@ -49,6 +50,10 @@ inline TPtrC Clip(const TDesC& aText, TInt aMax)
 
 // text from the engine (UTF-8) -> the Psion's 8-bit text (psiweb.cpp)
 void FromUtf8(TDes& aDst, const char* aSrc);
+
+struct TPwSettings;
+// the route in the user's words: About, Page information (psiweb.cpp)
+void RouteWords(const TPwSettings& aSettings, TDes& aOut);
 
 // Favourites and History (pwfavs.cpp): one entry is a title and an address.
 // They are kept in their own files (Favourites.dat, History.dat) beside
@@ -111,7 +116,13 @@ struct TPwSettings
 	TInt iToolbar;         // View > Show toolbar
 	TInt iToolband;        // (0.78) View > Show toolband: the address, Back, Forward...
 	TInt iDisplay;         // KPwDisplay* bits (docs/display.md)
+	TInt iSearch;          // (0.85) Search with: PW_SEARCH_* (pwaddr.h)
+	TInt iStyle;           // (0.86) Page style: PW_STYLE_* (psiweb_cmds.h)
+	TInt iFlags;           // (0.85) KPwFlag* bits
 	};
+
+// TPwSettings::iFlags, one byte after the toolband's in PsiWeb.ini (0.85)
+const TInt KPwFlagKeepCookies = 1;     // (0.89) Preferences > Cookies: kept when PsiWeb closes
 
 // TPwSettings::iDisplay, one byte at the end of PsiWeb.ini (0.81); all 0 is the standard
 const TInt KPwDisplayReading = 1;      // View > Reading mode
@@ -384,6 +395,25 @@ private:
 	TPwSettings& iSettings;
 	};
 
+// Set up PsiWeb (0.85): the suite's two pages (pgsetup.h) and PsiWeb's
+// own, Pages: pictures (their standard follows the route until changed)
+// and where words typed for an address are searched for
+class CPwSetupDialog : public CPgSetupDialog
+	{
+public:
+	CPwSetupDialog(TPwSettings& aSettings, TInt aTestDialog, TInt aTestFirstLine)
+		: CPgSetupDialog(aTestDialog, aTestFirstLine), iSettings(aSettings), iPicturesChosen(EFalse) {}
+	static TInt StandardPictures(const PgSuChoice& aChoice, TBool aTall);
+private:
+	void AppPreLayoutL();
+	void AppControlChangedL(TInt aControlId);
+	void AppChoiceChangedL();
+	void AppSaveL();
+	void ShowPicturesNoteL();
+	TPwSettings& iSettings;
+	TBool iPicturesChosen;     // the person set Pictures: the route no longer changes it
+	};
+
 class CPwPrefsDialog : public CEikDialog
 	{
 public:
@@ -407,6 +437,7 @@ public:
 	void EndAddressL(TBool aGo);        // the address shows the page again (and goes there)
 	void PageLoaded();                  // a page has loaded: History (pwfavs.cpp)
 	void PageTick();                    // ...and its title may arrive a moment later
+	void EngineCommandL(TInt aCmd);     // (0.85) a "Page not opened" page's links (PW_APP_*)
 private:
 	// Favourites and History (pwfavs.cpp)
 	TBool HavePage() const;
@@ -443,6 +474,10 @@ private:
 	void ShowToolBarL(TBool aShow);
 	void ShowToolBandL(TBool aShow);
 	void RestartEngineL();
+	void SetupL();                      // (0.85) Set up PsiWeb...
+	static TInt SetupCallback(TAny* aSelf);
+	CIdle* iSetupIdle;                  // the first-time setup, once the window is up
+	void GoL(const TDesC& aTyped);      // (0.85) an address, or words to search for
 	TRect PageRect();                   // the bars laid out as they are shown: the page's room
 	TBool TallScreen() const;           // 480 lines (the netBook): the toolband at first, not the toolbar
 	void StartAddressL();               // a tap on the address, or Ctrl+L

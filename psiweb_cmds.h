@@ -28,6 +28,31 @@ enum
 	                                   pw_putlog_run); log_state / log_msg say how it went */
 	};
 
+/* app_cmd (psiweb.h, 0.85): what a "Page not opened" page's links ask */
+enum
+	{
+	PW_APP_NONE = 0,
+	PW_APP_TEST,                    /* about:cmd-test: Test the connection */
+	PW_APP_SETUP                    /* about:cmd-setup: Set up PsiWeb */
+	};
+
+/* style (psiweb.h, 0.86): the page style, View > Page style */
+enum
+	{
+	PW_STYLE_FULL = 0,              /* the page as it comes */
+	PW_STYLE_LIGHTER,               /* scripts, styles, hidden parts out (htmlsimp mode 1) */
+	PW_STYLE_READER,                /* the text: menus, sidebars and banners out too (mode 4) */
+	PW_STYLE_TEXT                   /* text only, no pictures (mode 2) */
+	};
+
+/* page_secure (psiweb.h, 0.86) */
+enum
+	{
+	PW_SECURE_NO = 0,               /* plain http */
+	PW_SECURE_CHECKED,              /* https, the certificate checked on this Psion */
+	PW_SECURE_HELPER                /* https, fetched and checked by the web helper */
+	};
+
 /* log_state (psiweb.h) */
 enum
 	{

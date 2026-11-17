@@ -1323,8 +1323,8 @@ Display (docs/display.md, fonts):
 +#ifdef PSI_NO_BARS
 +	/* PsiWeb: an infoprint in plain words (psi_drv.c), no dialog */
 +	{
-+		void psi_load_failed(unsigned char *why);
-+		psi_load_failed(get_text_translation(t, ses->term));
++		void psi_load_failed(unsigned char *why, struct session *ses, unsigned char *url);
++		psi_load_failed(get_text_translation(t, ses->term), ses, url);
 +		return;
 +	}
 +#endif

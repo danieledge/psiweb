@@ -5,16 +5,29 @@
 A web browser for the **Psion Series 5mx**, the **netBook** and the **Series 7** (in colour on the last two, at 640x480). Its engine is [Links 2](http://links.twibright.com/) (2.30, graphics mode), built with the 1999 EPOC R5 toolchain. It runs on the suite's shared networking ([psion-core](https://github.com/danieledge/psion-core), this repository's `core/` submodule): the same Wi-Fi modem or dial-up link as PsiTerm and PsiMail, and the suite's own TLS 1.3 client for HTTPS.
 
 - Pages are plain documents: Links has **no CSS and no JavaScript**. Simple sites read well; big modern home pages come out as long lists.
-- Pictures (JPEG, PNG, GIF) are fetched **only when asked**: View > Show pictures (Ctrl+I) for the page showing, or Tools > Preferences > Pictures > On every page.
+- Pictures (JPEG, PNG, GIF) are fetched **on every page on a netBook with a network card**, and **only when asked** over a modem: View > Show pictures (Ctrl+I) for the page showing, or Tools > Preferences > Pictures.
+- **No helper needed.** PsiWeb fetches pages itself (Direct), with its own TLS 1.3 and certificate checks; the Atom modem helper and PsiProxy on a computer are optional ways to make pages lighter (see *Ways to connect*).
+- A new user is asked once how the Psion goes online (*Set up PsiWeb*); a page that cannot be opened says why and what to do.
 - Links are underlined, since blue is all but black in 16 greys.
 - PsiWeb starts on a built-in welcome page, without dialling.
 - On the netBook, pages and pictures are in colour, and a toolband along the top has Back, Forward, Reload, Stop, Home, the address and a progress bar (see *On the netBook*).
 
 Up to 0.61 the engine was NetSurf. Its sources are still in the tree as a fallback (see *The NetSurf engine* below), until Links has been proved on the device. The whole port is described in [`links/PORTING.md`](links/PORTING.md).
 
-**Status: alpha.** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
+**Status: beta (0.85).** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
 
 [![Download PsiWeb.sis](https://img.shields.io/badge/Download-PsiWeb.sis-2ea44f?logo=github)](https://github.com/danieledge/psiterm/raw/main/dist/PsiWeb.sis)
+
+## What's new in 0.85
+
+- **Set up PsiWeb.** The first time PsiWeb starts on a Psion with no settings from any program of the suite, one dialog asks how the Psion goes online (a network card or dial-up, the Atom modem, another WiFi modem), how pages come (Direct, the Atom modem helper, PsiProxy on a computer) and about pictures and search. It is always on Tools > Set up PsiWeb... It writes the same connection settings as before (shared with PsiTerm and PsiMail): nothing new in them, and Cancel changes nothing. A netBook is offered the network card first.
+- **The routes are named.** *Direct*, *Atom modem helper* and *PsiProxy on a computer* everywhere: setup, Help, About, Page information. The word "proxy" is gone from what you read. In Connection settings the link is now *Network card or dial-up (Psion TCP/IP)* (it was *Psion TCP/IP (dial-up)*), the same in PsiTerm and PsiMail, and *Use proxy* is the *Web helper*. The settings themselves did not change.
+- **Pages that do not open say why.** In place of a two-second infoprint, a *Page not opened* page: what could not be reached, the likely cause in plain words (the serial port in use, no connection, the name not found, refused, no answer, older security, a certificate not trusted or the Psion's date), and *Try again*, *Test the connection* and *Set up PsiWeb* as links. The address that did not open stays in the address box to correct. The route is on the page.
+- **Search works.** Words typed for an address (Ctrl+L, Ctrl+O) go to DuckDuckGo's page without scripts, or FrogFind (Tools > Preferences > Search with). Before, "Or words to search for" gave "No such file or directory".
+- **Pictures on every page on a netBook** with a network card going direct, as standard for a new PsiWeb; still only when asked over a modem.
+- **Menus regrouped.** Home page moves to Go, with a new Start page; View > Show holds Toolbar, Toolband and *Bright screen* (Reading mode renamed, now Shift+Ctrl+B); Tools > Log holds Keep a log, Send log to server and Restart browser engine; Tools > Set up PsiWeb... is new.
+- **No internal names** (`about:welcome`) in the address box or Open address.
+- About says *for the Psion Series 5mx, netBook and Series 7* and the route in plain words; Help has *Ways to connect* and *What works and what does not*, with a paragraph for the machine it runs on.
 
 ## What's new in 0.84
 
@@ -35,10 +48,36 @@ Since 0.77, the last signed release.
 
 ## Screenshots
 
-PsiWeb 0.80 on the netBook (colour, 640x480) and the Series 5mx (16 greys, 640x240). Taken in emulators. Tap or click one to see it full size.
+PsiWeb 0.85 (the first rows) and 0.80 on the netBook (colour, 640x480) and the Series 5mx (16 greys, 640x240). Taken in emulators; the netBook's *Page not opened* in the ARM harness, as that emulator has no network. Tap or click one to see it full size.
 
 <table>
 <tr><th>netBook</th><th>Series 5mx</th></tr>
+<tr><td colspan="2"><b>Set up PsiWeb: how the Psion goes online</b></td></tr>
+<tr>
+<td><a href="docs/img/netbook-psiweb-setup.png"><img src="docs/img/netbook-psiweb-setup.png" alt="netBook: the first page of Set up PsiWeb" width="400"></a></td>
+<td><a href="docs/img/5mx-psiweb-setup.png"><img src="docs/img/5mx-psiweb-setup.png" alt="Series 5mx: the first page of Set up PsiWeb" width="400"></a></td>
+</tr>
+<tr><td colspan="2"><b>Set up PsiWeb: how pages come</b></td></tr>
+<tr>
+<td><a href="docs/img/netbook-psiweb-setup-helper.png"><img src="docs/img/netbook-psiweb-setup-helper.png" alt="netBook: the Web helper page of Set up PsiWeb" width="400"></a></td>
+<td><a href="docs/img/5mx-psiweb-setup-helper.png"><img src="docs/img/5mx-psiweb-setup-helper.png" alt="Series 5mx: the Web helper page of Set up PsiWeb" width="400"></a></td>
+</tr>
+<tr><td colspan="2"><b>Set up PsiWeb: pictures and search</b></td></tr>
+<tr>
+<td><a href="docs/img/netbook-psiweb-setup-pages.png"><img src="docs/img/netbook-psiweb-setup-pages.png" alt="netBook: the Pages page of Set up PsiWeb" width="400"></a></td>
+<td><a href="docs/img/5mx-psiweb-setup-pages.png"><img src="docs/img/5mx-psiweb-setup-pages.png" alt="Series 5mx: the Pages page of Set up PsiWeb" width="400"></a></td>
+</tr>
+<tr><td colspan="2"><b>A page that cannot be opened says why</b></td></tr>
+<tr>
+<td><a href="docs/img/netbook-psiweb-not-opened.png"><img src="docs/img/netbook-psiweb-not-opened.png" alt="netBook: the Page not opened page" width="400"></a></td>
+<td><a href="docs/img/5mx-psiweb-not-opened.png"><img src="docs/img/5mx-psiweb-not-opened.png" alt="Series 5mx: the Page not opened page" width="400"></a></td>
+</tr>
+<tr><td colspan="2"><b>About, with the route in plain words</b></td></tr>
+<tr>
+<td><a href="docs/img/netbook-psiweb-about.png"><img src="docs/img/netbook-psiweb-about.png" alt="netBook: About PsiWeb" width="400"></a></td>
+<td><a href="docs/img/5mx-psiweb-about.png"><img src="docs/img/5mx-psiweb-about.png" alt="Series 5mx: About PsiWeb" width="400"></a></td>
+</tr>
+
 <tr><td colspan="2"><b>The welcome page, with the toolband</b></td></tr>
 <tr>
 <td><a href="docs/img/netbook-psiweb-welcome.png"><img src="docs/img/netbook-psiweb-welcome.png" alt="netBook: the welcome page under the toolband" width="400"></a></td>
@@ -68,9 +107,10 @@ Install `dist/PsiWeb.sis` (to D: if you have a CF card). PsiWeb is on the Extras
 | Ctrl+T | show or hide the toolbar (the page takes its room) |
 | Ctrl+I | show the pictures of this page, or take them away (as the Pictures button) |
 | Shift+Ctrl+D | add this page to Favourites |
-| Shift+Ctrl+Q | page information (title, address, status, free memory, connection) |
+| Shift+Ctrl+Q | page information (title, address, status, free memory, the route) |
+| Shift+Ctrl+B | Bright screen (more contrast, the backlight kept on) |
 | Ctrl+U | disconnect (hang up and free the serial port) |
-| Ctrl+K | preferences: home page, pictures |
+| Ctrl+K | preferences: home page, pictures, search, text |
 | Shift+Ctrl+H | help on PsiWeb |
 | Shift+Ctrl+A | about PsiWeb |
 | pen | tap links, buttons and form fields; the scroll bar beside the page (EIKON's) scrolls it |
@@ -79,42 +119,50 @@ The toolbar (Open, Back, Home, Pictures - pressed in while the page's pictures s
 
 **Favourites and History.** The menu bar is File, View, Go, Favourites, Tools. *Favourites > Add to favourites...* (Shift+Ctrl+D) saves the page showing (name from its title, editable); the first five are listed on the menu, *More favourites...* lists the rest, and *Organise favourites...* edits or deletes them (up to 40). *Go > History* lists the last five pages, newest first, with *Full history...* (50) and *Clear history*; a page is logged when it has loaded, a repeat moves to the top, and `about:` pages are skipped. *Open address* has a *Recent* line with the last twelve. They are kept in `C:\System\Apps\PsiWeb\Favourites.dat` and `History.dat` (not in PsiWeb.ini).
 
-**Passwords.** A page (or the proxy) that asks for a user name and password brings up PsiWeb's *User name and password* dialog. HTTP Basic and Digest (MD5 and SHA-256) are both understood. PsiWeb keeps the answer until it closes.
+**Passwords.** A page (or the web helper) that asks for a user name and password brings up PsiWeb's *User name and password* dialog. HTTP Basic and Digest (MD5 and SHA-256) are both understood. PsiWeb keeps the answer until it closes.
 
 **Files PsiWeb cannot show** (a PDF, a ZIP, a Word file): PsiWeb says what the file is and how big, and asks "Save it to a file?". Yes opens the standard Save as dialog (Documents on the Memory disk if there is one). The bottom left then shows how much has come, "Saved" says when it is done, and Esc stops it. A file bigger than 4 MB is not saved, and a part file is never left behind.
 
-**Tools > Connection settings**: modem (`ATDT host:port`, as PsiTerm) or the Psion's own TCP/IP (dial-up), baud rate and flow control. These are the same settings as PsiTerm and PsiMail use. **Test** (Ctrl+T) tries them before OK. The serial port can be used by one program at a time, so disconnect PsiTerm or PsiMail first (and the Remote link must be off). The [PsiConnect Atom modem firmware](https://github.com/danieledge/psiconnect) is a Wi-Fi modem tuned for the Psion.
+**Tools > Set up PsiWeb**: the first-time setup (see *Ways to connect*), any time.
 
-**Tools > Preferences**: the home page and pictures.
+**Tools > Connection settings**: a modem (`ATDT host:port`, as PsiTerm) or a network card or dial-up (the Psion's own TCP/IP), baud rate and flow control, and the web helper. These are the same settings as PsiTerm and PsiMail use. **Test** (Ctrl+T) tries them before OK. The serial port can be used by one program at a time, so disconnect PsiTerm or PsiMail first (and the Remote link must be off). The [PsiConnect Atom modem firmware](https://github.com/danieledge/psiconnect) is a Wi-Fi modem tuned for the Psion.
 
-**A proxy (optional).** PsiWeb does not need one: without it (*Use proxy: No*, the standard), `http://` goes direct and `https://` uses PsiWeb's own TLS 1.3 client (X25519 + ChaCha20-Poly1305, with session resumption). From 0.84 it checks each site's certificate, as PsiMail does (see *Certificates* below). No proxy address is built in.
+**Tools > Preferences**: the home page, pictures, search and text.
 
-**Certificates** (0.84). Without a proxy, PsiWeb checks who it is talking to before it sends anything: the site's certificate chain must reach one of the root certificates built into it (psion-core's `mail/engine/tlsv/roots.h`, 28 roots: Let's Encrypt, Google, DigiCert, Sectigo, GlobalSign, Amazon, Microsoft, Go Daddy, Starfield), every certificate on the way must be in date, the site's own must carry the name in the address, and the site must prove it holds that certificate's key. If any of that fails the page is not loaded and PsiWeb says *Certificate not trusted - host*. There is no way round it from the Psion: no "load anyway", and no list of exceptions. (PsiWeb.log, with Tools > Keep a log ticked, has the reason: a different name, out of date, an authority PsiWeb does not know.)
-- RSA keys and ECDSA keys on P-256 and P-384 are checked: between them nearly every site (Let's Encrypt's E and Y certificates, as Wikipedia, Hacker News and FrogFind have; Google's and Cloudflare's; GlobalSign's, as CNN lite has). RSA is offered first, being the cheaper on the Psion. A key of another kind gives *Certificate cannot be checked - host*; a server that will not talk to PsiWeb's TLS at all, *Secure connection refused - host*. Through a proxy, either still loads.
+### Ways to connect
+
+How the Psion goes online is set once for PsiWeb, PsiMail and PsiTerm: a **network card or dial-up** (the Psion's own TCP/IP, set up in the Control panel: a netBook's PC Card network card, or a dial-up) or a **WiFi modem** on the serial port, such as the [PsiConnect Atom](https://github.com/danieledge/psiconnect). Pages then come one of three ways:
+
+| | **Direct** | **Atom modem helper** | **PsiProxy on a computer** |
+|---|---|---|---|
+| What you need | Nothing extra | The PsiConnect Atom modem | A computer at home that is switched on, running [PsiProxy](https://github.com/danieledge/psiproxy) |
+| In one line | PsiWeb fetches pages itself | The modem fetches pages and makes them lighter | Your computer fetches pages and makes them much lighter |
+| Good for | A netBook on a network card; light sites on any Psion | A 5mx anywhere there is WiFi | A 5mx at home; heavy news sites; every kind of picture |
+| Speed | netBook: fast. 5mx on a modem: slow on big sites | About three times quicker than direct on a modem | Quickest: pages are a twentieth of the size |
+| Secure sites (https) | Checked by the Psion itself; nobody in between | Checked by the modem, which sees the page | Checked by the computer; the page and any password cross your home network unencrypted |
+| Pictures | JPEG, PNG, GIF; some newer kinds show as a box | Small ones converted | All kinds, made small |
+| Pages drawn by scripts | Do not work | Do not work | Some work, if turned on in PsiProxy |
+| Away from home | Works wherever the Psion is online | Works wherever the modem has WiFi | Does not work |
+| In Connection settings | Web helper: None - direct | Web helper `psiproxy`, port 8080 | Web helper: the computer's address, port 8081 |
+
+*Set up PsiWeb* writes these for you; no address is built in. Direct uses PsiWeb's own TLS 1.3 client (X25519, ChaCha20-Poly1305, session resumption) and checks each site's certificate, as PsiMail does (see *Certificates*). Which to choose across the suite: [Choosing your setup](https://github.com/danieledge/psion-core/blob/main/docs/SETUP.md).
+
+**Certificates** (0.84). Going direct, PsiWeb checks who it is talking to before it sends anything: the site's certificate chain must reach one of the root certificates built into it (psion-core's `mail/engine/tlsv/roots.h`, 28 roots: Let's Encrypt, Google, DigiCert, Sectigo, GlobalSign, Amazon, Microsoft, Go Daddy, Starfield), every certificate on the way must be in date, the site's own must carry the name in the address, and the site must prove it holds that certificate's key. If any of that fails the page is not loaded and PsiWeb says *Certificate not trusted - host*. There is no way round it from the Psion: no "load anyway", and no list of exceptions. (PsiWeb.log, with Tools > Log > Keep a log ticked, has the reason: a different name, out of date, an authority PsiWeb does not know.)
+- RSA keys and ECDSA keys on P-256 and P-384 are checked: between them nearly every site (Let's Encrypt's E and Y certificates, as Wikipedia, Hacker News and FrogFind have; Google's and Cloudflare's; GlobalSign's, as CNN lite has). RSA is offered first, being the cheaper on the Psion. A key of another kind gives *Certificate cannot be checked - host*; a server that will not talk to PsiWeb's TLS at all, *Secure connection refused - host*. Through a web helper, either still loads.
 - It costs time. On a 5mx (15 MIPS) one check takes about 0.6 s for RSA-2048, 5 s for RSA-4096, 1.2 s for ECDSA P-256 and 3.6 s for P-384; on the netBook about a fifth of that. A new connection checks two (the site's certificate and its signature): about 1.2 s for an RSA site, 2.3 s for Google or Cloudflare, 4.7 s for a Let's Encrypt ECDSA site. The first time a chain's intermediate certificates are seen they are checked too, then remembered in `C:\System\Apps\PsiWeb\certs.txt`. A resumed connection checks nothing again.
 - The Psion's clock must be roughly right (certificates have dates). If it was never set (before 2024), dates are not checked.
 
-A proxy on a computer on your network makes browsing much quicker and lighter, which is why it is recommended. It is one of the shared Connection settings: *Tools > Connection settings > Network > Use proxy*, with its address and port, set once for all three apps. With it on, every request goes to the proxy as plain HTTP, `https://` ones too, and:
-- the computer does the TLS, so the Psion skips a handshake for each site, and can reach sites its own TLS cannot talk to;
-- one connection stays open for the whole session, so the modem dials once;
-- PsiWeb's updates from GitHub come through it too (they are still checked against the signature).
+With a web helper set, every request goes to it as plain HTTP, `https://` ones too: the helper does the TLS (so the Psion skips a handshake for each site, and can reach sites its own TLS cannot), keeps one connection open for the session (the modem dials once), and slims the page. The Atom modem helper simplifies pages, converts small pictures and gzips the line; tell it where a PsiProxy is (`AT$PU`) and it hands calls to that. PsiProxy on a computer extracts articles, turns home pages into headline lists, converts every kind of picture for the screen, can render script-drawn pages in a headless browser if you turn that on, and receives logs from *Send log to server*. Any HTTP proxy that takes `GET http://...` requests (such as WebOne) also works as a helper, without the slimming.
 
-Three kinds work:
-- The [PsiConnect Atom modem](https://github.com/danieledge/psiconnect)'s own proxy: proxy host `psiproxy`, port `8080`. It does the TLS, simplifies pages (with text-only and reader modes), converts JPEG, PNG and GIF pictures to 16 greys and gzips the line, with no computer needed. Tell it where a PsiProxy is (`AT$PU`) and it hands calls to that when it answers.
-- [PsiProxy](https://github.com/danieledge/psiproxy), the one made for PsiWeb. It also slims each page for the 640x240 screen (articles extracted into one column, home pages turned into lists of headlines, site menus folded into one `[ Menu ]` link), so there is less to fetch, lay out and hold in memory; turns pictures (WebP, AVIF, JPEG, PNG, GIF) into 16-grey GIFs at most 320 pixels wide; can render JavaScript-only pages in a headless browser, if you turn that on; and receives logs from *Send log to server*. It listens on port 8081 by default.
-- [WebOne](https://github.com/atauenis/webone), or any HTTP proxy that takes `GET http://...` requests: TLS and one connection, but no slimming and no logs.
+**Keep a log** (Tools > Log): PsiWeb keeps no log unless this is ticked (it is off on a new Psion and after an update). Then it writes what it does to `C:\System\Data\PsiWeb.log` (the run before is kept as `PsiWeb.old`), for whoever is looking into a problem; untick it to stop, at once (the log kept so far stays). A user name and password in an address never go in.
 
-The link from the Psion to the proxy is plain HTTP, so keep the proxy on a network you trust.
+**Send log to server** (Tools > Log): sends `PsiWeb.log` and `PsiWeb.old` to PsiProxy on a computer, which saves them for you to read when something goes wrong. With the Atom modem helper they go to the PsiProxy set in the modem (AT$PU); without one it says *Needs PsiProxy on a computer*. It is dimmed until a web helper is set and *Keep a log* is ticked. The log goes as plain HTTP and holds the addresses of the pages you visited, so send it only to your own PsiProxy.
 
-Which to choose, and what each gives across the suite: [Choosing your setup](https://github.com/danieledge/psion-core/blob/main/docs/SETUP.md).
+**After use, Psion TCP/IP** (Connection settings > Network): *Stays connected* (the standard on a new Psion) keeps the dial-up connection up after use, until you disconnect (Ctrl+U); *Disconnects when idle* leaves it to the Psion's own idle time, as before. Anyone updating from an older version keeps *Disconnects when idle* until they change it.
 
-**Keep a log** (Tools): PsiWeb keeps no log unless this is ticked (it is off on a new Psion and after an update). Then it writes what it does to `C:\System\Data\PsiWeb.log` (the run before is kept as `PsiWeb.old`), for whoever is looking into a problem; untick it to stop, at once (the log kept so far stays). A user name and password in an address never go in.
+**If the engine stops**: the browser engine runs as its own program, so the Psion carries on. PsiWeb says so on the page, and Tools > Log > Restart browser engine starts it again.
 
-**Send log to server** (Tools): sends `PsiWeb.log` and `PsiWeb.old` to the proxy, if it is a PsiProxy, which saves them for you to read when something goes wrong. With the Atom modem's own proxy they go to the PsiProxy set in the modem's Web proxy settings (AT$PU); without one it says *Needs PsiProxy on a computer*. It is dimmed until a proxy is set and *Keep a log* is ticked. The log goes as plain HTTP and holds the addresses of the pages you visited, so send it only to your own PsiProxy.
-
-**After use, Psion Internet** (Connection settings > Network): *Stays connected* (the standard on a new Psion) keeps the dial-up connection up after use, until you disconnect (Ctrl+U); *Disconnects when idle* leaves it to the Psion's own idle time, as before. Anyone updating from an older version keeps *Disconnects when idle* until they change it.
-
-**If the engine stops**: the browser engine runs as its own program, so the Psion carries on. PsiWeb says so on the page, and Tools > Restart browser engine starts it again.
+**Page not opened.** A page that cannot be opened is replaced by one that says what could not be reached, the likely cause and what to do, with *Try again*, *Test the connection* and *Set up PsiWeb*. Back returns to the page before; the address stays in the address box to correct.
 
 ### Updating
 
@@ -142,7 +190,7 @@ Figures are ARM instructions counted in the emulator harness, at an assumed 15 M
 
 - The engine's heap is limited to 10 MB. On a long page, pictures away from the screen are let go and decoded again when they come back. A page that still does not fit stops where it is and says "Page too big".
 - `psiweb.exe` is about 2.1 MB (0.84's certificate check added 56 KB, of which ECDSA 11 KB). EPOC loads an EXE into RAM, so this comes on top of the heap.
-- HTTPS without a proxy, from 0.84 (first visit, then later ones): text.npr.org 7.0 s, then 2.0 s; wiby.me 5.1, 2.6; lite.duckduckgo.com 2.4, 1.8; www.cloudflare.com 13.2, 9.8; CNN lite 12.4, 8.8; Wikipedia 20.8, 13.6 (two connections). Through a proxy nothing changes.
+- HTTPS direct, from 0.84 (first visit, then later ones): text.npr.org 7.0 s, then 2.0 s; wiby.me 5.1, 2.6; lite.duckduckgo.com 2.4, 1.8; www.cloudflare.com 13.2, 9.8; CNN lite 12.4, 8.8; Wikipedia 20.8, 13.6 (two connections). Through a web helper nothing changes.
 
 ### On the netBook
 
@@ -152,7 +200,7 @@ The same `PsiWeb.sis` installs on the netBook. PsiWeb looks at the screen when i
 - **The whole screen.** The page has all 480 lines and, with the toolbar hidden, the whole width.
 - **The toolband** (View > Show toolband, Shift+Ctrl+T) along the top: Back, Forward, Reload, Stop and Home, the page's address, a bar that fills as the page comes (its bytes, then its pictures), and Pictures. Tap the address, or press Ctrl+L, and type: the whole address is chosen, so typing replaces it. Enter goes there (or searches for the words), Esc leaves it as it was. On the netBook the toolband is shown and the toolbar hidden at first; Ctrl+T brings the toolbar back, and the toolband then stops at it.
 
-- **Through a proxy** (0.83). Each request PsiWeb sends to a proxy says which screen it is for: `X-Psi-Screen: 640x480x256` on the netBook, `640x240x16` on the 5mx (the width and height of the page area, and the colours). It goes to the proxy only, never to a site. [PsiProxy](https://github.com/danieledge/psiproxy) 1.01 and the [PsiConnect Atom](https://github.com/danieledge/psiconnect) 2.8 use it: the netBook gets pictures in colour up to 560 pixels wide (and from PsiProxy tables that fit and lighter pages), the 5mx the same 16-grey output as before. A proxy that does not know the header ignores it.
+- **Through a web helper** (0.83). Each request PsiWeb sends to a helper says which screen it is for: `X-Psi-Screen: 640x480x256` on the netBook, `640x240x16` on the 5mx (the width and height of the page area, and the colours). It goes to the helper only, never to a site. [PsiProxy](https://github.com/danieledge/psiproxy) 1.01 and the [PsiConnect Atom](https://github.com/danieledge/psiconnect) 2.8 use it: the netBook gets pictures in colour up to 560 pixels wide (and from PsiProxy tables that fit and lighter pages), the 5mx the same 16-grey output as before. A helper that does not know the header ignores it.
 - **Known fault (0.83 and earlier, netBook only).** A JPEG whose whole file reaches the engine in one piece is drawn black: in the ARM harness (`--netbook`), any JPEG under about 8 KB; a 5mx, PNGs and GIFs are not affected. PsiProxy 1.01 sends small photos to the netBook as PNG for now. To be fixed in the engine's colour path (`links/psi_drv.c`, `jpeg.c`'s size-only pass).
 
 On the Series 5mx nothing changes unless you ask: 16 greys, the toolbar, 240 lines. The toolband is there too (Shift+Ctrl+T), at the cost of 25 lines.
@@ -231,6 +279,8 @@ Installed PsiWebs update from the **psiterm** repository's `dist/` (`PsiWeb-vers
 - **netBook emulator** (`../psionEmulators`, with `../psion-netbook/tools/mkimage.mts --with PATH/PsiWeb.sis` to put a test build in a scratch ROM image, since programs on the card cannot start there): see `CLAUDE.md`. The ARM harness takes `--netbook` for colour screenshots at 640x480, and `--progress` to log the toolband's progress figure.
 - **PC build** (`links/build_host.sh`, `links/run_host.sh`): Links with the `psi` driver on Linux, for quick checks.
 - **Certificates** (0.84): `test/cert/run.sh` builds psion-core's certificate check with `engine/pwcert.c` for the PC and checks it on chains fetched with openssl (trusted sites, another name, self-signed, expired, a refused handshake); `python3 core/tools/emu/net.py certbad` (`test/emu/cert.net.py`) has the real package in the 5mx emulator refuse a self-signed server behind the emulated modem.
+- **Addresses and search** (0.85): `test/addr/addrtest.c` (what is words, what is an address, the search address); **Page not opened** (0.85): `test/problem/problemtest.c` (each failure's kind and the page, escaped and bounded). Each file's first lines say how to build it. The setup assistant's choices are tested in psion-core (`ssh/test/setuptest.cpp`).
+- **netBook emulator, no network.** That emulator has no modem or network card behind it, so pages there end in nothing; the *Page not opened* screenshots for the netBook come from the ARM harness with `--netbook`. Its taps do not reach dialog page tabs: use Up and Right.
 
 ## The NetSurf engine
 
@@ -244,8 +294,8 @@ PsiWeb is one of a family of programs that bring the Series 5mx into 2026, with 
 - [PsiMail](https://github.com/danieledge/psimail): IMAP/SMTP email with TLS, CalDAV calendar, contacts
 - [PsiCast](https://github.com/danieledge/psicast): the Psion's screen in a browser, through the Atom
 - [PsiLinux](https://github.com/danieledge/psilinux): Linux programs on the Psion
-- [PsiConnect](https://github.com/danieledge/psiconnect): the Atom modem firmware (Wi-Fi modem, PPP, web proxy)
-- [PsiProxy](https://github.com/danieledge/psiproxy): the proxy on your own computer
+- [PsiConnect](https://github.com/danieledge/psiconnect): the Atom modem firmware (Wi-Fi modem, PPP, the Atom modem helper)
+- [PsiProxy](https://github.com/danieledge/psiproxy): PsiProxy on a computer: the web helper on your own computer
 - [psion-core](https://github.com/danieledge/psion-core): the shared code and tools, each program's `core/` submodule
 
 ## Support

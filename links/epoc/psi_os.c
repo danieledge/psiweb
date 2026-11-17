@@ -20,6 +20,7 @@
 #include "../../core/web/engine/pwnet.h"
 #include "../../engine/pwcert.h"
 #include "psiweb.h"
+#include "psiweb_cmds.h"
 
 #undef read
 #undef write
@@ -112,8 +113,18 @@ void psi_about_func(struct connection *c)
 	const char *page;
 	int r, len;
 	unsigned char *u = c->url;
+	extern const char *psi_problem_page(void);
+	extern void psi_app_command(int cmd);
 	if (!casecmp(u, cast_uchar "about:welcome", 13)) page = psi_welcome;
 	else if (!casecmp(u, cast_uchar "about:blank", 11)) page = "<html><body></body></html>";
+	else if (!casecmp(u, cast_uchar "about:problem", 13)) page = psi_problem_page();	/* (0.85) */
+	else if (!casecmp(u, cast_uchar "about:cmd-test", 14) || !casecmp(u, cast_uchar "about:cmd-setup", 15)) {
+		/* (0.85) a "Page not opened" page's links: the app acts, the page stays */
+		psi_app_command(u[10] == 't' ? PW_APP_TEST : PW_APP_SETUP);
+		setcstate(c, S_INTERRUPTED);
+		abort_connection(c);
+		return;
+	}
 	else {
 		setcstate(c, S_BAD_URL);
 		abort_connection(c);

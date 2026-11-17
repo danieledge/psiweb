@@ -24,6 +24,7 @@
 #include "psilink.h"
 #include "pglinktest.h"
 #include "psigreyui.h"
+#include "pwaddr.h"              // (0.85) an address, or words to search for
 
 // The link settings, proxy included, are shared with PsiTerm and PsiMail
 // (psilink.h). The proxy fields of TPwSettings are only a copy of the shared
@@ -84,7 +85,7 @@ static void SaveSharedLink(RFs& aFs, const TPwSettings& aSettings)
 
 _LIT(KEngineExe, "psiweb.exe");
 _LIT(KIniFile, "C:\\System\\Apps\\PsiWeb\\PsiWeb.ini");
-_LIT(KVersion, "0.84");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
+_LIT(KVersion, "0.85");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
 _LIT(KDefaultHome, "http://68k.news/");
 const TInt KZoomSteps[] = { 50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200 };
 const TInt KZoomCount = 11;
@@ -776,7 +777,7 @@ void CPwView::Tick()
 	// the engine asks something (a password, where to save a file): the
 	// dialog is shown from an idle callback, not inside this tick
 	if (s && !iAsking && iAsker && !iAsker->IsActive()
-		&& (s->auth_state == PW_ASK_ASKING || s->save_state == PW_ASK_ASKING))
+		&& (s->auth_state == PW_ASK_ASKING || s->save_state == PW_ASK_ASKING || s->app_cmd != PW_APP_NONE))
 		iAsker->Start(TCallBack(AskCallback, this));
 	if (s && (iUpdState == PW_UPD_RUNNING || s->update_state != iUpdState))
 		{
@@ -861,6 +862,16 @@ TInt CPwView::AskCallback(TAny* aSelf)
 		if (err != KErrNone && s->save_state == PW_ASK_ASKING)
 			s->save_state = PW_ASK_CANCEL;
 		}
+	// (0.85) a "Page not opened" page's Test the connection or Set up
+	// PsiWeb link (psiweb_cmds.h PW_APP_*)
+	TInt cmd = s->app_cmd;
+	s->app_cmd = PW_APP_NONE;
+	if (cmd == PW_APP_TEST || cmd == PW_APP_SETUP)
+		{
+		CPwAppUi* ui = (CPwAppUi*)CEikonEnv::Static()->EikAppUi();
+		TRAPD(err, ui->EngineCommandL(cmd));
+		(void)err;
+		}
 	s->net.resized = 1;                  // wakes the engine's wait (psi_os.c)
 	v->RingEngine();
 	v->iAsking = EFalse;
@@ -878,7 +889,7 @@ void CPwView::AskAuthL()
 	TBuf<100> who;
 	TPtrC h = Clip(host, 60);
 	if (s->auth_proxy)
-		who.Format(_L("The proxy %S needs a password"), &h);
+		who.Format(_L("The web helper %S needs a password"), &h);
 	else
 		who.Format(_L("%S needs a password"), &h);
 	TBuf<100> what;
@@ -1009,7 +1020,7 @@ void CPwView::SendLog()
 	UseSharedLink(iCoeEnv->FsSession(), iSettings);   // the proxy may have been set in another app
 	if (!iSettings.iUseProxy || iSettings.iProxyHost.Length() == 0)
 		{
-		iEikonEnv->InfoMsg(_L("Not available - set a proxy in Connection settings"));
+		iEikonEnv->InfoMsg(_L("Not available - set a web helper in Connection settings"));
 		return;
 		}
 	iShared->use_proxy = iSettings.iUseProxy;
@@ -1476,7 +1487,7 @@ TBool CPwConnDialog::OkToExitL(TInt aButtonId)
 	TInt port = NumberEditorValue(EPwDlgProxyPort);
 	if (proxy && host.Length() == 0)
 		{
-		iEikonEnv->InfoMsg(_L("No proxy host entered"));
+		iEikonEnv->InfoMsg(_L("No helper's address entered"));
 		TryChangeFocusToL(EPwDlgProxyHost);
 		return EFalse;
 		}
@@ -1548,6 +1559,7 @@ void CPwPrefsDialog::PreLayoutDynInitL()
 	SetEdwinTextL(EPwDlgHome, &iSettings.iHome);
 	((CEikChoiceList*)Control(EPwDlgPictures))->SetCurrentItem(iSettings.iImages ? 1 : 0);
 	((CEikChoiceList*)Control(EPwDlgText))->SetCurrentItem((iSettings.iDisplay & KPwDisplayScaledText) ? 1 : 0);
+	SetChoiceListCurrentItem(EPwDlgSearch, iSettings.iSearch == PW_SEARCH_FROGFIND ? 1 : 0);
 	}
 
 TBool CPwPrefsDialog::OkToExitL(TInt aButtonId)
@@ -1567,6 +1579,7 @@ TBool CPwPrefsDialog::OkToExitL(TInt aButtonId)
 	GetEdwinText(iSettings.iHome, EPwDlgHome);
 	iSettings.iHome.Trim();
 	iSettings.iImages = ((CEikChoiceList*)Control(EPwDlgPictures))->CurrentItem() == 1;
+	iSettings.iSearch = ChoiceListCurrentItem(EPwDlgSearch) == 1 ? PW_SEARCH_FROGFIND : PW_SEARCH_DDG;
 	if (((CEikChoiceList*)Control(EPwDlgText))->CurrentItem() == 1)
 		iSettings.iDisplay |= KPwDisplayScaledText;
 	else
@@ -1631,6 +1644,13 @@ void CPwAppUi::ConstructL()
 	TPsiReading::Recover(iCoeEnv->FsSession(), iCoeEnv->WsSession(), KUidPsiWeb);
 	iForeground = ETrue;
 	UpdateReading();
+	// (0.85) a new user (no settings in any program of the suite): the
+	// setup assistant over the first page, once the window is up
+	if (CPgSetupDialog::FirstRun(iCoeEnv->FsSession(), KIniFile))
+		{
+		iSetupIdle = CIdle::NewL(CActive::EPriorityIdle);
+		iSetupIdle->Start(TCallBack(SetupCallback, this));
+		}
 	}
 
 // ----- Reading mode (docs/display.md) ----------------------------------------------
@@ -1843,8 +1863,10 @@ void CPwAppUi::ChromeTick()
 		TBuf<PW_URL_MAX> url;
 		if (iView->EngineRunning())
 			FromUtf8(url, s->url);
-		if (url.Compare(_L("about:blank")) == 0 || url.Compare(_L("about:welcome")) == 0)
-			url.Zero();
+		if (url.Compare(_L("about:problem")) == 0)
+			FromUtf8(url, s->problem_url);   // (0.85) the address that did not open, to correct
+		else if (Clip(url, 6).Compare(_L("about:")) == 0)
+			url.Zero();                      // (0.85) no internal names in the address
 		if (iAddressStale || url.Compare(iShownUrl) != 0)
 			{
 			iAddressStale = EFalse;
@@ -1914,7 +1936,7 @@ void CPwAppUi::EndAddressL(TBool aGo)
 	if (aGo && url.Length() > 0)
 		{
 		iShownUrl = url;                 // (until the engine says where it went)
-		iView->Command(PW_CMD_OPEN, url);
+		GoL(url);
 		}
 	else
 		{
@@ -1971,6 +1993,7 @@ CPwAppUi::~CPwAppUi()
 		}
 	delete iFavs;
 	delete iHist;
+	delete iSetupIdle;
 	}
 
 void CPwAppUi::LoadSettings(TPwSettings& aSettings)
@@ -1990,10 +2013,17 @@ void CPwAppUi::LoadSettings(TPwSettings& aSettings)
 	aSettings.iToolbar = TallScreen() ? 0 : 1;
 	aSettings.iToolband = TallScreen() ? 1 : 0;
 	aSettings.iDisplay = 0;           // sharp text, Reading mode off (docs/display.md)
+	aSettings.iSearch = PW_SEARCH_DDG;
+	aSettings.iStyle = 0;
+	aSettings.iFlags = 0;
 	RFile file;
 	if (file.Open(iCoeEnv->FsSession(), KIniFile, EFileRead) != KErrNone)
 		{
 		UseSharedLink(iCoeEnv->FsSession(), aSettings);
+		// (0.85) a new PsiWeb on a tall screen (the netBook) with the network
+		// card or dial-up route: pictures on every page, as the line is fast;
+		// on a modem only when asked, as before
+		aSettings.iImages = TallScreen() && aSettings.iNetMode && !aSettings.iUseProxy;
 		return;
 		}
 	TBuf8<400> d;
@@ -2034,6 +2064,12 @@ void CPwAppUi::LoadSettings(TPwSettings& aSettings)
 						if (band & 2)
 							aSettings.iToolband = band & 1;
 						}
+					if (pos < d.Length())            // (0.85) Search with
+						aSettings.iSearch = d[pos++] == PW_SEARCH_FROGFIND ? PW_SEARCH_FROGFIND : PW_SEARCH_DDG;
+					if (pos < d.Length())            // (0.86) Page style
+						aSettings.iStyle = d[pos++] & 3;
+					if (pos < d.Length())            // (0.85) KPwFlag* bits
+						aSettings.iFlags = d[pos++] & KPwFlagKeepCookies;
 					}
 				}
 			}
@@ -2075,6 +2111,9 @@ void CPwAppUi::SaveSettings(const TPwSettings& aSettings)
 	d.Append((TUint8)aSettings.iImages);    // (0.62)
 	d.Append((TUint8)aSettings.iDisplay);   // (0.81)
 	d.Append((TUint8)(2 | (aSettings.iToolband ? 1 : 0)));   // (0.78)
+	d.Append((TUint8)aSettings.iSearch);    // (0.85)
+	d.Append((TUint8)aSettings.iStyle);     // (0.86)
+	d.Append((TUint8)aSettings.iFlags);     // (0.85)
 	TInt r = file.Write(d);
 	if (r == KErrNone)
 		r = file.Flush();
@@ -2105,7 +2144,7 @@ void CPwAppUi::DynInitMenuPaneL(TInt aMenuId, CEikMenuPane* aMenuPane)
 		// route's stays as it was: the engine frees the port)
 		aMenuPane->SetItemDimmed(EPwCmdHangup, iView->Settings().iNetMode && !PgLinkUp());
 		}
-	else if (aMenuId == R_PW_TOOLS_MENU)
+	else if (aMenuId == R_PW_LOG_MENU)
 		{
 		// dimmed, not gone, until a proxy is set: the log goes to it;
 		// (0.77) and while no log is kept
@@ -2114,7 +2153,7 @@ void CPwAppUi::DynInitMenuPaneL(TInt aMenuId, CEikMenuPane* aMenuPane)
 			!(st.iDisplay & KPwKeepLog) || !st.iUseProxy || st.iProxyHost.Length() == 0);
 		aMenuPane->SetItemButtonState(EPwCmdKeepLog, (st.iDisplay & KPwKeepLog) ? EEikMenuItemSymbolOn : 0);
 		}
-	else if (aMenuId == R_PW_VIEW_MENU)
+	else if (aMenuId == R_PW_SHOW_MENU)
 		{
 		aMenuPane->SetItemButtonState(EPwCmdToggleToolbar,
 			iView->Settings().iToolbar ? EEikMenuItemSymbolOn : 0);
@@ -2122,8 +2161,9 @@ void CPwAppUi::DynInitMenuPaneL(TInt aMenuId, CEikMenuPane* aMenuPane)
 			iView->Settings().iToolband ? EEikMenuItemSymbolOn : 0);
 		aMenuPane->SetItemButtonState(EPwCmdReading,
 			(iView->Settings().iDisplay & KPwDisplayReading) ? EEikMenuItemSymbolOn : 0);
-		aMenuPane->SetItemButtonState(EPwCmdImages, iView->PicturesShown() ? EEikMenuItemSymbolOn : 0);
 		}
+	else if (aMenuId == R_PW_VIEW_MENU)
+		aMenuPane->SetItemButtonState(EPwCmdImages, iView->PicturesShown() ? EEikMenuItemSymbolOn : 0);
 	}
 
 // a dimmed command chosen: say why (Tools > Send log to server)
@@ -2137,7 +2177,7 @@ void CPwAppUi::HandleAttemptDimmedSelectionL(TInt aCommandId)
 	if (!(iView->Settings().iDisplay & KPwKeepLog))
 		iEikonEnv->InfoMsg(_L("Logging is off - turn on Tools > Keep a log"));
 	else
-		iEikonEnv->InfoMsg(_L("Not available - set a proxy in Connection settings"));
+		iEikonEnv->InfoMsg(_L("Not available - set a web helper in Connection settings"));
 	}
 
 // cuts aText to aWidth pixels of aFont, ending in "..." (one character on
@@ -2156,6 +2196,28 @@ static void Ellipsis(TDes& aText, const CFont& aFont, TInt aWidth)
 		}
 	aText.SetLength(n);
 	aText.Append(KEllipsis);
+	}
+
+// (0.85) The route in the user's words (core/docs/setup-assistant.md):
+// "Direct, on the network card or dial-up", "Through the Atom modem
+// helper", "Through PsiProxy at 192.168.1.20" - About, Page information
+void RouteWords(const TPwSettings& aS, TDes& aOut)
+	{
+	TBuf8<64> h;
+	h.Copy(Clip(aS.iProxyHost, 60));
+	h.ZeroTerminate();
+	TBool helper = aS.iUseProxy && aS.iProxyHost.Length() > 0;
+	if (!helper)
+		aOut.Copy(aS.iNetMode ? _L("Direct, on the network card or dial-up") : _L("Direct, through the modem"));
+	else if (pg_su_is_atom_host((const char*)h.Ptr()))
+		aOut.Copy(_L("Through the Atom modem helper"));
+	else
+		{
+		aOut.Copy(_L("Through PsiProxy at "));
+		aOut.Append(Clip(aS.iProxyHost, aOut.MaxLength() - aOut.Length() - 6));
+		if (aS.iProxyPort != PG_SU_PSIPROXY_PORT)
+			aOut.AppendFormat(_L(":%d"), aS.iProxyPort);
+		}
 	}
 
 // View > Page information: the title, the address, what the engine says,
@@ -2178,14 +2240,7 @@ void CPwAppUi::PageInfoL()
 	TMemoryInfoV1Buf mem;
 	UserHal::MemoryInfo(mem);
 	lines[3].Format(_L("%d KB"), mem().iFreeRamInBytes / 1024);
-	if (iView->Settings().iUseProxy)
-		{
-		lines[4] = _L("Via proxy ");
-		lines[4].Append(Clip(iView->Settings().iProxyHost, 60));
-		lines[4].AppendFormat(_L(":%d"), iView->Settings().iProxyPort);
-		}
-	else
-		lines[4] = _L("Direct");
+	RouteWords(iView->Settings(), lines[4]);
 	// the prompts take about 120 px of the 640, the frame and margins more:
 	// the dialog's labels are bold, which the normal font's widths allow for.
 	// 300 px keeps it inside the size of Psion's own dialogs (about 370-560).
@@ -2205,18 +2260,9 @@ void CPwAppUi::AboutL()
 	const TPwSettings& s = iView->Settings();
 	static const TInt KBaud[] = { 9600, 19200, 38400, 57600, 115200 };
 	TBuf<120> status;
-	if (s.iNetMode)
-		status.Copy(_L("Connects via Psion Internet (PPP)"));
-	else
-		status.Format(_L("Connects via modem at %d baud"), KBaud[s.iBaudIndex >= 0 && s.iBaudIndex < 5 ? s.iBaudIndex : 4]);
-	if (s.iUseProxy)
-		{
-		status.Append(_L(" - proxy "));
-		status.Append(Clip(s.iProxyHost, 40));
-		status.AppendFormat(_L(":%d"), s.iProxyPort);
-		}
-	else
-		status.Append(_L(" - no proxy"));
+	RouteWords(s, status);
+	if (!s.iNetMode)
+		status.AppendFormat(_L(" - modem at %d baud"), KBaud[s.iBaudIndex >= 0 && s.iBaudIndex < 5 ? s.iBaudIndex : 4]);
 	CPwAboutDialog* dlg = new(ELeave) CPwAboutDialog(status);
 	dlg->ExecuteLD(R_PW_ABOUT_DIALOG);
 	}
@@ -2302,11 +2348,13 @@ void CPwAppUi::HandleCommandL(TInt aCommand)
 		{
 			TBuf<500> url;
 		FromUtf8(url, sh->url);
-		if (url.Compare(_L("about:blank")) == 0)
-			url.Zero();
+		if (url.Compare(_L("about:problem")) == 0)
+			FromUtf8(url, sh->problem_url);
+		else if (Clip(url, 6).Compare(_L("about:")) == 0)
+			url.Zero();                      // (0.85) never an internal name
 		CPwOpenDialog* dlg = new(ELeave) CPwOpenDialog(url, *iHist);
 		if (dlg->ExecuteLD(R_PW_OPEN_DIALOG) && url.Length() > 0)
-			iView->Command(PW_CMD_OPEN, url);
+			GoL(url);
 		break;
 		}
 	case EPwCmdHome:
@@ -2436,6 +2484,15 @@ void CPwAppUi::HandleCommandL(TInt aCommand)
 	case EPwCmdHistNone:
 	case EPwCmdHistory:
 		break;
+	case EPwCmdSetup:
+		SetupL();
+		break;
+	case EPwCmdStart:
+		iView->OpenUrlL(_L("about:welcome"));
+		break;
+	case EPwCmdShowMenu:
+	case EPwCmdLogMenu:
+		break;
 	case EPwCmdConnSettings:
 		{
 		CPwConnDialog* dlg = new(ELeave) CPwConnDialog(st);
@@ -2544,6 +2601,116 @@ void CPwAppUi::ProcessMessageL(TUid aUid, const TDesC8& aParams)
 	url.Trim();
 	if (url.Length() > 0 && iView)
 		iView->OpenUrlL(url);
+	}
+
+// ===========================================================================
+// Set up PsiWeb (0.85; core/docs/setup-assistant.md)
+// ===========================================================================
+
+// Pictures' standard by route: on every page for the netBook's network card
+// (or dial-up) going direct, else only when asked
+TInt CPwSetupDialog::StandardPictures(const PgSuChoice& aChoice, TBool aTall)
+	{
+	return aTall && aChoice.conn == PG_SU_CONN_NET && aChoice.helper == PG_SU_HELPER_DIRECT;
+	}
+
+void CPwSetupDialog::AppPreLayoutL()
+	{
+	// the settings PsiWeb has (a file there), else the route's standard
+	TInt pics = iHadFile ? iSettings.iImages : StandardPictures(Choice(), iTall);
+	SetChoiceListCurrentItem(EPwDlgSuPictures, pics ? 1 : 0);
+	SetChoiceListCurrentItem(EPwDlgSuSearch, iSettings.iSearch == PW_SEARCH_FROGFIND ? 1 : 0);
+	ShowPicturesNoteL();
+	}
+
+void CPwSetupDialog::ShowPicturesNoteL()
+	{
+	SetLabelL(EPwDlgSuPicturesNote, ChoiceListCurrentItem(EPwDlgSuPictures) == 1
+		? _L("On every page suits a network card - Ctrl+I for one page")
+		: _L("Only when asked suits a modem - Ctrl+I shows a page's pictures"));
+	}
+
+void CPwSetupDialog::AppControlChangedL(TInt aControlId)
+	{
+	if (aControlId == EPwDlgSuPictures)
+		{
+		iPicturesChosen = ETrue;
+		ShowPicturesNoteL();
+		}
+	}
+
+void CPwSetupDialog::AppChoiceChangedL()
+	{
+	if (iPicturesChosen)
+		return;
+	SetChoiceListCurrentItem(EPwDlgSuPictures, StandardPictures(Choice(), iTall) ? 1 : 0);
+	ShowPicturesNoteL();
+	}
+
+void CPwSetupDialog::AppSaveL()
+	{
+	iSettings.iImages = ChoiceListCurrentItem(EPwDlgSuPictures) == 1;
+	iSettings.iSearch = ChoiceListCurrentItem(EPwDlgSuSearch) == 1 ? PW_SEARCH_FROGFIND : PW_SEARCH_DDG;
+	}
+
+TInt CPwAppUi::SetupCallback(TAny* aSelf)
+	{
+	CPwAppUi* ui = (CPwAppUi*)aSelf;
+	TRAPD(err, ui->SetupL());
+	(void)err;
+	return 0;
+	}
+
+// Tools > Set up PsiWeb..., and at the first start of a new user. OK saves
+// the shared link (the assistant) and PsiWeb's own settings, then the
+// engine starts again with them; Cancel changes nothing, but PsiWeb.ini
+// is written all the same at a first start, so it asks only once.
+void CPwAppUi::SetupL()
+	{
+	TPwSettings& st = iView->Settings();
+	iView->StartBusyCancel();            // (the engine's "Starting..." is not over the dialog)
+	CPwSetupDialog* dlg = new(ELeave) CPwSetupDialog(st, R_PW_TEST_DIALOG, EPwDlgTest1);
+	TBool ok = dlg->ExecuteLD(R_PW_SETUP_DIALOG);
+	if (ok)
+		UseSharedLink(iCoeEnv->FsSession(), st);
+	SaveSettings(st);
+	if (ok)
+		{
+		ShowPicturesState(st.iImages);
+		RestartEngineL();
+		}
+	}
+
+// (0.85) What a "Page not opened" page's links ask for
+void CPwAppUi::EngineCommandL(TInt aCmd)
+	{
+	if (aCmd == PW_APP_SETUP)
+		{
+		SetupL();
+		return;
+		}
+	TPsiLink link;
+	link.SetDefaults();
+	link.Load(iCoeEnv->FsSession());
+	PgLinkTestL(link.iBaudIndex, link.iRtsCts, link.iNetMode, link.iPppStart, R_PW_TEST_DIALOG, EPwDlgTest1);
+	}
+
+// (0.85) Opens what was typed: an address as it is, words through the
+// search page chosen in Preferences (pwaddr.h)
+void CPwAppUi::GoL(const TDesC& aTyped)
+	{
+	TBuf8<PW_URL_MAX> in;
+	in.Copy(Clip(aTyped, in.MaxLength()));
+	char out[PW_URL_MAX];
+	TInt n = pw_addr_make(in.Ptr(), in.Length(), iView->Settings().iSearch, out, sizeof(out));
+	if (n < 0)
+		{
+		iEikonEnv->InfoMsg(_L("Too many words to search for"));
+		return;
+		}
+	TBuf<PW_URL_MAX> url;
+	url.Copy(TPtrC8((const TUint8*)out, n));
+	iView->Command(PW_CMD_OPEN, url);
 	}
 
 // ===========================================================================

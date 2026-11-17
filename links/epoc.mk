@@ -106,7 +106,7 @@ LINKS_OBJS += $(O)/links/strike_psi.o
 endif
 PSI_OBJS   := $(O)/psi/psi_drv.o $(O)/psi/psi_os.o $(O)/psi/pwgrey.o $(O)/psi/pwcolour.o $(O)/psi/psi_str.o $(O)/psi/psi_digest.o $(O)/psi/pwnet.o \
 	$(O)/psi/nsprintf.o $(O)/psi/tls13.o $(O)/psi/x25519.o $(O)/psi/pwrandom.o \
-	$(O)/psi/certcheck.o $(O)/psi/pmrsa.o $(O)/psi/pwcert.o \
+	$(O)/psi/certcheck.o $(O)/psi/pmrsa.o $(O)/psi/pwcert.o $(O)/psi/pwproblem.o \
 	$(addprefix $(O)/ltc/,$(subst /,__,$(LTC_SRCS:=.o)))
 LTM_LIB    := $(O)/libltm.a
 JPG_LIB    := $(O)/libjpeg.a
@@ -174,7 +174,7 @@ $(O)/links/strike_psi.o: $(O)/strike_psi.c $(HDRS) $(SRC)/links.h
 	@mkdir -p $(dir $@)
 	$(CC) -c $(LCFLAGS) -O0 $< -o $@
 
-$(O)/psi/psi_drv.o: $(LW)/psi_drv.c $(HDRS) $(WEB)/fb/pwback.h $(SRC)/links.h $(WEB)/psiweb.h $(CORE)/ssh/psishared.h
+$(O)/psi/psi_drv.o: $(LW)/psi_drv.c $(HDRS) $(WEB)/fb/pwback.h $(SRC)/links.h $(WEB)/psiweb.h $(WEB)/psiweb_cmds.h $(WEB)/engine/pwproblem.h $(CORE)/ssh/psishared.h
 	@mkdir -p $(dir $@)
 	$(CC) -c $(LCFLAGS) -I$(WEB)/fb -I$(WEB) -I$(CORE)/ssh $< -o $@
 $(O)/psi/psi_os.o: $(LW)/epoc/psi_os.c $(HDRS) $(O)/inc/welcome.inc $(CORE)/web/engine/pwnet.h $(WEB)/engine/pwcert.h $(SRC)/links.h $(WEB)/psiweb.h $(CORE)/ssh/psishared.h
@@ -210,6 +210,10 @@ $(O)/psi/pmrsa.o: $(TLSV)/pmrsa.c
 $(O)/psi/pwcert.o: $(WEB)/engine/pwcert.c $(WEB)/engine/pwcert.h $(CAL)/calport.h
 	@mkdir -p $(dir $@)
 	$(CC) -c $(TLSVFLAGS) $< -o $@
+# (0.85) the "Page not opened" page
+$(O)/psi/pwproblem.o: $(WEB)/engine/pwproblem.c $(WEB)/engine/pwproblem.h $(CORE)/ssh/pgsetup.h
+	@mkdir -p $(dir $@)
+	$(CC) -c $(CFLAGS_C) -std=gnu99 -I$(CORE)/ssh $< -o $@
 $(O)/ltm/%.o: $(LTM)/%.c
 	@mkdir -p $(dir $@)
 	$(CC) -c $(LTMFLAGS) $< -o $@

@@ -37,6 +37,12 @@ enum TPwCommands
 	EPwCmdKeepLog,           // Tools > Keep a log (0.77)
 	EPwCmdToggleToolband,    // View > Show toolband (Shift+Ctrl+T, 0.78)
 	EPwCmdAddress,           // Ctrl+L: to the toolband's address (0.78)
+	EPwCmdSetup,             // (0.85) Tools > Set up PsiWeb...
+	EPwCmdStart,             // (0.85) Go > Start page
+	EPwCmdShowMenu,          // (0.85) View > Show (the cascade's own id)
+	EPwCmdLogMenu,           // (0.85) Tools > Log (the cascade's own id)
+	EPwCmdRetry,             // (0.85) a "Page not opened" page: Try again
+	EPwCmdTestConn,          // (0.85) ...Test the connection
 	EPwCmdFav0 = 0x1100,     // the favourites on the menu: 16 slots
 	EPwCmdHist0 = 0x1120     // the History cascade's pages: 16 slots
 	};
@@ -88,7 +94,11 @@ enum TPwDialogControls
 	EPwDlgRecent,            // Open address: Recent
 	EPwDlgOrgList,           // Favourites / History lists
 	EPwDlgAbout7,            // (0.82) About: the IJG's sentence
-	EPwDlgAbout8             // (0.82) About: the Symbian STDLIB notice
+	EPwDlgAbout8,            // (0.82) About: the Symbian STDLIB notice
+	EPwDlgSearch,            // (0.85) Preferences: Search with
+	EPwDlgSuPictures,        // (0.85) Set up PsiWeb > Pages
+	EPwDlgSuPicturesNote,
+	EPwDlgSuSearch
 	};
 
 // Organise favourites: its buttons
@@ -115,5 +125,6 @@ enum TPwGreyButton
 enum TPwConnPages
 	{
 	EPwPageLink = 0x300,
-	EPwPageProxy
+	EPwPageProxy,
+	EPwPageSuPages           // (0.85) Set up PsiWeb > Pages
 	};

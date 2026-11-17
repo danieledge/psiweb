@@ -28,6 +28,7 @@
 #ifdef PSI_EPOC
 #include "psiweb.h"
 #endif
+#include "../engine/pwproblem.h"	/* (0.85) the "Page not opened" page */
 
 /* NSFB key codes (libnsfb_event.h) that PsiWeb.app sends */
 enum {
@@ -60,7 +61,10 @@ static int last_busy = -1, last_back = -1, last_fwd = -1;
 static unsigned char last_url[512], last_status_txt[256];
 static unsigned char *psi_param;
 static unsigned char *psi_pics_url;	/* View > Show pictures was asked for this page */
-static char psi_conn_why[80];		/* why the last connection failed (psi_os.c) */
+static char psi_conn_why[160];		/* why the last connection failed (psi_os.c) */
+static char psi_problem[PW_PROBLEM_MAX];	/* (0.85) the "Page not opened" page (about:problem) */
+static int psi_problem_due;		/* ...to be shown at the next poll */
+static uttime psi_cmd_sent;		/* when an about:cmd- link was handed to the app (no "Stopped") */
 
 extern struct graphics_driver psi_driver;
 
@@ -780,38 +784,72 @@ void psi_conn_failed(const char *why)
 	snprintf(psi_conn_why, sizeof(psi_conn_why), "%s", why ? why : "");
 }
 
-/* session.c print_error_dialog: the page did not load. Links' words for
-   the commonest causes are put plainly (no "error", no "socket") */
-void psi_load_failed(unsigned char *why)
+/* about:problem's page (psi_os.c psi_about_func) */
+const char *psi_problem_page(void)
 {
-	static const char *const map[][2] = {
-		{ "Error writing to socket", "Page not loaded - the connection broke" },
-		{ "Error reading from socket", "Page not loaded - the connection broke" },
-		{ "Connection refused", "Page not loaded - the server refused the connection" },
-		{ "Receive timeout", "Page not loaded - the server did not answer in time" },
-		{ "SSL error", "Page not loaded - the secure connection failed" },
-		{ "Host not found", "Page not loaded - server not found" },
-		{ "Bad HTTP response", "Page not loaded - the server's answer made no sense" },
-		{ "Server returned empty response", "Page not loaded - the server sent nothing" },
-		{ "File not found", "File not found" },
-		{ "Interrupted", "Stopped" },
-	};
-	char line[120];
-	unsigned i;
-	if (psi_conn_why[0]) {
-		psi_infoprint(psi_conn_why);
+	return psi_problem;
+}
+
+/* about:cmd-test, about:cmd-setup (a "Page not opened" page's links):
+   handed to PsiWeb.app (psiweb.h app_cmd); the page stays */
+void psi_app_command(int cmd)
+{
+#ifdef PSI_EPOC
+	PwShared *s = (PwShared *)pwb_shared();
+	if (s) s->app_cmd = cmd;
+#else
+	(void)cmd;
+#endif
+	psi_cmd_sent = get_time();
+}
+
+/* session.c print_error_dialog: the page did not load. (0.85) In place of
+   an infoprint, a page that says what happened, the likely cause and what
+   to do (engine/pwproblem.c), shown at the next poll; the address that did
+   not open goes to the app for its address box. Stopping (Esc) is only an
+   infoprint, and an about:cmd- link nothing at all. */
+void psi_load_failed(unsigned char *why, struct session *ses, unsigned char *url)
+{
+	PwRoute route;
+	int kind;
+	(void)ses;
+	if (!why) why = cast_uchar "";
+	if (!casestrcmp(why, cast_uchar "Interrupted")) {
+		if (!psi_cmd_sent || get_time() - psi_cmd_sent > 2000) psi_infoprint("Stopped");
+		psi_cmd_sent = 0;
 		psi_conn_why[0] = 0;
 		return;
 	}
-	if (!why) why = cast_uchar "";
-	for (i = 0; i < sizeof(map) / sizeof(map[0]); i++)
-		if (!casestrcmp(why, cast_uchar map[i][0])) {
-			psi_infoprint(map[i][1]);
-			return;
+	if (url && !casecmp(url, cast_uchar "about:", 6)) {
+		psi_conn_why[0] = 0;
+		return;			/* (an about: page of ours: nothing to say) */
+	}
+	kind = pw_problem_kind((const char *)why, psi_conn_why);
+	route.net_mode = 0;
+	route.use_proxy = 0;
+	route.proxy_host = "";
+#ifdef PSI_EPOC
+	{
+		PwShared *s = (PwShared *)pwb_shared();
+		if (s) {
+			route.net_mode = s->net.net_mode;
+			route.use_proxy = s->use_proxy;
+			route.proxy_host = s->proxy_host;
+			snprintf(s->problem_url, sizeof(s->problem_url), "%s", url ? (char *)url : "");
 		}
-	if (!casecmp(why, cast_uchar "Error ", 6)) why += 6;
-	snprintf(line, sizeof(line), "Page not loaded - %s", (char *)why);
-	psi_infoprint(line);
+	}
+#endif
+	pw_problem_html(psi_problem, sizeof(psi_problem), url ? (const char *)url : "", kind, psi_conn_why, &route);
+#ifdef PSI_EPOC
+	{
+		extern void pw_log(const char *);
+		char line[200];
+		snprintf(line, sizeof(line), "page not opened (%d): %.60s / %.100s", kind, (char *)why, psi_conn_why);
+		pw_log(line);
+	}
+#endif
+	psi_conn_why[0] = 0;
+	psi_problem_due = 1;
 }
 
 /* ---------- memory: the soft ceiling ----------
@@ -1320,6 +1358,12 @@ static void poll_fn(void *p)
 			report_state(1);
 			pwb_ready();
 		}
+	}
+
+	if (psi_problem_due) {
+		struct session *ses = psi_ses();
+		psi_problem_due = 0;
+		if (ses) psi_goto(ses, "about:problem");
 	}
 
 	for (n = 0; n < 32 && pwb_next_event(&ev, 0); n++) {

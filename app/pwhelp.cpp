@@ -11,170 +11,167 @@
 #include <eikrted.h>
 #include <txtrich.h>
 
-struct TPwHelpTopic { const char* iTitle; const char* iText; };
+// (0.85) iTall and iShort: a paragraph for the netBook and Series 7 (a
+// screen 400 or more high), or for the Series 5mx, added after the text
+// (0 for none): one help, the right words on each machine
+struct TPwHelpTopic { const char* iTitle; const char* iText; const char* iTall; const char* iShort; };
 
 static const TPwHelpTopic KHelpTopics[] =
 	{
 	{ "Getting started",
-	  "PsiWeb is the Links web browser on the Psion: pages are shown as plain documents, with JPEG, "
-	  "PNG and GIF pictures when you ask for them; no JavaScript and no style sheets. It "
-	  "reaches the Internet through a WiFi modem on the serial port or the Psion's own Internet "
-	  "connection, as PsiTerm and PsiMail do.\n"
+	  "Type an address, or words to search for, and press Enter: Ctrl+L puts the cursor in the "
+	  "address along the top (the toolband), and File > Open address (Ctrl+O) asks for one. Words "
+	  "go to the search page chosen in Tools > Preferences (DuckDuckGo as standard).\n"
 	  "\n"
-	  "File > Open address (Ctrl+O, or the Open button) asks for an address; words instead of an "
-	  "address are searched for, and Recent offers the pages you have seen. File > Home page (Ctrl+H) opens your home page, which is set in "
-	  "Tools > Preferences. PsiWeb starts on its own welcome page, which needs no connection.\n"
+	  "Tap a link to follow it. Go > Back (Ctrl+B) and Forward (Ctrl+F) move through the pages you "
+	  "have seen, Esc stops a page that is loading, and Go > Start page goes back to PsiWeb's own "
+	  "first page, which needs no connection.\n"
 	  "\n"
-	  "The toolband along the top (View > Show toolband, Shift+Ctrl+T) has Back, Forward, Reload, "
-	  "Stop and Home, the address of the page, a bar that fills as the page comes, and Pictures. Tap "
-	  "the address (or press Ctrl+L) and type: the old address goes as you type. Enter goes to the "
-	  "new address, or searches for the words; Esc leaves the address as it was. On the netBook the "
-	  "toolband is shown and the toolbar hidden at first, so the page has the whole screen; on the "
-	  "Series 5mx it is the other way round.\n"
+	  "Tools > Set up PsiWeb chooses how the Psion goes online and how pages reach it, the first "
+	  "time PsiWeb starts and whenever you like. A page that cannot be opened says why, with Try "
+	  "again, Test the connection and Set up PsiWeb on it.",
+	  "On the netBook the toolband is shown and the toolbar hidden, so the page has the whole "
+	  "screen, in colour.",
+	  "On the Series 5mx the toolbar is shown on the right; View > Show > Toolband (Shift+Ctrl+T) "
+	  "adds the address along the top. Pages are in 16 greys." },
+
+	{ "Ways to connect",
+	  "How the Psion goes online is set once for PsiWeb, PsiMail and PsiTerm (Tools > Connection "
+	  "settings, or Set up PsiWeb): a network card or dial-up (the Psion's own TCP/IP, set up in "
+	  "the Control panel), or a WiFi modem on the serial port, such as the PsiConnect Atom.\n"
 	  "\n"
-	  "On the netBook pages are in colour (EPOC's 256 colours: pictures are blended from them) and "
-	  "fill its 480 lines. On the Series 5mx they are in 16 greys.\n"
+	  "Pages then reach PsiWeb in one of three ways:\n"
 	  "\n"
-	  "PsiWeb starts its browser engine when it opens; the engine then dials or connects when a page "
-	  "needs it, and says what it is doing at the bottom left." },
+	  "Direct: PsiWeb fetches pages itself. Nothing extra is needed. Secure sites (https) are "
+	  "checked by the Psion itself and nobody in between sees the page. Fast on a network card; "
+	  "slow for big sites over a modem. JPEG, PNG and GIF pictures; some newer kinds show as a box. "
+	  "Works wherever the Psion is online.\n"
+	  "\n"
+	  "Atom modem helper: the PsiConnect Atom fetches pages and makes them lighter, about three "
+	  "times quicker than direct over a modem. The modem checks secure sites, and it sees the page. "
+	  "Small pictures are converted. Works wherever the modem has WiFi. In Connection settings it "
+	  "is the web helper psiproxy, port 8080.\n"
+	  "\n"
+	  "PsiProxy on a computer: a computer at home, switched on and running PsiProxy "
+	  "(github.com/danieledge/psiproxy), fetches pages and makes them much lighter: the quickest "
+	  "way, and every kind of picture. The computer checks secure sites, but the page and any "
+	  "password you type cross your home network unencrypted. Some pages drawn by scripts work if "
+	  "that is turned on in PsiProxy. Does not work away from home. In Connection settings it is "
+	  "the web helper at the computer's address, port 8081. Tools > Log > Send log to server "
+	  "needs it.\n"
+	  "\n"
+	  "Test (Ctrl+T, in Connection settings and Set up PsiWeb) tries the settings shown before OK. "
+	  "File > Connect brings the connection up now; File > Disconnect (Ctrl+U) hangs up the modem "
+	  "and frees the serial port for PsiTerm or PsiMail, or takes the network or dial-up "
+	  "connection down. The serial port can be used by one program at a time; the Remote link "
+	  "must be off (System screen, Ctrl+L).",
+	  "On the netBook a PC Card network card is the best way: choose Network card or dial-up and "
+	  "Direct. Pictures are shown on every page as standard there.",
+	  "On the Series 5mx the Atom modem with its helper is the everyday way; direct suits light "
+	  "sites, and PsiProxy on a computer is the quickest at home." },
+
+	{ "What works and what does not",
+	  "Works: pages written as HTML on the server, which is most news, reference and text sites; "
+	  "tables and frames; JPEG, PNG and GIF pictures; plain forms, such as searches and simple "
+	  "logins; cookies, until PsiWeb closes; user names and passwords that the site asks for in a "
+	  "dialog; saving a file PsiWeb cannot show, such as a PDF, to a disk.\n"
+	  "\n"
+	  "Does not work: pages drawn by scripts (JavaScript), such as YouTube, X, the new Reddit, most "
+	  "web programs and bank logins: they come out blank or nearly so. Style sheets, video and "
+	  "sound. Sites that still use only old security (TLS 1.2), which say \"The site needs older "
+	  "security than PsiWeb has\": they may open through PsiProxy on a computer.\n"
+	  "\n"
+	  "Light editions of big sites suit the Psion best: 68k.news, text.npr.org, lite.cnn.com, "
+	  "en.m.wikipedia.org, old.reddit.com, html.duckduckgo.com. FrogFind (frogfind.com) searches "
+	  "and can read other pages as plain text; it is someone else's service, which sees the "
+	  "addresses you read.",
+	  0, 0 },
 
 	{ "Reading pages",
 	  "Up and Down scroll a line; Fn+Up and Fn+Down (Pg Up and Pg Dn) a screen; Go > Top of page and "
 	  "End of page go to the ends. Tap a link to follow it, a field to type in it, a button to press "
-	  "it; once a field is chosen, type into it. Left and Right scroll a wide page sideways.\n"
+	  "it; once a field is chosen, type into it. Left and Right scroll a wide page sideways. The "
+	  "scroll bar beside the page works with the pen.\n"
 	  "\n"
-	  "The scroll bar beside the page works with the pen: tap its arrows to move a few lines, tap "
-	  "above or below its thumb to move a screen, or drag the thumb.\n"
+	  "View > Zoom in and Zoom out (Ctrl+M and Shift+Ctrl+M, or the Zoom icons beside the screen) "
+	  "go round the sizes from 50% to 200%; Normal size is 100%.\n"
 	  "\n"
-	  "Go > Back (Ctrl+B, or the Back button) and Forward (Ctrl+F) move through the pages you have "
-	  "seen. Esc stops a page that is loading; File > Reload (Ctrl+R) fetches it again.\n"
-	  "\n"
-	  "View > Zoom in and Zoom out (Ctrl+M and Shift+Ctrl+M, or the Zoom in and Zoom out icons "
-	  "beside the screen) go round the sizes from 50% to 200%; Normal size is 100%.\n"
-	  "\n"
-	  "Pictures are left out, which is much faster over a modem: View > Show pictures (Ctrl+I, or "
-	  "the Pictures button) fetches the pictures of the page showing, and takes them away again. "
-	  "The button stays pressed in while they show. To have them on every page, set Pictures in "
-	  "Tools > Preferences. View > Show toolbar (Ctrl+T) gives the page the toolbar's "
-	  "room; the engine starts again to draw at the new width.\n"
+	  "View > Show pictures (Ctrl+I, or the Pictures button) fetches the pictures of the page "
+	  "showing, and takes them away again; the button stays pressed in while they show. Pictures "
+	  "on every page is set in Tools > Preferences.\n"
 	  "\n"
 	  "View > Page information (Shift+Ctrl+Q) shows the page's title and address, what the engine "
-	  "is doing, the free memory and the connection in use.\n"
+	  "is doing, the free memory and how the page came (Direct, the Atom modem helper or PsiProxy "
+	  "on a computer).\n"
 	  "\n"
-	  "A page that asks for a user name and password brings up a dialog for them; PsiWeb remembers "
-	  "them until it closes. A file PsiWeb cannot show, such as a PDF, can be saved to a disk (up "
-	  "to 4 MB): PsiWeb says what it is and offers the Save as dialog; the bottom left shows how much "
-	  "has come, and Esc stops it.\n"
-	  "\n"
-	  "Light sites suit the Psion's memory best - 68k.news, FrogFind, DuckDuckGo Lite, text.npr.org, "
-	  "lite.cnn.com. On a long page with pictures, those far from the screen are let go, and made "
-	  "again from memory when you come back to them; a page that still does not fit says \"Page too "
-	  "big\" and shows what fits." },
+	  "A file PsiWeb cannot show can be saved to a disk (up to 4 MB): the bottom left shows how "
+	  "much has come, and Esc stops it. On a long page with pictures, those far from the screen "
+	  "are let go and made again when you come back; a page that still does not fit says \"Page "
+	  "too big\" and shows what fits.",
+	  0, 0 },
 
 	{ "Favourites & history",
-	  "Favourites keep the pages you go back to. Favourites > Add to favourites (Shift+Ctrl+D) "
-	  "saves the page showing: the name is the page's title and can be changed. The first five "
-	  "favourites are on the Favourites menu itself; choose one to open it. More favourites lists "
-	  "them all when there are over five. Organise favourites shows the list with Edit, to change "
-	  "a name or address, and Delete; both act at once, and Close ends. PsiWeb keeps up to 40.\n"
+	  "Favourites > Add to favourites (Shift+Ctrl+D) saves the page showing: the name is the page's "
+	  "title and can be changed. The first five favourites are on the Favourites menu itself; More "
+	  "favourites lists them all. Organise favourites has Edit and Delete, which act at once. "
+	  "PsiWeb keeps up to 40.\n"
 	  "\n"
-	  "History is on the Go menu. It lists the last five pages you have seen, newest first; Full "
-	  "history lists the last 50, and Clear history removes them all. A page is added when it has "
-	  "loaded, and a page seen again moves to the top. PsiWeb's own welcome page is not kept.\n"
-	  "\n"
-	  "File > Open address has a Recent line: choose one of the last twelve pages with Left and "
-	  "Right to put its address in the Address line.\n"
+	  "Go > History lists the last five pages you have seen, newest first; Full history lists the "
+	  "last 50, and Clear history removes them all. File > Open address has a Recent line with the "
+	  "last twelve.\n"
 	  "\n"
 	  "Favourites and History are kept in Favourites.dat and History.dat, in PsiWeb's folder on "
-	  "C:, and stay when PsiWeb closes." },
+	  "C:, and stay when PsiWeb closes.",
+	  0, 0 },
 
-	{ "Screen & greys",
-	  "View > Reading mode (Shift+Ctrl+R) raises the screen's contrast and keeps the backlight on "
-	  "while PsiWeb is in front; your own settings come back when it goes to the background or "
-	  "closes, or the Psion is switched off (the next key turns it on again).\n"
-	  "\n"
-	  "Pictures are dithered once, as they are set out, by error diffusion; text and the page's "
-	  "own colours are drawn in plain greys, with no pattern. Tools > Preferences > Screen greys "
-	  "shows a picture four ways: choose the one that looks best with 1 to 4, fine-tune it lighter "
-	  "or darker with Up and Down, and press Enter. The new greys are used from the next page, and "
-	  "by PsiTerm and PsiMail too. A there opens the detailed settings, which can also choose the "
-	  "ordered pattern of earlier versions.\n"
-	  "\n"
-	  "On a colour screen (the netBook) the page is drawn in EPOC's 256 colours instead: text and "
-	  "the page's colours take the nearest colour, with no pattern, and pictures are blended from "
-	  "the colours by error diffusion. The greys settings do not change it.\n"
+	{ "Screen",
+	  "View > Show > Bright screen (Shift+Ctrl+B; called Reading mode before 0.85) raises the "
+	  "screen's contrast and keeps the backlight on while PsiWeb is in front; your own settings "
+	  "come back when it goes to the background or closes.\n"
 	  "\n"
 	  "Tools > Preferences > Text: Sharp (the standard) draws text with fonts made ahead for the "
-	  "Psion's greys at 100%; other zoom sizes use the scaled fonts. Scaled (as before) uses Links' "
-	  "own fonts at every size. The engine starts again when it changes." },
-
-	{ "Connections & proxy",
-	  "Tools > Connection settings chooses how PsiWeb reaches the Internet, the same way as PsiTerm "
-	  "and PsiMail.\n"
-	  "\n"
-	  "Test (Ctrl+T) tries the settings shown, before OK: whether the modem answers and at what "
-	  "speed, and whether CTS allows RTS/CTS flow control; for Psion Internet, whether the "
-	  "connection is up and names can be looked up (it asks before dialling).\n"
-	  "\n"
-	  "Modem: a serial WiFi modem (such as a WiRSa or a WiFi232) on the Psion's serial port. PsiWeb "
-	  "dials the server with ATDT host:port. Set the baud rate to the modem's; 115200 with RTS/CTS "
-	  "flow control is fastest if the cable carries those lines.\n"
-	  "\n"
-	  "Psion TCP/IP: the Psion's own dial-up (PPP) connection, set up in the Control panel's Internet "
-	  "and Modems settings. PsiWeb starts it when it needs to and the Psion's connection dialogs "
-	  "appear. Connection settings > Network > After use, Psion Internet chooses what happens "
-	  "next, for PsiTerm and PsiMail too: Stays connected (the standard on a new Psion) keeps it "
-	  "up until you disconnect; Disconnects when idle leaves it to the Psion's own idle time, as "
-	  "before (kept for anyone updating from an older version).\n"
-	  "\n"
-	  "A proxy (Tools > Connection settings > Network > Use proxy, shared with PsiTerm and PsiMail), "
-	  "such as PsiProxy (in the proxy folder of PsiWeb's source) or WebOne on a computer on your "
-	  "network, is recommended but optional: it fetches https pages for the Psion, which has no "
-	  "time for a TLS handshake on every page, and keeps one connection open so the modem dials "
-	  "once. Without one, http pages go direct and https pages use PsiWeb's own TLS 1.3, which "
-	  "checks each site's certificate: one that cannot be trusted stops the page (\"Certificate "
-	  "not trusted\"). A site PsiWeb's own TLS cannot talk to says \"Secure connection "
-	  "refused\": read it through a proxy.\n"
-	  "\n"
-	  "PsiWeb keeps no log unless Tools > Keep a log is ticked. Then it writes what it does "
-	  "(the addresses of the pages, the connection's own lines) to PsiWeb.log, for whoever is "
-	  "looking into a problem; untick it to stop, at once (the log kept so far stays). "
-	  "Tools > Send log to server sends PsiWeb's log to PsiProxy (not WebOne), to help find a "
-	  "fault: the proxy, or if that is the Atom modem's own, the PsiProxy set in the modem's Web "
-	  "proxy settings (without one it says Needs PsiProxy on a computer). It is dimmed until a "
-	  "proxy is set and a log is kept. The log goes as plain HTTP "
-	  "and can hold the names of the sites you visited.\n"
-	  "\n"
-	  "File > Disconnect (Ctrl+U) hangs up the modem and frees the serial port for PsiTerm or "
-	  "PsiMail, or takes the Psion Internet connection down. The "
-	  "port can be used by one program at a time; the Remote link must be off too." },
+	  "Psion's screen at 100%; Scaled (as before) uses Links' own fonts at every size.",
+	  "On the netBook the page is drawn in EPOC's 256 colours: text takes the nearest colour, and "
+	  "pictures are blended from the colours.",
+	  "On the Series 5mx pictures are dithered into 16 greys. Tools > Preferences > Screen greys "
+	  "shows a picture four ways: choose the one that looks best with 1 to 4, then Up and Down for "
+	  "lighter or darker, and Enter. PsiTerm and PsiMail use the same greys." },
 
 	{ "If the engine stops",
 	  "The browser engine runs as its own program, so if it stops, the Psion carries on. PsiWeb "
-	  "then says so on the page and Tools > Restart browser engine starts it again. Preferences and connection settings that the engine reads when it "
-	  "starts also restart it, on the same page." },
+	  "says so on the page, and Tools > Log > Restart browser engine starts it again. Settings "
+	  "the engine reads when it starts also restart it, on the same page.\n"
+	  "\n"
+	  "PsiWeb keeps no log unless Tools > Log > Keep a log is ticked. Then it writes what it does "
+	  "(the addresses of the pages, the connection's own lines) to PsiWeb.log, for whoever is "
+	  "looking into a problem. Send log to server sends it to PsiProxy on a computer, as plain "
+	  "HTTP: it can hold the names of the sites you visited.",
+	  0, 0 },
 
 	{ "Updating PsiWeb",
 	  "Tools > Update PsiWeb looks for a newer PsiWeb on GitHub (the published releases, or the test "
-	  "builds) or on a local server on your own network, downloads it in pieces to the memory disk, "
-	  "checks its signature and offers to install it. Esc stops the download. PsiWeb closes while "
-	  "the installer runs; start it again from the Extras bar afterwards.\n"
+	  "builds) or on a local server on your own network, downloads it, checks its signature and "
+	  "offers to install it. Esc stops the download. PsiWeb closes while the installer runs.\n"
 	  "\n"
-	  "Tools > About PsiWeb (Shift+Ctrl+A) shows the version you have." },
+	  "Tools > About PsiWeb (Shift+Ctrl+A) shows the version you have.",
+	  0, 0 },
 
 	{ "Keyboard shortcuts",
 	  "Up/Down, Fn+Up/Fn+Down (Pg Up/Pg Dn): scroll\n"
 	  "Esc: stop loading\n"
 	  "\n"
-	  "Ctrl+O or Ctrl+L: open an address, or search for words\n"
+	  "Ctrl+L / Ctrl+O: type an address or words / open an address\n"
 	  "Ctrl+H / Ctrl+R: home page / reload\n"
 	  "Ctrl+B / Ctrl+F: back / forward\n"
 	  "Ctrl+M / Shift+Ctrl+M, or the Zoom icons: zoom in / out\n"
-	  "Ctrl+I / Ctrl+T: show pictures (this page, on or off) / show toolbar\n"
+	  "Ctrl+I: show pictures (this page, on or off)\n"
+	  "Ctrl+T / Shift+Ctrl+T: toolbar / toolband\n"
+	  "Shift+Ctrl+B: Bright screen\n"
 	  "Shift+Ctrl+Q: page information\n"
-	  "Shift+Ctrl+R: Reading mode\n"
+	  "Shift+Ctrl+D: add to favourites\n"
 	  "Ctrl+U: disconnect\n"
-	  "Ctrl+K / Shift+Ctrl+H / Shift+Ctrl+A / Ctrl+E: preferences / help / about / close" }
+	  "Ctrl+K / Shift+Ctrl+H / Shift+Ctrl+A / Ctrl+E: preferences / help / about / close",
+	  0, 0 }
 	};
 
 static const TInt KHelpCount = sizeof(KHelpTopics) / sizeof(KHelpTopics[0]);
@@ -209,7 +206,18 @@ void CPwHelpDialog::ShowTopicL(TInt aTopic)
 	{
 	const TPwHelpTopic& topic = KHelpTopics[aTopic];
 	TPtrC8 title((const TUint8*)topic.iTitle);
-	TPtrC8 text((const TUint8*)topic.iText);
+	// (0.85) the text, then this machine's own paragraph
+	TBool tall = iEikonEnv->ScreenDevice()->SizeInPixels().iHeight >= 400;
+	const char* own = tall ? topic.iTall : topic.iShort;
+	HBufC8* all = HBufC8::NewLC(TPtrC8((const TUint8*)topic.iText).Length() + (own ? TPtrC8((const TUint8*)own).Length() + 2 : 0));
+	TPtr8 ap = all->Des();
+	ap.Copy(TPtrC8((const TUint8*)topic.iText));
+	if (own)
+		{
+		ap.Append(_L8("\n\n"));
+		ap.Append(TPtrC8((const TUint8*)own));
+		}
+	TPtrC8 text(*all);
 	HBufC* b = HBufC::NewLC(title.Length() + text.Length() + 4);
 	TPtr p = b->Des();
 	p.Copy(title);
@@ -231,7 +239,7 @@ void CPwHelpDialog::ShowTopicL(TInt aTopic)
 	ed->RichText()->ApplyCharFormatL(cf, cm, 0, title.Length());
 	ed->HandleTextChangedL();
 	ed->SetCursorPosL(0, EFalse);
-	CleanupStack::PopAndDestroy();          // b
+	CleanupStack::PopAndDestroy(2);         // b, all
 	}
 
 // the keys start on the topic list (Left and Right change the topic; Down

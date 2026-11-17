@@ -354,7 +354,7 @@ int pw_update_run(void)
 	setup_route();
 	why[0] = 0;
 	say(PW_UPD_RUNNING, "Checking for a new PsiWeb (%s%s)...",
-		R.local ? "local server " : (R.tls ? "GitHub" : "GitHub via the proxy"),
+		R.local ? "local server " : (R.tls ? "GitHub" : "GitHub through the web helper"),
 		R.local ? R.host : "");
 
 	r = fetch_small("PsiWeb-version.txt", remote, sizeof(remote), why, sizeof(why));
@@ -530,7 +530,7 @@ int pw_putlog_run(void)
 	const char *lhost;
 
 	if (!s->use_proxy || !s->proxy_host[0]) {
-		log_end(PW_LOG_FAILED, "Not available - set a proxy in Connection settings");
+		log_end(PW_LOG_FAILED, "Not available - set a web helper in Connection settings");
 		return PW_LOG_FAILED;
 	}
 	sold = pw_log_size(1);
@@ -558,7 +558,7 @@ int pw_putlog_run(void)
 	/* (behind the Atom's own proxy: PsiDevBox.ini if set, else the Atom's, which
 	   passes it on to a PsiProxy or says it has none) */
 	if (!pg_devbox(s->proxy_host, s->proxy_port, &lhost, &lport)) {
-		log_end(PW_LOG_FAILED, "Not available - set a proxy in Connection settings");
+		log_end(PW_LOG_FAILED, "Not available - set a web helper in Connection settings");
 		return PW_LOG_FAILED;
 	}
 	if (pwn_connect(lhost, lport, 0, why, sizeof(why)) != 0) {
@@ -567,7 +567,7 @@ int pw_putlog_run(void)
 			pg_shared()->quit = 0;
 			log_end(PW_LOG_FAILED, "stopped");
 		} else
-			log_end(PW_LOG_FAILED, "%.80s", why[0] ? why : "no connection to the proxy");
+			log_end(PW_LOG_FAILED, "%.80s", why[0] ? why : "no connection to the web helper");
 		return PW_LOG_FAILED;
 	}
 	snprintf(req, sizeof(req),
@@ -598,7 +598,7 @@ int pw_putlog_run(void)
 			if (part == 2 || (part == 1 && c != -2)) break;   /* (the body, or the reply, ends with the connection) */
 			pwn_close(1);
 			if (c == -2) { pg_shared()->quit = 0; log_end(PW_LOG_FAILED, "stopped"); }
-			else log_end(PW_LOG_FAILED, "no reply from the proxy");
+			else log_end(PW_LOG_FAILED, "no reply from the web helper");
 			return PW_LOG_FAILED;
 		}
 		if (c == '\r') continue;
@@ -612,7 +612,7 @@ int pw_putlog_run(void)
 			if (n == 0) continue;            /* (modem CONNECT leftovers) */
 			if (strncmp(line, "HTTP/", 5) || !strchr(line, ' ')) {
 				pwn_close(1);
-				log_end(PW_LOG_FAILED, "not a web proxy");
+				log_end(PW_LOG_FAILED, "not a web helper");
 				return PW_LOG_FAILED;
 			}
 			status = atoi(strchr(line, ' ') + 1);
@@ -634,6 +634,6 @@ int pw_putlog_run(void)
 	}
 	if (ok == PG_ANSWER_NEEDS) log_end(PW_LOG_FAILED, PG_NEEDS_PSIPROXY);
 	else if (status == 413) log_end(PW_LOG_FAILED, "the log is too big");
-	else log_end(PW_LOG_FAILED, "the proxy said %d", status);
+	else log_end(PW_LOG_FAILED, "the web helper said %d", status);
 	return PW_LOG_FAILED;
 }

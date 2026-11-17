@@ -9,7 +9,7 @@ SUBPROJECT    psiweb
 
 SOURCE        psiweb.cpp pwhelp.cpp pwfavs.cpp
 SUBPROJECT    psitermssh
-SOURCE        pglinktest.cpp psigreyui.cpp
+SOURCE        pglinktest.cpp psigreyui.cpp pgsetup.cpp
 SUBPROJECT    psiweb
 RESOURCE      psiweb.rss
 

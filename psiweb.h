@@ -162,6 +162,26 @@ typedef struct
 	volatile int progress;             /* psiweb: how far the page has come,
 	                                      0 to 100; -1 when nothing loads */
 
+	/* (0.85) the engine asks the app to act: a "Page not opened" page's
+	   Test the connection and Set up PsiWeb links (PW_APP_*); the app
+	   clears it when taken. problem_url: the address that did not open,
+	   for the address box while that page shows */
+	volatile int app_cmd;
+	char problem_url[PW_URL_MAX];
+
+	/* (0.86) the page style (app sets: PW_STYLE_*) and what came of the
+	   page showing (psiweb writes them with the page): for the route
+	   light and Page information */
+	volatile int style;
+	volatile int page_style;           /* the style the page was made in */
+	volatile int page_secure;          /* PW_SECURE_* */
+	volatile int page_bytes;           /* HTML as it came */
+	volatile int page_kept;            /* HTML after the style's simplifier */
+	volatile int page_pics_out;        /* pictures left out */
+	volatile int page_scripts;         /* 1: the page looks drawn by scripts */
+	volatile int keep_cookies;         /* (0.89) app sets: cookies kept between sessions */
+	int spare[8];
+
 	unsigned char fb[PW_MAX_H * PW_STRIDE8];   /* MUST stay last: see above */
 	} PwShared;
 

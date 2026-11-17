@@ -25,6 +25,7 @@ NAME PSIW
 
 #include "psiweb.hrh"
 #include "pwicons.rh"
+#include "psilink.rh"         // the shared connection settings' words (core/ssh)
 
 RESOURCE RSS_SIGNATURE { }
 
@@ -152,7 +153,7 @@ RESOURCE HOTKEYS r_pw_hotkeys
 	shift_control=
 		{
 		HOTKEY { command=EPwCmdZoomOut; key='m'; },
-		HOTKEY { command=EPwCmdReading; key='r'; },
+		HOTKEY { command=EPwCmdReading; key='b'; },
 		HOTKEY { command=EPwCmdToggleToolband; key='t'; },
 		HOTKEY { command=EPwCmdAddFav; key='d'; },
 		HOTKEY { command=EPwCmdPageInfo; key='q'; },
@@ -176,13 +177,13 @@ RESOURCE MENU_BAR r_pw_menubar
 	}
 
 // File: the page, the connection, Close. Stop has no letter shortcut: Esc
-// stops a page loading, as in the built-in programs
+// stops a page loading, as in the built-in programs. (0.85) Home page moved
+// to Go, where browsers have it
 RESOURCE MENU_PANE r_pw_file_menu
 	{
 	items=
 		{
 		MENU_ITEM { command=EPwCmdOpen; txt="Open address..."; },
-		MENU_ITEM { command=EPwCmdHome; txt="Home page"; flags=EEikMenuItemSeparatorAfter; },
 		MENU_ITEM { command=EPwCmdReload; txt="Reload"; },
 		MENU_ITEM { command=EPwCmdStop; txt="Stop"; extratxt="Esc"; flags=EEikMenuItemSeparatorAfter; },
 		MENU_ITEM { command=EPwCmdConnect; txt="Connect..."; },
@@ -192,10 +193,10 @@ RESOURCE MENU_PANE r_pw_file_menu
 	}
 
 // View: zoom (in and out cycle round the sizes; also the Zoom icons beside
-// the screen), the toolbar tick box, Show pictures (a tick box: the
-// pictures of the page showing, as the Pictures button; pictures on every
-// page is in Preferences), then Page info (the Email program's Status
-// information, on its key)
+// the screen), Show (a cascade: the toolbar, the toolband, Bright screen),
+// Show pictures (a tick box: the pictures of the page showing, as the
+// Pictures button; pictures on every page is in Preferences), then Page
+// information (the Email program's Status information, on its key)
 RESOURCE MENU_PANE r_pw_view_menu
 	{
 	items=
@@ -203,20 +204,35 @@ RESOURCE MENU_PANE r_pw_view_menu
 		MENU_ITEM { command=EPwCmdZoomIn; txt="Zoom in"; },
 		MENU_ITEM { command=EPwCmdZoomOut; txt="Zoom out"; },
 		MENU_ITEM { command=EPwCmdZoomNormal; txt="Normal size"; flags=EEikMenuItemSeparatorAfter; },
-		MENU_ITEM { command=EPwCmdToggleToolbar; txt="Show toolbar"; flags=EEikMenuItemCheckBox; },
-		MENU_ITEM { command=EPwCmdToggleToolband; txt="Show toolband"; flags=EEikMenuItemCheckBox; },
-		MENU_ITEM { command=EPwCmdReading; txt="Reading mode"; flags=EEikMenuItemCheckBox; },
-		MENU_ITEM { command=EPwCmdImages; txt="Show pictures"; flags=EEikMenuItemCheckBox|EEikMenuItemSeparatorAfter; },
+		MENU_ITEM { command=EPwCmdImages; txt="Show pictures"; flags=EEikMenuItemCheckBox; },
+		MENU_ITEM { command=EPwCmdShowMenu; cascade=r_pw_show_menu; txt="Show"; flags=EEikMenuItemSeparatorAfter; },
 		MENU_ITEM { command=EPwCmdPageInfo; txt="Page information..."; }
 		};
 	}
 
+// View > Show: the bars, and Bright screen (the contrast and backlight for
+// reading: called Reading mode up to 0.84, renamed so that "Reader" means
+// one thing; Shift+Ctrl+B)
+RESOURCE MENU_PANE r_pw_show_menu
+	{
+	items=
+		{
+		MENU_ITEM { command=EPwCmdToggleToolbar; txt="Toolbar"; flags=EEikMenuItemCheckBox; },
+		MENU_ITEM { command=EPwCmdToggleToolband; txt="Toolband"; flags=EEikMenuItemCheckBox; },
+		MENU_ITEM { command=EPwCmdReading; txt="Bright screen"; flags=EEikMenuItemCheckBox; }
+		};
+	}
+
+// Go: Back and Forward, the start page and the home page, the page's top
+// and end, History
 RESOURCE MENU_PANE r_pw_go_menu
 	{
 	items=
 		{
 		MENU_ITEM { command=EPwCmdBack; txt="Back"; },
 		MENU_ITEM { command=EPwCmdForward; txt="Forward"; flags=EEikMenuItemSeparatorAfter; },
+		MENU_ITEM { command=EPwCmdStart; txt="Start page"; },
+		MENU_ITEM { command=EPwCmdHome; txt="Home page"; flags=EEikMenuItemSeparatorAfter; },
 		MENU_ITEM { command=EPwCmdTop; txt="Top of page"; },
 		MENU_ITEM { command=EPwCmdBottom; txt="End of page"; flags=EEikMenuItemSeparatorAfter; },
 		MENU_ITEM { command=EPwCmdHistory; cascade=r_pw_history_menu; txt="History"; }
@@ -247,19 +263,30 @@ RESOURCE MENU_PANE r_pw_favs_menu
 		};
 	}
 
-// Tools: preferences and settings, the engine, updates, About last
+// Tools: preferences and settings (Set up PsiWeb... is the first-time setup,
+// any time), the log and the engine in a cascade, updates, Help and About last
 RESOURCE MENU_PANE r_pw_tools_menu
 	{
 	items=
 		{
 		MENU_ITEM { command=EPwCmdPrefs; txt="Preferences..."; },
-		MENU_ITEM { command=EPwCmdConnSettings; txt="Connection settings..."; flags=EEikMenuItemSeparatorAfter; },
-		MENU_ITEM { command=EPwCmdRestart; txt="Restart browser engine"; },
-		MENU_ITEM { command=EPwCmdSendLog; txt="Send log to server"; },
-		MENU_ITEM { command=EPwCmdKeepLog; txt="Keep a log"; flags=EEikMenuItemCheckBox; },
+		MENU_ITEM { command=EPwCmdConnSettings; txt="Connection settings..."; },
+		MENU_ITEM { command=EPwCmdSetup; txt="Set up PsiWeb..."; flags=EEikMenuItemSeparatorAfter; },
+		MENU_ITEM { command=EPwCmdLogMenu; cascade=r_pw_log_menu; txt="Log"; },
 		MENU_ITEM { command=EPwCmdUpdate; txt="Update PsiWeb..."; flags=EEikMenuItemSeparatorAfter; },
 		MENU_ITEM { command=EPwCmdHelp; txt="Help on PsiWeb"; },
 		MENU_ITEM { command=EPwCmdAbout; txt="About PsiWeb"; }
+		};
+	}
+
+// Tools > Log: for whoever is looking into a problem (no lines in a cascade)
+RESOURCE MENU_PANE r_pw_log_menu
+	{
+	items=
+		{
+		MENU_ITEM { command=EPwCmdKeepLog; txt="Keep a log"; flags=EEikMenuItemCheckBox; },
+		MENU_ITEM { command=EPwCmdSendLog; txt="Send log to server"; },
+		MENU_ITEM { command=EPwCmdRestart; txt="Restart browser engine"; }
 		};
 	}
 
@@ -352,6 +379,43 @@ RESOURCE DLG_BUTTONS r_pw_pick_buttons
 		};
 	}
 
+// The setup assistant (0.85; core/docs/setup-assistant.md): the first time
+// PsiWeb starts with no settings anywhere, and from Tools > Set up PsiWeb...
+// Its first two pages are the suite's (pgsetup.rssi); Pages is PsiWeb's own.
+#include "pgsetup.rssi"       // the setup assistant's shared pages (core/ssh), after EIK_APP_INFO
+
+RESOURCE DIALOG r_pw_setup_dialog
+	{
+	title="Set up PsiWeb";
+	flags=EEikDialogFlagWait;
+	buttons=r_pgsu_buttons;
+	pages=r_pw_setup_pages;
+	}
+
+RESOURCE ARRAY r_pw_setup_pages
+	{
+	items=
+		{
+		PAGE { text="Connection"; id=EPgSuPageConn; lines=r_pgsu_conn_lines; },
+		PAGE { text="Web helper"; id=EPgSuPageHelper; lines=r_pgsu_helper_lines; },
+		PAGE { text="Pages"; id=EPwPageSuPages; lines=r_pw_setup_pages_lines; }
+		};
+	}
+
+RESOURCE ARRAY r_pw_setup_pages_lines
+	{
+	items=
+		{
+		DLG_LINE { type=EEikCtChoiceList; prompt="Pictures"; id=EPwDlgSuPictures;
+			control=CHOICELIST { maxdisplaychar=16; array_id=r_pw_pictures_array; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPwDlgSuPicturesNote; control=LABEL { standard_font=EEikLabelFontAnnotation;
+			horiz_align=EEikLabelAlignHLeft; reserve_length=72;
+			txt="Only when asked suits a modem - View > Show pictures for one page"; }; },
+		DLG_LINE { type=EEikCtChoiceList; prompt="Search with"; id=EPwDlgSuSearch;
+			control=CHOICELIST { maxdisplaychar=16; array_id=r_pw_search_array; }; }
+		};
+	}
+
 RESOURCE DIALOG r_pw_conn_dialog
 	{
 	title="Connection settings";
@@ -376,7 +440,7 @@ RESOURCE ARRAY r_pw_conn_link_lines
 		DLG_LINE { type=EEikCtChoiceList; prompt="Connect via"; id=EPwDlgLink; control=CHOICELIST { array_id=r_pw_link_array; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="Baud rate"; id=EPwDlgBaud; control=CHOICELIST { array_id=r_pw_baud_array; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="Flow control"; id=EPwDlgFlow; control=CHOICELIST { array_id=r_pw_flow_array; }; },
-		DLG_LINE { type=EEikCtEdwin; prompt="Psion Internet: first send"; id=EPwDlgPppStart; control=EDWIN { width=14; maxlength=40; }; }
+		DLG_LINE { type=EEikCtEdwin; prompt=PSILINK_TXT_FIRST_SEND; id=EPwDlgPppStart; control=EDWIN { width=14; maxlength=40; }; }
 		};
 	}
 
@@ -384,12 +448,12 @@ RESOURCE ARRAY r_pw_conn_proxy_lines
 	{
 	items=
 		{
-		DLG_LINE { type=EEikCtChoiceList; prompt="After use, Psion Internet"; id=EPwDlgKeepUp; control=CHOICELIST { array_id=r_pw_keepup_array; }; },
+		DLG_LINE { type=EEikCtChoiceList; prompt=PSILINK_TXT_AFTER_USE; id=EPwDlgKeepUp; control=CHOICELIST { array_id=r_pw_keepup_array; }; },
 		DLG_LINE { type=EEikCtLabel; control=LABEL { standard_font=EEikLabelFontAnnotation;
 			txt="Disconnect with Ctrl+U - the modem route always hangs up after use"; }; },
-		DLG_LINE { type=EEikCtChoiceList; prompt="Use proxy"; id=EPwDlgProxy; control=CHOICELIST { array_id=r_pw_proxy_array; }; },
-		DLG_LINE { type=EEikCtEdwin; prompt="Proxy host"; id=EPwDlgProxyHost; control=EDWIN { width=22; maxlength=60; }; },
-		DLG_LINE { type=EEikCtNumberEditor; prompt="Proxy port"; id=EPwDlgProxyPort; control=NUMBER_EDITOR { min=1; max=65535; }; }
+		DLG_LINE { type=EEikCtChoiceList; prompt=PSILINK_TXT_HELPER; id=EPwDlgProxy; control=CHOICELIST { array_id=r_pw_proxy_array; }; },
+		DLG_LINE { type=EEikCtEdwin; prompt=PSILINK_TXT_HELPER_HOST; id=EPwDlgProxyHost; control=EDWIN { width=22; maxlength=60; }; },
+		DLG_LINE { type=EEikCtNumberEditor; prompt=PSILINK_TXT_HELPER_PORT; id=EPwDlgProxyPort; control=NUMBER_EDITOR { min=1; max=65535; }; }
 		};
 	}
 
@@ -407,6 +471,7 @@ RESOURCE DIALOG r_pw_prefs_dialog
 		{
 		DLG_LINE { type=EEikCtEdwin; prompt="Home page"; id=EPwDlgHome; control=EDWIN { width=20; maxlength=200; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="Pictures"; id=EPwDlgPictures; control=CHOICELIST { array_id=r_pw_pictures_array; }; },
+		DLG_LINE { type=EEikCtChoiceList; prompt="Search with"; id=EPwDlgSearch; control=CHOICELIST { array_id=r_pw_search_array; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="Text"; id=EPwDlgText; control=CHOICELIST { array_id=r_pw_text_array; }; }
 		};
 	}
@@ -477,7 +542,14 @@ RESOURCE ARRAY r_pw_flow_array
 
 RESOURCE ARRAY r_pw_link_array
 	{
-	items={ LBUF { txt="Modem (ATDT host:port)"; }, LBUF { txt="Psion TCP/IP (dial-up)"; } };
+	items={ LBUF { txt=PSILINK_TXT_VIA_MODEM; }, LBUF { txt=PSILINK_TXT_VIA_NET; } };
+	}
+
+// Preferences and Set up > Search with: words typed for an address go to
+// the search page chosen (CPwAppUi::SearchUrl), in this order
+RESOURCE ARRAY r_pw_search_array
+	{
+	items={ LBUF { txt="DuckDuckGo"; }, LBUF { txt="FrogFind"; } };
 	}
 
 RESOURCE ARRAY r_pw_pictures_array
@@ -492,9 +564,10 @@ RESOURCE ARRAY r_pw_keepup_array
 	items={ LBUF { txt="Stays connected"; }, LBUF { txt="Disconnects when idle"; } };
 	}
 
+// Network > Web helper (iUseProxy): the same words in every program (psilink.rh)
 RESOURCE ARRAY r_pw_proxy_array
 	{
-	items={ LBUF { txt="No"; }, LBUF { txt="Yes"; } };
+	items={ LBUF { txt=PSILINK_TXT_HELPER_NO; }, LBUF { txt=PSILINK_TXT_HELPER_YES; } };
 	}
 
 // Update: where to fetch PsiWeb-version.txt and PsiWeb.sis from - the same
@@ -573,10 +646,10 @@ RESOURCE DIALOG r_pw_about_dialog
 	items=
 		{
 		DLG_LINE { type=EEikCtLabel; id=EPwDlgAbout1; control=LABEL { standard_font=EEikLabelFontLegend; reserve_length=24; txt="PsiWeb"; }; },
-		DLG_LINE { type=EEikCtLabel; id=EPwDlgAbout2; control=LABEL { txt="Web browser for the Psion Series 5mx - (c) 2026 Dan Edge"; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPwDlgAbout2; control=LABEL { txt="Web browser for the Psion Series 5mx, netBook and Series 7"; }; },
 		DLG_LINE { type=EEikCtLabel; id=EPwDlgAboutStatus; control=LABEL { standard_font=EEikLabelFontAnnotation; reserve_length=70; txt="-"; }; },
 		DLG_LINE { type=EEikCtLabel; id=EPwDlgAbout4; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="Links 2 browser engine (c) Mikulas Patocka & others - GPL v2 (no JavaScript)"; }; },
-		DLG_LINE { type=EEikCtLabel; id=EPwDlgAbout5; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="Source: github.com/danieledge/psiweb - PsiWeb's own code MIT - see COPYING.txt"; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPwDlgAbout5; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="(c) 2026 Dan Edge - source: github.com/danieledge/psiweb - MIT, see COPYING.txt"; }; },
 		DLG_LINE { type=EEikCtLabel; id=EPwDlgAbout6; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="libpng, zlib, DejaVu fonts; TLS: LibTomCrypt, LibTomMath, TweetNaCl (public domain)"; }; },
 		DLG_LINE { type=EEikCtLabel; id=EPwDlgAbout7; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="This software is based in part on the work of the Independent JPEG Group"; }; },
 		DLG_LINE { type=EEikCtLabel; id=EPwDlgAbout8; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="This product includes software licensed from Symbian Ltd (c) Symbian Ltd 1998-9"; }; },
