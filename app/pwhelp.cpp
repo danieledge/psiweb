@@ -73,7 +73,9 @@ static const TPwHelpTopic KHelpTopics[] =
 	{ "What works and what does not",
 	  "Works: pages written as HTML on the server, which is most news, reference and text sites; "
 	  "tables and frames; JPEG, PNG and GIF pictures; plain forms, such as searches and simple "
-	  "logins; cookies, until PsiWeb closes; user names and passwords that the site asks for in a "
+	  "logins; cookies, until PsiWeb closes or, with Tools > Preferences > Cookies > Kept for next "
+	  "time, from one day to the next (in PsiWeb's folder; choosing Until PsiWeb closes again "
+	  "deletes them); user names and passwords that the site asks for in a "
 	  "dialog; saving a file PsiWeb cannot show, such as a PDF, to a disk.\n"
 	  "\n"
 	  "Does not work: pages drawn by scripts (JavaScript), such as YouTube, X, the new Reddit, most "
@@ -82,7 +84,8 @@ static const TPwHelpTopic KHelpTopics[] =
 	  "security than PsiWeb has\": they may open through PsiProxy on a computer.\n"
 	  "\n"
 	  "Light editions of big sites suit the Psion best: 68k.news, text.npr.org, lite.cnn.com, "
-	  "en.m.wikipedia.org, old.reddit.com, html.duckduckgo.com. FrogFind (frogfind.com) searches "
+	  "en.m.wikipedia.org, old.reddit.com, html.duckduckgo.com: on the full site, a line at the "
+	  "top of the page offers the lighter edition. FrogFind (frogfind.com) searches "
 	  "and can read other pages as plain text; it is someone else's service, which sees the "
 	  "addresses you read.",
 	  0, 0 },
@@ -129,8 +132,8 @@ static const TPwHelpTopic KHelpTopics[] =
 	  "modem helper or PsiProxy on a computer) and whether it is secure and checked, and the "
 	  "page's style, its size and the pictures left out.\n"
 	  "\n"
-	  "A file PsiWeb cannot show can be saved to a disk (up to 4 MB): the bottom left shows how "
-	  "much has come, and Esc stops it. On a long page with pictures, those far from the screen "
+	  "A file PsiWeb cannot show can be saved to a disk, as big as the disk has room for (less a "
+	  "little for the Psion): the bottom left shows how much has come, and Esc stops it. On a long page with pictures, those far from the screen "
 	  "are let go and made again when you come back; a page that still does not fit says \"Page "
 	  "too big\" and shows what fits.",
 	  0, 0 },

@@ -49,6 +49,7 @@ const char *pwb_home_url(void) { return "about:welcome"; }
 const char *pwb_res_dir(void) { return "/tmp/psiwebemu/"; }
 int pwb_load_images(void) { return 1; }
 int pwb_style(void) { return 0; }
+int pwb_keep_cookies(void) { return 0; }
 int pwb_zoom(void) { return 100; }
 unsigned long pwb_ms(void) { return (unsigned long)emu_hc(HB_MS, 0, 0, 0, 0); }
 

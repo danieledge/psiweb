@@ -32,7 +32,8 @@ const char *pwb_home_url(void);
 const char *pwb_first_url(void);                       /* Links: the first page (start_url or about:welcome) */
 const char *pwb_res_dir(void);
 int  pwb_load_images(void);
-int  pwb_style(void);                                  /* (0.86) View > Page style: PW_STYLE_* */
+int  pwb_style(void);
+int  pwb_keep_cookies(void);                           /* (0.87) Preferences > Cookies: kept */                                  /* (0.86) View > Page style: PW_STYLE_* */
 int  pwb_zoom(void);                                  /* percent */
 int  pwb_depth(void);                                 /* the screen: 4 (16 greys) or 8 (EPOC's 256 colours) */
 void *pwb_shared(void);                               /* the PwShared block */

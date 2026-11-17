@@ -14,9 +14,16 @@ A web browser for the **Psion Series 5mx**, the **netBook** and the **Series 7**
 
 Up to 0.61 the engine was NetSurf. Its sources are still in the tree as a fallback (see *The NetSurf engine* below), until Links has been proved on the device. The whole port is described in [`links/PORTING.md`](links/PORTING.md).
 
-**Status: beta (0.86).** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
+**Status: beta (0.87).** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
 
 [![Download PsiWeb.sis](https://img.shields.io/badge/Download-PsiWeb.sis-2ea44f?logo=github)](https://github.com/danieledge/psiterm/raw/main/dist/PsiWeb.sis)
+
+## What's new in 0.87
+
+- **Cookies kept for next time**, if you ask: Tools > Preferences > Cookies > *Kept for next time* keeps a site's cookies (what keeps you logged in) in PsiWeb's folder from one day to the next; *Until PsiWeb closes*, the standard, is as before, and choosing it again deletes the kept ones. Only cookies a site gives a date are kept, as other browsers do.
+- **A lighter edition offered.** On CNN, NPR, Reddit, English Wikipedia and DuckDuckGo, a line at the top of the page offers the site's own light edition (lite.cnn.com, text.npr.org, old.reddit.com, en.m.wikipedia.org, html.duckduckgo.com): offered, never forced. A page drawn by scripts says so in Lighter, Reader and Text only, with the reader service (FrogFind).
+- **Saving a file**: as big as the disk has room for, less 256 KB for the Psion, where it was at most 4 MB.
+- Not in this version: WebP pictures (the plan's D9). 0.86 asks sites for JPEG, PNG and GIF instead; whether boxes for WebP pictures are still common has to be seen on a real netBook before 150 to 250 KB of decoder is worth it.
 
 ## What's new in 0.86
 
@@ -62,10 +69,20 @@ Since 0.77, the last signed release.
 
 ## Screenshots
 
-PsiWeb 0.86 and 0.85 (the first rows) and 0.80 on the netBook (colour, 640x480) and the Series 5mx (16 greys, 640x240). Taken in emulators; pages and the netBook's *Page not opened* in the ARM harness, as the netBook emulator has no network. Tap or click one to see it full size.
+PsiWeb 0.87, 0.86 and 0.85 (the first rows) and 0.80 on the netBook (colour, 640x480) and the Series 5mx (16 greys, 640x240). Taken in emulators; pages and the netBook's *Page not opened* in the ARM harness, as the netBook emulator has no network. Tap or click one to see it full size.
 
 <table>
 <tr><th>netBook</th><th>Series 5mx</th></tr>
+<tr><td><b>A lighter edition offered, Wikipedia (0.87)</b></td><td><b>Preferences, with Cookies (0.87)</b></td></tr>
+<tr>
+<td><a href="docs/img/netbook-psiweb-lighter-edition.png"><img src="docs/img/netbook-psiweb-lighter-edition.png" alt="netBook: the full Wikipedia site with the offer of its mobile edition" width="400"></a></td>
+<td><a href="docs/img/5mx-psiweb-preferences.png"><img src="docs/img/5mx-psiweb-preferences.png" alt="Series 5mx: Preferences" width="400"></a></td>
+</tr>
+<tr><td><b>A page drawn by scripts says so (0.87)</b></td><td></td></tr>
+<tr>
+<td><a href="docs/img/netbook-psiweb-drawn-by-scripts.png"><img src="docs/img/netbook-psiweb-drawn-by-scripts.png" alt="netBook: reddit.com in Lighter, drawn by scripts" width="400"></a></td>
+<td></td>
+</tr>
 <tr><td colspan="2"><b>The start page and its speed dial (0.86)</b></td></tr>
 <tr>
 <td><a href="docs/img/netbook-psiweb-start.png"><img src="docs/img/netbook-psiweb-start.png" alt="netBook: the start page" width="400"></a></td>
@@ -151,7 +168,7 @@ Install `dist/PsiWeb.sis` (to D: if you have a CF card). PsiWeb is on the Extras
 | Shift+Ctrl+R | the next page style (Full, Lighter, Reader, Text only) |
 | 1 to 8 | on the start page, open a tile |
 | Ctrl+U | disconnect (hang up and free the serial port) |
-| Ctrl+K | preferences: home page, pictures, search, text |
+| Ctrl+K | preferences: home page, pictures, page style, search, text, cookies |
 | Shift+Ctrl+H | help on PsiWeb |
 | Shift+Ctrl+A | about PsiWeb |
 | pen | tap links, buttons and form fields; the scroll bar beside the page (EIKON's) scrolls it |
@@ -162,7 +179,7 @@ The toolbar (Open, Back, Home, Pictures - pressed in while the page's pictures s
 
 **Passwords.** A page (or the web helper) that asks for a user name and password brings up PsiWeb's *User name and password* dialog. HTTP Basic and Digest (MD5 and SHA-256) are both understood. PsiWeb keeps the answer until it closes.
 
-**Files PsiWeb cannot show** (a PDF, a ZIP, a Word file): PsiWeb says what the file is and how big, and asks "Save it to a file?". Yes opens the standard Save as dialog (Documents on the Memory disk if there is one). The bottom left then shows how much has come, "Saved" says when it is done, and Esc stops it. A file bigger than 4 MB is not saved, and a part file is never left behind.
+**Files PsiWeb cannot show** (a PDF, a ZIP, a Word file): PsiWeb says what the file is and how big, and asks "Save it to a file?". Yes opens the standard Save as dialog (Documents on the Memory disk if there is one). The bottom left then shows how much has come, "Saved" says when it is done, and Esc stops it. A file bigger than the disk's free room (less 256 KB) is not saved, and a part file is never left behind.
 
 **Tools > Set up PsiWeb**: the first-time setup (see *Ways to connect*), any time.
 

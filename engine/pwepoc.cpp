@@ -559,6 +559,45 @@ extern "C" const char* pwb_first_url()
 extern "C" const char* pwb_res_dir() { return Pw()->res_dir; }
 extern "C" int pwb_load_images() { return Pw()->load_images; }
 extern "C" int pwb_style() { return Pw()->style; }
+extern "C" int pwb_keep_cookies() { return Pw()->keep_cookies; }
+
+// (0.87) File > Save's limit: the free room on the disk the file goes to
+// (the one chosen, else the roomier of C: and D:), less 256 KB for the
+// rest of the Psion. Looked at no more than once a second.
+extern "C" long psi_save_max()
+	{
+	static TUint last = 0;
+	static long room = 4L * 1024 * 1024;
+	TUint now = User::TickCount();
+	if (last && now - last < 64)
+		return room;
+	last = now;
+	RFs fs;
+	if (fs.Connect() != KErrNone)
+		return room;
+	TInt drive = -1;
+	char c = Pw()->save_path[0];
+	if (c >= 'a' && c <= 'z') c -= 'a' - 'A';
+	if (c >= 'A' && c <= 'Z')
+		drive = c - 'A';
+	long best = 0;
+	for (TInt d = 0; d < 26; d++)
+		{
+		if (drive >= 0 ? d != drive : (d != EDriveC && d != EDriveD))
+			continue;
+		TVolumeInfo v;
+		if (fs.Volume(v, d) != KErrNone)
+			continue;
+		TInt64 free = v.iFree;
+		long f = free.High() || free.Low() > 0x7fffffffUL ? 0x7fffffffL : (long)free.Low();
+		if (f > best)
+			best = f;
+		}
+	fs.Close();
+	best -= 256L * 1024;
+	room = best > 0 ? best : 0;
+	return room;
+	}
 extern "C" int pwb_zoom() { return Pw()->zoom; }
 extern "C" int pwb_depth() { return Pw()->depth == PW_DEPTH_COLOR256 ? 8 : 4; }
 extern "C" void* pwb_shared() { return Pw(); }

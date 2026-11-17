@@ -85,7 +85,7 @@ static void SaveSharedLink(RFs& aFs, const TPwSettings& aSettings)
 
 _LIT(KEngineExe, "psiweb.exe");
 _LIT(KIniFile, "C:\\System\\Apps\\PsiWeb\\PsiWeb.ini");
-_LIT(KVersion, "0.86");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
+_LIT(KVersion, "0.87");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
 _LIT(KDefaultHome, "http://68k.news/");
 const TInt KZoomSteps[] = { 50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200 };
 const TInt KZoomCount = 11;
@@ -315,6 +315,7 @@ void CPwView::StartEngineL()
 	s->proxy_port = iSettings.iProxyPort;
 	s->load_images = iSettings.iImages;
 	s->style = StyleNow(iSettings);          // (0.86) View > Page style
+	s->keep_cookies = (iSettings.iFlags & KPwFlagKeepCookies) != 0;   // (0.87)
 	s->zoom = iSettings.iZoom;
 	s->display = (iSettings.iDisplay & KPwDisplayScaledText) ? PW_DISPLAY_SCALED_TEXT : 0;
 	s->net.log_on = (iSettings.iDisplay & KPwKeepLog) ? 1 : 0;   // (0.77) Tools > Keep a log; the engine reads it at each line
@@ -1572,6 +1573,7 @@ void CPwPrefsDialog::PreLayoutDynInitL()
 	((CEikChoiceList*)Control(EPwDlgText))->SetCurrentItem((iSettings.iDisplay & KPwDisplayScaledText) ? 1 : 0);
 	SetChoiceListCurrentItem(EPwDlgSearch, iSettings.iSearch == PW_SEARCH_FROGFIND ? 1 : 0);
 	SetChoiceListCurrentItem(EPwDlgStyle, StyleNow(iSettings));
+	SetChoiceListCurrentItem(EPwDlgCookies, (iSettings.iFlags & KPwFlagKeepCookies) ? 1 : 0);
 	}
 
 TBool CPwPrefsDialog::OkToExitL(TInt aButtonId)
@@ -1592,6 +1594,14 @@ TBool CPwPrefsDialog::OkToExitL(TInt aButtonId)
 	iSettings.iHome.Trim();
 	iSettings.iImages = ((CEikChoiceList*)Control(EPwDlgPictures))->CurrentItem() == 1;
 	iSettings.iSearch = ChoiceListCurrentItem(EPwDlgSearch) == 1 ? PW_SEARCH_FROGFIND : PW_SEARCH_DDG;
+	if (ChoiceListCurrentItem(EPwDlgCookies) == 1)
+		iSettings.iFlags |= KPwFlagKeepCookies;
+	else if (iSettings.iFlags & KPwFlagKeepCookies)
+		{
+		// (0.87) no longer kept: the cookies kept so far go
+		iSettings.iFlags &= ~KPwFlagKeepCookies;
+		iCoeEnv->FsSession().Delete(_L("C:\\System\\Apps\\PsiWeb\\cookies.txt"));
+		}
 	if (ChoiceListCurrentItem(EPwDlgStyle) != StyleNow(iSettings))
 		iSettings.iStyle = ChoiceListCurrentItem(EPwDlgStyle);   // (0.86) chosen: no longer the route's standard
 	if (((CEikChoiceList*)Control(EPwDlgText))->CurrentItem() == 1)

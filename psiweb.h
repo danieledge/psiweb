@@ -179,7 +179,7 @@ typedef struct
 	volatile int page_kept;            /* HTML after the style's simplifier */
 	volatile int page_pics_out;        /* pictures left out */
 	volatile int page_scripts;         /* 1: the page looks drawn by scripts */
-	volatile int keep_cookies;         /* (0.89) app sets: cookies kept between sessions */
+	volatile int keep_cookies;         /* (0.87) app sets: cookies kept between sessions */
 	/* (0.87) the start page (about:start): the app makes it (speed dial,
 	   recent pages, the route) and the engine serves it; field_active:
 	   the engine says a text field on the page has the cursor, so keys 1

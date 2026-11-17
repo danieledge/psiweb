@@ -124,7 +124,7 @@ struct TPwSettings
 	};
 
 // TPwSettings::iFlags, one byte after the toolband's in PsiWeb.ini (0.85)
-const TInt KPwFlagKeepCookies = 1;     // (0.89) Preferences > Cookies: kept when PsiWeb closes
+const TInt KPwFlagKeepCookies = 1;     // (0.87) Preferences > Cookies: kept when PsiWeb closes
 
 // TPwSettings::iDisplay, one byte at the end of PsiWeb.ini (0.81); all 0 is the standard
 const TInt KPwDisplayReading = 1;      // View > Reading mode

@@ -80,6 +80,7 @@ static void check_heap(int busy);
 static void save_progress(void);
 static void load_start(void);
 static void report_page(void);
+static void psi_cookies(int save);
 
 static void present_bh(void *p)
 {
@@ -635,8 +636,10 @@ static void report_state(int force)
 	check_heap(busy);
 	save_progress();
 	if (force || busy != last_busy) {
-		if (last_busy == 1 && !busy)
+		if (last_busy == 1 && !busy) {
 			psi_mem_report(cast_const_char u);
+			psi_cookies(1);		/* (0.87) a page done: its cookies kept, if asked (a crash keeps them too) */
+		}
 		last_busy = busy;
 		pwb_set_busy(busy);
 	}
@@ -1069,6 +1072,23 @@ int psi_show_pictures(struct session *ses)
 	if (!psi_pics_url || !ses || list_empty(ses->history)) return 0;
 	return !strcmp(cast_const_char cur_loc(ses)->url, cast_const_char psi_pics_url);
 }
+
+/* (0.87) Preferences > Cookies: kept between sessions, in Links' own
+   cookies.txt in PsiWeb's folder. Links' home folder (links_home) is set
+   only while the cookies are read or written, so it keeps no other file. */
+#ifdef PSI_EPOC
+#define PSI_COOKIE_HOME "C:\\System\\Apps\\PsiWeb\\"
+static void psi_cookies(int save)
+{
+	if (!pwb_keep_cookies() || links_home) return;
+	links_home = stracpy(cast_uchar PSI_COOKIE_HOME);
+	if (save) do_save_cookies(); else init_cookies();
+	mem_free(links_home);
+	links_home = NULL;
+}
+#else
+static void psi_cookies(int save) { (void)save; }
+#endif
 
 /* psi_style.c: pictures for this address? (the page being laid out may
    not be the one in the history yet) */
@@ -1520,6 +1540,7 @@ static unsigned char *psi_init_driver(unsigned char *param, unsigned char *displ
 	/* PsiWeb.app's setting; off unless the user has asked for pictures */
 	dds.display_images = pwb_load_images() ? 1 : 0;
 #endif
+	psi_cookies(0);			/* (0.87) the cookies kept from before */
 	last_status = get_time();
 	last_active = last_status;		/* (quick while starting) */
 	poll_timer = install_timer(POLL_MS, poll_fn, NULL);
@@ -1529,6 +1550,7 @@ static unsigned char *psi_init_driver(unsigned char *param, unsigned char *displ
 
 static void psi_shutdown_driver(void)
 {
+	psi_cookies(1);			/* (0.87) kept for next time, if asked */
 	if (poll_timer) kill_timer(poll_timer), poll_timer = NULL;
 	unregister_bottom_half(present_bh, NULL);
 	shutdown_virtual_devices();

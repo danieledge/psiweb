@@ -80,6 +80,49 @@ static void add_escaped(unsigned char **s, int *l, unsigned char *u)
 	}
 }
 
+/* (0.87) A lighter edition of the site, offered (not forced) in a line at
+   the top of its page: a site's own text or mobile edition, which suits
+   Links. The address's path is kept where the edition has the same pages. */
+static const struct { const char *host; const char *light; int keep_path; } k_light[] = {
+	{ "www.cnn.com", "https://lite.cnn.com/", 0 },
+	{ "edition.cnn.com", "https://lite.cnn.com/", 0 },
+	{ "cnn.com", "https://lite.cnn.com/", 0 },
+	{ "www.npr.org", "https://text.npr.org/", 0 },
+	{ "npr.org", "https://text.npr.org/", 0 },
+	{ "www.reddit.com", "https://old.reddit.com", 1 },
+	{ "reddit.com", "https://old.reddit.com", 1 },
+	{ "en.wikipedia.org", "https://en.m.wikipedia.org", 1 },
+	{ "duckduckgo.com", "https://html.duckduckgo.com/html/", 0 },
+	{ "www.duckduckgo.com", "https://html.duckduckgo.com/html/", 0 },
+};
+
+static int light_edition(unsigned char *url, unsigned char **s, int *l)
+{
+	unsigned char *h = url, *e;
+	size_t hn;
+	unsigned i;
+	if (!casecmp(h, cast_uchar "https://", 8)) h += 8;
+	else if (!casecmp(h, cast_uchar "http://", 7)) h += 7;
+	else return 0;
+	for (e = h; *e && *e != '/' && *e != ':' && *e != '?' && *e != '#'; e++)
+		;
+	hn = (size_t)(e - h);
+	for (i = 0; i < sizeof(k_light) / sizeof(k_light[0]); i++) {
+		if (strlen(k_light[i].host) != hn || casecmp(h, cast_uchar k_light[i].host, hn)) continue;
+		add_to_str(s, l, cast_uchar "<p><small>A lighter edition of this site exists - <a href=\"");
+		add_to_str(s, l, cast_uchar k_light[i].light);
+		if (k_light[i].keep_path && *e == '/') {
+			unsigned char *q;
+			for (q = e; *q && *q != '#'; q++)
+				if (*q == '"' || *q == '<' || *q == '>') break;
+			if (!*q || *q == '#') add_bytes_to_str(s, l, e, (size_t)(q - e));
+		}
+		add_to_str(s, l, cast_uchar "\">open it</a></small></p>");
+		return 1;
+	}
+	return 0;
+}
+
 /* Show the rest (about:cmd-rest): the page showing is laid out again, uncut */
 void psi_style_rest(unsigned char *url)
 {
@@ -114,8 +157,22 @@ unsigned char *psi_style_page(struct cache_entry *ce, unsigned char *start, size
 		return start;
 	}
 	if (style <= PW_STYLE_FULL || style > PW_STYLE_TEXT || !start) {
+		unsigned char *p;
+		int pl = 0;
 		report(PW_STYLE_FULL, (int)*len, (int)*len, 0, 0, url);
-		return start;
+		if (!start || ce->incomplete) return start;
+		/* (0.87) Full: the page as it comes, with only the offer of a
+		   lighter edition, if the site has one */
+		p = init_str();
+		if (!light_edition(url, &p, &pl)) {
+			mem_free(p);
+			return start;
+		}
+		add_bytes_to_str(&p, &pl, start, *len);
+		if (k_page) mem_free(k_page);
+		k_page = p;
+		*len = (size_t)pl;
+		return k_page;
 	}
 	mode = style == PW_STYLE_LIGHTER ? PSI_SIMP_LIGHTER : style == PW_STYLE_READER ? PSI_SIMP_READER : PSI_SIMP_TEXT;
 	/* Links lays a page out again and again while it comes: the simplifier
@@ -159,14 +216,16 @@ unsigned char *psi_style_page(struct cache_entry *ce, unsigned char *start, size
 	pics = style != PW_STYLE_TEXT && k_imgs > 0 && !psi_pictures_for(url) ? k_imgs : 0;
 	drawn = k_done && k_text < PSI_SCRIPT_TEXT && k_scripts > 0;
 	report(style, k_raw, l, pics, drawn, url);
-	if (!cut && !pics && !drawn) {
-		*len = (size_t)k_len;
-		return k_body;
-	}
 	{
 		unsigned char *p = init_str();
 		int pl = 0;
 		char b[80];
+		int light = light_edition(url, &p, &pl);
+		if (!cut && !pics && !drawn && !light) {
+			mem_free(p);
+			*len = (size_t)k_len;
+			return k_body;
+		}
 		if (drawn) {
 			add_to_str(&p, &pl, cast_uchar "<p><b>This page is drawn by scripts, which PsiWeb cannot run</b><br>"
 				"<a href=\"http://frogfind.com/read.php?a=");

@@ -118,6 +118,9 @@
 #define PSI_PIC_MARGIN 240	/* ... except within this many pixels of it */
 #define PSI_HEAP_SOFT 1572864	/* big "may fail" allocations stop this far below the heap's limit */
 #define PSI_HEAP_STOP 786432	/* and a page stops loading ("Page too big") this far below it */
-#define PSI_SAVE_MAX 4194304	/* File > Save: the biggest file saved (session.c) */
+/* File > Save: the biggest file saved (session.c). (0.87) The free room on
+   the disk it goes to, less 256 KB (pwepoc.cpp), in place of a fixed 4 MB */
+long psi_save_max(void);
+#define PSI_SAVE_MAX psi_save_max()
 
 #endif

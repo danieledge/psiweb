@@ -110,7 +110,8 @@ enum TPwDialogControls
 	EPwDlgSuSearch,
 	EPwDlgStyle,             // (0.86) Preferences: Page style
 	EPwDlgSuStyle,           // (0.86) Set up PsiWeb > Pages: Page style
-	EPwDlgSuStyleNote
+	EPwDlgSuStyleNote,
+	EPwDlgCookies            // (0.87) Preferences: Cookies
 	};
 
 // Organise favourites: its buttons

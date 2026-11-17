@@ -489,7 +489,8 @@ RESOURCE DIALOG r_pw_prefs_dialog
 		DLG_LINE { type=EEikCtChoiceList; prompt="Pictures"; id=EPwDlgPictures; control=CHOICELIST { array_id=r_pw_pictures_array; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="Page style"; id=EPwDlgStyle; control=CHOICELIST { array_id=r_pw_style_array; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="Search with"; id=EPwDlgSearch; control=CHOICELIST { array_id=r_pw_search_array; }; },
-		DLG_LINE { type=EEikCtChoiceList; prompt="Text"; id=EPwDlgText; control=CHOICELIST { array_id=r_pw_text_array; }; }
+		DLG_LINE { type=EEikCtChoiceList; prompt="Text"; id=EPwDlgText; control=CHOICELIST { array_id=r_pw_text_array; }; },
+		DLG_LINE { type=EEikCtChoiceList; prompt="Cookies"; id=EPwDlgCookies; control=CHOICELIST { array_id=r_pw_cookies_array; }; }
 		};
 	}
 
@@ -569,6 +570,13 @@ RESOURCE ARRAY r_pw_link_array
 RESOURCE ARRAY r_pw_style_array
 	{
 	items={ LBUF { txt="Full"; }, LBUF { txt="Lighter"; }, LBUF { txt="Reader"; }, LBUF { txt="Text only"; } };
+	}
+
+// (0.87) Preferences > Cookies: a site's cookies (what keeps you logged in)
+// until PsiWeb closes, as before, or kept in PsiWeb's folder for next time
+RESOURCE ARRAY r_pw_cookies_array
+	{
+	items={ LBUF { txt="Until PsiWeb closes"; }, LBUF { txt="Kept for next time"; } };
 	}
 
 RESOURCE ARRAY r_pw_search_array
