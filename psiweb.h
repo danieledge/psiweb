@@ -186,6 +186,22 @@ typedef struct
 	   to 8 are typed, not tiles */
 	volatile int field_active;
 	char start_page[6144];
+	/* (0.89) Test the connection's web part (PW_CMD_TEST): the engine
+	   fetches cmd_arg, a small page, through the route in use and says
+	   how it went (psiweb writes them; the app sets test_state RUNNING
+	   before the command) */
+	volatile int test_state;           /* PW_TEST_* */
+	volatile int test_bytes;           /* the page's size */
+	volatile int test_ms;              /* how long it took */
+	volatile int test_kind;            /* PW_PROB_* (engine/pwproblem.h) when it failed */
+	char test_why[96];                 /* the connection's or the engine's words */
+	/* (0.89) the busy message's figures (psiweb writes them with each
+	   frame): the host of the page coming ("" when none, or one of
+	   PsiWeb's own), how much of it has come, and its pictures */
+	char load_host[64];
+	volatile int load_kb;
+	volatile int pics_done;
+	volatile int pics_all;
 	int spare[8];
 
 	unsigned char fb[PW_MAX_H * PW_STRIDE8];   /* MUST stay last: see above */

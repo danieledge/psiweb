@@ -59,6 +59,25 @@ int main(void)
 		if (pw_shell_command("w3m", (const unsigned char *)lng, 299, c, sizeof(c)) != -1) { printf("FAIL shell long\n"); gFail++; }
 		if (pw_shell_command("w3m", (const unsigned char *)"\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'\'", 24, c, 40) != -1) { printf("FAIL shell quotes\n"); gFail++; }
 	}
+	/* (0.89) zoom per machine (pw_zoom_load, pw_zoom_save) */
+	{
+		int z, o, b1, b2;
+		/* a file older than 0.89: its one byte is the zoom of the machine that wrote it */
+		pw_zoom_load(1, 125, -1, &z, &o); if (z != 125 || o != 0) { printf("FAIL zoom old tall %d %d\n", z, o); gFail++; }
+		pw_zoom_load(0, 80, -1, &z, &o); if (z != 80 || o != 0) { printf("FAIL zoom old short %d %d\n", z, o); gFail++; }
+		pw_zoom_load(0, 0, -1, &z, &o); if (z != 100) { printf("FAIL zoom none %d\n", z); gFail++; }
+		/* the netBook saves 150; the file goes to a 5mx: it keeps its own 80 */
+		pw_zoom_save(1, 150, 80, &b1, &b2); if (b1 != 80 || b2 != 150) { printf("FAIL zoom save tall %d %d\n", b1, b2); gFail++; }
+		pw_zoom_load(0, b1, b2, &z, &o); if (z != 80 || o != 150) { printf("FAIL zoom 5mx %d %d\n", z, o); gFail++; }
+		/* the 5mx changes to 90 and saves; back on the netBook: 150 still */
+		pw_zoom_save(0, 90, o, &b1, &b2); if (b1 != 90 || b2 != 150) { printf("FAIL zoom save short %d %d\n", b1, b2); gFail++; }
+		pw_zoom_load(1, b1, b2, &z, &o); if (z != 150 || o != 90) { printf("FAIL zoom netBook %d %d\n", z, o); gFail++; }
+		/* a netBook that never chose a zoom (0) gets 100, not the 5mx's */
+		pw_zoom_save(0, 70, 0, &b1, &b2); if (b1 != 70 || b2 != 0) { printf("FAIL zoom save none %d %d\n", b1, b2); gFail++; }
+		pw_zoom_load(1, b1, b2, &z, &o); if (z != 100 || o != 70) { printf("FAIL zoom tall none %d %d\n", z, o); gFail++; }
+		/* a new netBook (no other zoom) writes 100 for the 5mx */
+		pw_zoom_save(1, 110, 0, &b1, &b2); if (b1 != 100 || b2 != 110) { printf("FAIL zoom new tall %d %d\n", b1, b2); gFail++; }
+	}
 	printf(gFail ? "addrtest: %d failed\n" : "addrtest: all passed\n", gFail);
 	return gFail != 0;
 	}

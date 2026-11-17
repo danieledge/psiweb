@@ -14,7 +14,7 @@ int emu_hc(int op, int a, int b, int c, int d);
 void emu_mem_report(void);
 enum {
 	HB = 200, HB_OPEN = HB, HB_PRESENT, HB_EVENT, HB_CMD, HB_STATUS, HB_TITLE,
-	HB_URL, HB_BUSY, HB_READY, HB_MS, HB_CONFIG, HB_UPDCFG, HB_IMAGES, HB_DEPTH, HB_STYLE,
+	HB_URL, HB_BUSY, HB_READY, HB_MS, HB_CONFIG, HB_UPDCFG, HB_IMAGES, HB_DEPTH, HB_STYLE, HB_COOKIES,
 	HP = 300, HP_DIAL = HP, HP_HANGUP, HP_AVAIL, HP_READ, HP_WRITE, HP_WAIT, HP_ENTROPY
 };
 
@@ -47,7 +47,11 @@ const int emu_ask_offsets[] = {
 	(int)&((PwShared *)0)->auth_state, (int)&((PwShared *)0)->auth_user, (int)&((PwShared *)0)->auth_pass,
 	(int)&((PwShared *)0)->save_state, (int)&((PwShared *)0)->save_path, (int)&((PwShared *)0)->auth_realm,
 	(int)&((PwShared *)0)->save_name, (int)&((PwShared *)0)->save_type, (int)&((PwShared *)0)->save_size,
-	(int)&((PwShared *)0)->progress
+	(int)&((PwShared *)0)->progress,
+	/* (0.89) 10..17: Test the connection's web part, the busy message's figures */
+	(int)&((PwShared *)0)->test_state, (int)&((PwShared *)0)->test_bytes, (int)&((PwShared *)0)->test_ms,
+	(int)&((PwShared *)0)->test_why, (int)&((PwShared *)0)->load_host, (int)&((PwShared *)0)->load_kb,
+	(int)&((PwShared *)0)->pics_done, (int)&((PwShared *)0)->pics_all
 };
 PsiShared *pg_shared(void) { return &g_sh.net; }
 
@@ -80,7 +84,7 @@ const char *pwb_first_url(void) { return "about:blank"; }
 const char *pwb_res_dir(void) { return "/tmp/psiwebemu/"; }
 int pwb_load_images(void) { return emu_hc(HB_IMAGES, 0, 0, 0, 0); }
 int pwb_style(void) { return emu_hc(HB_STYLE, 0, 0, 0, 0); }
-int pwb_keep_cookies(void) { return 0; }
+int pwb_keep_cookies(void) { return emu_hc(HB_COOKIES, 0, 0, 0, 0); }   /* (0.89) run_links.py --keep-cookies */
 long psi_save_max(void) { return 4194304L; }
 int pwb_zoom(void) { return 100; }
 unsigned long pwb_ms(void) { return (unsigned long)emu_hc(HB_MS, 0, 0, 0, 0); }

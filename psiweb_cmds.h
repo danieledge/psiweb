@@ -30,7 +30,20 @@ enum
 	                                   page showing out again */,
 	PW_CMD_RESIZE                   /* 0.87: the page area changed (a bar shown or
 	                                   hidden): width and height say how big; the
-	                                   page is laid out again, with no restart */
+	                                   page is laid out again, with no restart */,
+	PW_CMD_TEST                     /* 0.89: Test the connection's web part: fetch
+	                                   cmd_arg (a small page) through the route in
+	                                   use, not shown; test_* say how it went */
+	};
+
+/* test_state (psiweb.h, 0.89) */
+enum
+	{
+	PW_TEST_IDLE = 0,
+	PW_TEST_RUNNING,
+	PW_TEST_OK,                     /* test_bytes in test_ms */
+	PW_TEST_FAILED,                 /* test_kind, test_why */
+	PW_TEST_STOPPED
 	};
 
 /* app_cmd (psiweb.h, 0.85): what a "Page not opened" page's links ask */

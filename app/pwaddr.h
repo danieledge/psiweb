@@ -173,4 +173,32 @@ static inline int pw_shell_command(const char *aProgram, const unsigned char *aU
 	return n;
 	}
 
+/* (0.89) Zoom is remembered per machine, in PsiWeb.ini: the old zoom byte
+ * is the 5mx's (a short screen's), a byte at the end (after the full
+ * browser's texts) the netBook's (a tall screen's), 0 when none was chosen
+ * there yet. aTallByte is -1 for a file older than 0.89, whose one byte is
+ * the zoom of the machine that wrote it. A zoom under 30 is no zoom (100).
+ * Load: this machine's zoom, and the other's to keep (0: none). */
+static inline void pw_zoom_load(int aTall, int aOldByte, int aTallByte, int* aZoom, int* aOther)
+	{
+	int old = aOldByte >= 30 ? aOldByte : 100;
+	if (aTall)
+		{
+		*aZoom = aTallByte < 0 ? old : aTallByte >= 30 ? aTallByte : 100;
+		*aOther = aTallByte < 0 ? 0 : old;
+		}
+	else
+		{
+		*aZoom = old;
+		*aOther = aTallByte >= 30 ? aTallByte : 0;
+		}
+	}
+
+/* Save: the two bytes from this machine's zoom and the other's kept one */
+static inline void pw_zoom_save(int aTall, int aZoom, int aOther, int* aOldByte, int* aTallByte)
+	{
+	*aOldByte = aTall ? (aOther >= 30 ? aOther : 100) : aZoom;
+	*aTallByte = aTall ? aZoom : (aOther >= 30 ? aOther : 0);
+	}
+
 #endif

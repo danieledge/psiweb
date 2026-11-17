@@ -72,6 +72,19 @@ int main(void)
 		pw_problem_html(small, 300, "http://x/", 0, "", &direct);
 		CHECK(small[0] == 0 && small[300] == 'z');
 	}
+	/* (0.89) the short causes, for Test the connection: one line each, in
+	   the style's words, the helper's refusal said as such */
+	for (k = 0; k < PW_PROB_COUNT; k++) {
+		const char *t = pw_problem_short(k, &direct);
+		CHECK(t && t[0] && strlen(t) < PW_PROBLEM_SHORT_MAX);
+		CHECK(strlen(pw_problem_short(k, &pp)) < PW_PROBLEM_SHORT_MAX);
+		CHECK(!strstr(t, "error") && !strstr(t, "rror") && !strstr(t, "please") && !strstr(t, "!"));
+		CHECK(t[strlen(t) - 1] != '.');
+	}
+	CHECK(strstr(pw_problem_short(PW_PROB_REFUSED, &pp), "web helper") != NULL);
+	CHECK(strstr(pw_problem_short(PW_PROB_REFUSED, &direct), "web helper") == NULL);
+	CHECK(strstr(pw_problem_short(PW_PROB_REFUSED, &atom), "web helper") != NULL);
+	CHECK(pw_problem_short(-1, NULL) != NULL);
 	printf(gFail ? "problemtest: %d failed\n" : "problemtest: all passed\n", gFail);
 	return gFail != 0;
 }

@@ -80,6 +80,7 @@ static void check_heap(int busy);
 static void save_progress(void);
 static void load_start(void);
 static void report_page(void);
+static void psi_load_figures(struct session *ses, int busy);
 static void psi_cookies(int save);
 
 static void present_bh(void *p)
@@ -729,6 +730,7 @@ static void report_page(void)
 		s->field_active = t == L_FIELD || t == L_AREA;
 	}
 	s->progress = page_progress(ses, !list_empty(queue) || !list_empty(downloads));
+	psi_load_figures(ses, !list_empty(queue) || !list_empty(downloads));
 #endif
 }
 
@@ -811,6 +813,118 @@ void psi_app_command(int cmd)
 	(void)cmd;
 #endif
 	psi_cmd_sent = get_time();
+}
+
+/* (0.89) Test the connection's web part (PW_CMD_TEST): a small page
+   fetched through the route in use, as a page would be (Links' own
+   connection, the proxy if one is set, TLS and the certificate check),
+   but not shown. test_state etc. say how it went (psiweb.h). Esc
+   (PW_CMD_STOP: abort_all_connections) ends it as Stopped. */
+static struct status psi_test_stat;
+static int psi_test_on;
+static uttime psi_test_t0;
+
+static void psi_test_end(struct status *st, void *data)
+{
+#ifdef PSI_EPOC
+	PwShared *s = (PwShared *)pwb_shared();
+#endif
+	(void)data;
+	if (st->state >= 0) return;		/* still on its way */
+	psi_test_on = 0;
+#ifdef PSI_EPOC
+	if (!s) return;
+	s->test_ms = (int)(get_time() - psi_test_t0);
+	s->test_bytes = st->ce ? (int)st->ce->length : 0;
+	if (st->state == S__OK) {
+		s->test_why[0] = 0;
+		s->test_state = PW_TEST_OK;
+	} else if (st->state == S_INTERRUPTED) {
+		s->test_state = PW_TEST_STOPPED;
+	} else {
+		struct session *ses = psi_ses();
+		unsigned char *why = get_err_msg(st->state, ses ? ses->term : NULL);
+		if (ses) why = get_text_translation(why, ses->term);
+		PwRoute route;
+		route.net_mode = s->net.net_mode;
+		route.use_proxy = s->use_proxy;
+		route.proxy_host = s->proxy_host;
+		s->test_kind = pw_problem_kind((const char *)why, psi_conn_why);
+		/* the likely cause, in a line of the result window */
+		snprintf(s->test_why, sizeof(s->test_why), "%s", pw_problem_short(s->test_kind, &route));
+		s->test_state = PW_TEST_FAILED;
+		{
+			extern void pw_log(const char *);
+			char line[200];
+			snprintf(line, sizeof(line), "test: not opened (%d): %.60s / %.100s", s->test_kind, (char *)why, psi_conn_why);
+			pw_log(line);
+		}
+	}
+	{
+		extern void pw_log(const char *);
+		char line[160];
+		snprintf(line, sizeof(line), "test: state %d, %d bytes in %d ms", s->test_state, s->test_bytes, s->test_ms);
+		pw_log(line);
+	}
+#endif
+	psi_conn_why[0] = 0;
+}
+
+static void psi_test_start(const char *url)
+{
+	if (psi_test_on) change_connection(&psi_test_stat, NULL, PRI_CANCEL);
+	psi_test_on = 1;
+	psi_conn_why[0] = 0;
+	psi_test_t0 = get_time();
+	psi_test_stat.end = psi_test_end;
+	psi_test_stat.data = NULL;
+	load_url(cast_uchar url, NULL, &psi_test_stat, PRI_MAIN, NC_RELOAD, 1, 0, 0, 0);
+}
+
+/* (0.89) The busy message's figures (psiweb.h load_*, pics_*), written with
+   each frame: the host of the page coming (without "www."), how many KB of
+   it have come, and once it is in, its pictures done of all */
+static void psi_load_figures(struct session *ses, int busy)
+{
+#ifdef PSI_EPOC
+	PwShared *s = (PwShared *)pwb_shared();
+	struct f_data_c *fd;
+	unsigned char *u = NULL;
+	int kb = 0, done = 0, all = 0, n = 0;
+	if (!s) return;
+	if (busy && ses) {
+		fd = current_frame(ses);
+		if (ses->rq) {
+			u = ses->rq->url;
+			if (ses->rq->stat.prg) kb = (int)(ses->rq->stat.prg->pos / 1024);
+		} else if (fd && fd->rq && fd->rq->state >= 0) {
+			u = fd->rq->url;
+			if (fd->rq->stat.prg) kb = (int)(fd->rq->stat.prg->pos / 1024);
+		} else if (fd && fd->af) {
+			struct additional_file *af;
+			struct list_head *laf;
+			foreach(struct additional_file, af, laf, fd->af->af) {
+				all++;
+				if (!af->rq || af->rq->stat.state < 0) done++;
+				if (all >= 500) break;
+			}
+		}
+	}
+	if (u && (!casecmp(u, cast_uchar "http://", 7) || !casecmp(u, cast_uchar "https://", 8))) {
+		u += u[4] == 's' || u[4] == 'S' ? 8 : 7;
+		if (!casecmp(u, cast_uchar "www.", 4)) u += 4;
+		while (u[n] && u[n] != '/' && u[n] != ':' && u[n] != '?' && u[n] != '#' && n < (int)sizeof(s->load_host) - 1) {
+			s->load_host[n] = u[n];
+			n++;
+		}
+	}
+	s->load_host[n] = 0;
+	s->load_kb = kb;
+	s->pics_done = done;
+	s->pics_all = all;
+#else
+	(void)ses; (void)busy;
+#endif
 }
 
 /* session.c print_error_dialog: the page did not load. (0.85) In place of
@@ -1333,6 +1447,10 @@ static void run_command(int cmd, char *arg)
 		mark(0, 0, w, h);
 		break;
 	}
+	case PW_CMD_TEST:
+		/* (0.89) Test the connection's web part */
+		psi_test_start(arg);
+		break;
 	case PW_CMD_RESTYLE:
 		/* (0.86) View > Page style: the page showing, laid out again in the
 		   new style (psi_style.c reads it) */
@@ -1340,6 +1458,7 @@ static void run_command(int cmd, char *arg)
 		draw_formatted(ses);
 		break;
 	case PW_CMD_QUIT:
+		psi_cookies(1);			/* (0.89) before Links frees them: see psi_shutdown_driver */
 		terminate_loop = 1;
 		break;
 	case PW_CMD_HANGUP:
@@ -1467,6 +1586,7 @@ static void poll_fn(void *p)
 			send_mouse(mouse_down ? (B_LEFT | B_DRAG) : (B_LEFT | B_MOVE));
 			break;
 		case PWB_QUIT:
+			psi_cookies(1);		/* (0.89) before Links frees them: see psi_shutdown_driver */
 			terminate_loop = 1;
 			in_poll = 0;
 			return;
@@ -1550,7 +1670,12 @@ static unsigned char *psi_init_driver(unsigned char *param, unsigned char *displ
 
 static void psi_shutdown_driver(void)
 {
-	psi_cookies(1);			/* (0.87) kept for next time, if asked */
+	/* (0.89) The cookies are not saved here: Links has freed them by now
+	   (main.c terminate_all_subsystems: free_cookies, then
+	   shutdown_graphics), so up to 0.88 this wrote an empty cookies.txt
+	   over the kept ones whenever PsiWeb closed. They are saved when a
+	   page is done and when the engine is asked to quit (PW_CMD_QUIT,
+	   PWB_QUIT), before that. */
 	if (poll_timer) kill_timer(poll_timer), poll_timer = NULL;
 	unregister_bottom_half(present_bh, NULL);
 	shutdown_virtual_devices();

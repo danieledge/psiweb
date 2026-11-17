@@ -26,6 +26,7 @@
 #include "pwicons.h"
 #include "psilink.h"
 #include "pglinktest.h"
+#include <engine/pwproblem.h>    // (0.89) PW_PROB_*: Test the connection's web part
 #include "psigreyui.h"
 #include "pwaddr.h"              // (0.85) an address, or words to search for
 
@@ -88,7 +89,7 @@ static void SaveSharedLink(RFs& aFs, const TPwSettings& aSettings)
 
 _LIT(KEngineExe, "psiweb.exe");
 _LIT(KIniFile, "C:\\System\\Apps\\PsiWeb\\PsiWeb.ini");
-_LIT(KVersion, "0.88");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
+_LIT(KVersion, "0.89");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
 _LIT(KDefaultHome, "http://68k.news/");
 const TInt KZoomSteps[] = { 50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200 };
 const TInt KZoomCount = 11;
@@ -218,11 +219,14 @@ void CPwView::ConstructL(const TRect& aRect, const TPwSettings& aSettings)
 	EnableDragEvents();
 	iPics = -1;
 	iLastBusy = EFalse;
-	// the page's scroll bar, as the built-in programs have it: always there
-	// (dimmed when the page fits), beside the page
+	// the page's scroll bar, beside the page. (0.89) Shown only while the
+	// page does not fit; its room stays the page's margin, white, so a page
+	// lays out the same whether or not the bar shows (UpdateScrollBarL)
 	iSBFrame = new(ELeave) CEikScrollBarFrame(this, this);
 	iSBFrame->SetScrollBarVisibilityL(CEikScrollBarFrame::EOff, CEikScrollBarFrame::EOn);
 	LayoutL();
+	iSbShown = ETrue;
+	ShowScrollBar(EFalse);               // (nothing to scroll until a page says so)
 
 	TSize size = iPageArea.Size();
 	if (size.iWidth > PW_MAX_W) size.iWidth = PW_MAX_W;
@@ -390,6 +394,66 @@ void CPwView::StartBusyCancel()
 	iStartBusy = EFalse;
 	}
 
+// (0.89) The route in a busy message: "direct", "through the Atom",
+// "through PsiProxy"
+static void RouteBusyWords(const TPwSettings& aS, TDes& aOut)
+	{
+	TBuf8<64> h;
+	h.Copy(Clip(aS.iProxyHost, 60));
+	h.ZeroTerminate();
+	if (!aS.iUseProxy || aS.iProxyHost.Length() == 0)
+		aOut.Copy(_L("direct"));
+	else if (pg_su_is_atom_host((const char*)h.Ptr()))
+		aOut.Copy(_L("through the Atom"));
+	else
+		aOut.Copy(_L("through PsiProxy"));
+	}
+
+// (0.89) While a page loads, the busy message (bottom left) says which page,
+// by which route and how much has come: "Opening bbc.co.uk through PsiProxy
+// - 64 KB...", then "Fetching pictures through PsiProxy - 12 of 30...".
+// A note from the link that matters more (dialling, looking up a name, the
+// modem) stays up until data comes; the figures change at most twice a second.
+void CPwView::LoadBusyL()
+	{
+	PwShared* s = iShared;
+	TBuf<100> t;
+	if (s && iRunning && s->busy && !iLinkBusy)
+		{
+		TBuf<32> route;
+		RouteBusyWords(iSettings, route);
+		if (s->load_host[0])
+			{
+			TBuf<64> host;
+			FromUtf8(host, s->load_host);
+			TPtrC h = Clip(host, 36);
+			t.Format(_L("Opening %S %S"), &h, &route);
+			if (s->load_kb > 0)
+				t.AppendFormat(_L(" - %d KB"), s->load_kb);
+			t.Append(_L("..."));
+			}
+		else if (s->pics_all > 0 && s->pics_done < s->pics_all)
+			t.Format(_L("Fetching pictures %S - %d of %d..."), &route, s->pics_done, s->pics_all);
+		}
+	if (t.Length() == 0)
+		{
+		if (iLoadBusy)
+			iEikonEnv->BusyMsgCancel();
+		iLoadBusy = EFalse;
+		iLoadShown.Zero();
+		return;
+		}
+	if (t == iLoadShown)
+		return;
+	TUint now = User::TickCount();
+	if (iLoadBusy && iLoadShown.Length() && now - iLoadAt < 32)
+		return;                          // (the figure changes again soon)
+	iEikonEnv->BusyMsgL(t, EHLeftVBottom, TTimeIntervalMicroSeconds32(0));
+	iLoadBusy = ETrue;
+	iLoadShown = t;
+	iLoadAt = now;
+	}
+
 void CPwView::StopEngine()
 	{
 	if (!iRunning)
@@ -467,6 +531,9 @@ void CPwView::LayoutL()
 	layout.iTilingMode = TEikScrollBarFrameLayout::EInclusiveRectConstant;
 	iSBFrame->TileL(&hModel, &vModel, client, inclusive, layout);
 	iPageArea = client;
+	CEikScrollBar* sb = iSBFrame->GetScrollBarHandle(CEikScrollBar::EVertical);
+	if (sb && !iSbShown)
+		sb->MakeVisible(EFalse);         // (0.89) laid out again, still not shown
 	}
 
 TInt CPwView::CountComponentControls() const
@@ -507,7 +574,35 @@ void CPwView::UpdateScrollBarL()
 		return;
 	TEikScrollBarModel model(h, h > 0 ? vh : 0, h > 0 ? y : 0);
 	sb->SetModelL(&model);
-	sb->DrawNow();
+	if (h > vh && vh > 0)
+		{
+		ShowScrollBar(ETrue);
+		sb->DrawNow();
+		}
+	else
+		ShowScrollBar(EFalse);           // (0.89) the page fits, or there is none
+	}
+
+// (0.89) The bar only while there is something to scroll; without it, its
+// room is drawn white (Draw)
+void CPwView::ShowScrollBar(TBool aShow)
+	{
+	if (!iSBFrame || aShow == iSbShown)
+		return;
+	CEikScrollBar* sb = iSBFrame->GetScrollBarHandle(CEikScrollBar::EVertical);
+	if (!sb)
+		return;
+	iSbShown = aShow;
+	sb->MakeVisible(aShow);
+	if (!aShow && IsReadyToDraw())
+		{
+		TRect strip(Rect());
+		strip.iTl.iX = iPageArea.iBr.iX;
+		if (!strip.IsEmpty())
+			{
+			Window().Invalidate(strip);
+			}
+		}
 	}
 
 // The pen on the bar: the arrows move a few lines, the shaft a screen (as
@@ -745,7 +840,21 @@ void CPwView::Tick()
 		TBool dots = m.Length() >= 3 && m.Right(3).Compare(_L("...")) == 0;
 		if (m.Length() && m[m.Length() - 1] == '.' && !dots)
 			m.SetLength(m.Length() - 1);     // no full stop at the end of a message
-		if (iUpdDlg)
+		// (0.89) the link's routine notes for each connection ("Connecting
+		// to 10.0.0.5:8080...", "Request sent...") are left out while a page
+		// loads, or the connection is tested: the busy message says which page
+		// and by which route instead (LoadBusyL). Dialling, looking up and
+		// the modem still say what they do.
+		TBool routine = m.Find(_L("Connecting to ")) == 0 || m.Find(_L("TCP connection open")) == 0
+			|| m.Find(_L("Request sent")) == 0 || m.Find(_L("Receiving the reply")) == 0
+			|| m.Find(_L("Using the address looked up")) == 0;
+		if (routine && !iUpdDlg && (iTesting || (s->busy && s->load_host[0])))
+			{
+			if (iLinkBusy && !iTesting)
+				iLoadShown.Zero();           // the route's message goes up again over the old note
+			iLinkBusy = EFalse;
+			}
+		else if (iUpdDlg)
 			{
 			// updating: the progress window shows each step of getting online
 			if (m.Length())
@@ -759,6 +868,8 @@ void CPwView::Tick()
 			{
 			TRAPD(err, iEikonEnv->BusyMsgL(m, EHLeftVBottom, TTimeIntervalMicroSeconds32(0)));
 			iLinkBusy = err == KErrNone;
+			iLoadBusy = EFalse;              // (its busy message has gone under this one)
+			iLoadShown.Zero();
 			}
 		else if (m.Length())
 			{
@@ -778,6 +889,11 @@ void CPwView::Tick()
 		{
 		iEikonEnv->BusyMsgCancel();
 		iLinkBusy = EFalse;
+		}
+	if (s && !iUpdDlg && !iTesting && iLogState != PW_LOG_RUNNING)
+		{
+		TRAPD(lerr, LoadBusyL());
+		(void)lerr;
 		}
 	// the engine asks something (a password, where to save a file): the
 	// dialog is shown from an idle callback, not inside this tick
@@ -1258,6 +1374,26 @@ void CPwView::StartInstallerL()
 void CPwView::Draw(const TRect& aRect) const
 	{
 	CWindowGc& gc = SystemGc();
+	// (0.89) right of the engine's page (its width is even, the room may
+	// be a pixel wider) and, with no scroll bar, the bar's room: the page's
+	// white margin, never an old frame's columns
+	TInt engW = iShared && iShared->width > 0 && iShared->width < iPageArea.Width() ? iShared->width : iPageArea.Width();
+		{
+		TRect strip(Rect());
+		strip.iTl.iX = iPageArea.iTl.iX + engW;
+		if (iSbShown)
+			strip.iBr.iX = iPageArea.iBr.iX;
+		strip.Intersection(aRect);
+		if (!strip.IsEmpty())
+			{
+			gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
+			gc.SetBrushColor(KRgbWhite);
+			gc.SetPenStyle(CGraphicsContext::ENullPen);
+			gc.DrawRect(strip);
+			gc.SetPenStyle(CGraphicsContext::ESolidPen);
+			gc.SetBrushStyle(CGraphicsContext::ENullBrush);
+			}
+		}
 	if (iShowMsg)
 		{
 		gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
@@ -1277,7 +1413,9 @@ void CPwView::Draw(const TRect& aRect) const
 		return;
 		}
 	TRect r(aRect);
-	r.Intersection(iPageArea);           // (the scroll bar draws itself)
+	TRect page(iPageArea);
+	page.iBr.iX = page.iTl.iX + engW;
+	r.Intersection(page);                // (the scroll bar draws itself)
 	if (!r.IsEmpty())
 		gc.BitBlt(r.iTl, iBitmap, r);
 	}
@@ -2164,6 +2302,7 @@ void CPwAppUi::LoadSettings(TPwSettings& aSettings)
 		return;
 		}
 	TBuf8<400> d;
+	TInt tallZoom = -1;                  // (0.89) the tall screen's zoom byte: -1 an older file
 	if (file.Read(d) == KErrNone && d.Length() >= 10 && d[0] == 1)
 		{
 		TInt pos = 1;
@@ -2222,12 +2361,21 @@ void CPwAppUi::LoadSettings(TPwSettings& aSettings)
 							aSettings.iFullCommand.Copy(d.Mid(pos, len));
 							pos += len;
 							}
+						// (0.89) the netBook's (a tall screen's) zoom, after the
+						// full browser's two texts (0: none chosen yet)
+						if (pos < d.Length())
+							tallZoom = d[pos++];
 						}
 					}
 				}
 			}
 		}
 	file.Close();
+	// (0.89) Zoom is remembered per machine: the old byte is the 5mx's (a
+	// short screen's), the new one the netBook's, so PsiWeb.ini restored
+	// from the other machine does not bring its size along. A file older
+	// than 0.89 has only the one, for the machine that wrote it.
+	pw_zoom_load(TallScreen(), aSettings.iZoom, tallZoom, &aSettings.iZoom, &iOtherZoom);
 	UseSharedLink(iCoeEnv->FsSession(), aSettings);
 	}
 
@@ -2252,7 +2400,10 @@ void CPwAppUi::SaveSettings(const TPwSettings& aSettings)
 	d.Append((TUint8)(aSettings.iProxyPort & 0xff));
 	d.Append((TUint8)(aSettings.iProxyPort >> 8));
 	d.Append((TUint8)aSettings.iImages);
-	d.Append((TUint8)aSettings.iZoom);
+	// (0.89) the 5mx's zoom here, the netBook's at the end (LoadSettings)
+	TInt shortZoom, tallZoom;
+	pw_zoom_save(TallScreen(), aSettings.iZoom, iOtherZoom, &shortZoom, &tallZoom);
+	d.Append((TUint8)shortZoom);
 	TBuf8<200> tmp;
 	tmp.Copy(aSettings.iProxyHost);
 	d.Append((TUint8)tmp.Length());
@@ -2273,6 +2424,7 @@ void CPwAppUi::SaveSettings(const TPwSettings& aSettings)
 	tmp.Copy(aSettings.iFullCommand);
 	d.Append((TUint8)tmp.Length());
 	d.Append(tmp);
+	d.Append((TUint8)tallZoom);             // (0.89)
 	TInt r = file.Write(d);
 	if (r == KErrNone)
 		r = file.Flush();
@@ -2908,6 +3060,8 @@ void CPwAppUi::SetupL()
 	}
 
 // (0.85) What a "Page not opened" page's links ask for
+void WebTestThen(PgLinkTest* aTest, void* aCtx);   // (0.89) below
+
 void CPwAppUi::EngineCommandL(TInt aCmd)
 	{
 	if (aCmd == PW_APP_SETUP)
@@ -2933,7 +3087,155 @@ void CPwAppUi::EngineCommandL(TInt aCmd)
 	TPsiLink link;
 	link.SetDefaults();
 	link.Load(iCoeEnv->FsSession());
-	PgLinkTestL(link.iBaudIndex, link.iRtsCts, link.iNetMode, link.iPppStart, R_PW_TEST_DIALOG, EPwDlgTest1);
+	// (0.89) the link's test, then a small page through the route in use
+	PgLinkTestThenL(link.iBaudIndex, link.iRtsCts, link.iNetMode, link.iPppStart, R_PW_TEST_DIALOG, EPwDlgTest1,
+		WebTestThen, this);
+	}
+
+// ----- (0.89) Test the connection: the web part ---------------------------------
+// After the link's own test (core's pglinktest: the modem answers, the
+// network is up, a name is looked up), the engine fetches a small file
+// through the route PsiWeb uses - its own TLS and certificate check direct,
+// or the web helper - exactly as a page would come, and the result window
+// says in a line or two whether it came. The file is the one PsiWeb's
+// updates are checked with, on GitHub.
+_LIT(KWebTestUrl, "https://raw.githubusercontent.com/danieledge/psiterm/main/dist/PsiWeb-version.txt");
+const TInt KWebTestTickUs = 250000;
+const TInt KWebTestMaxTicks = 4 * 120;     // two minutes: past a dial-up and a slow handshake on a 5mx
+
+// Takes every key while the page is fetched; Esc stops it
+class CPwTestKeys : public CCoeControl
+	{
+public:
+	TKeyResponse OfferKeyEventL(const TKeyEvent& aKeyEvent, TEventCode aType)
+		{
+		if (aType == EEventKey && aKeyEvent.iCode == EKeyEscape)
+			iStop = ETrue;
+		return EKeyWasConsumed;
+		}
+	TBool iStop;
+	};
+
+struct TPwTestWait
+	{
+	PwShared* iShared;
+	CPwTestKeys* iKeys;
+	TInt iTicks;
+	TBool iEnded;                      // the loop was ended here (not by someone else's Stop)
+	};
+
+static TInt WebTestTick(TAny* aPtr)
+	{
+	TPwTestWait* w = (TPwTestWait*)aPtr;
+	w->iTicks++;
+	if (w->iTicks % 80 == 0)
+		UserHal::ResetAutoSwitchOffTimer();
+	if (w->iShared->test_state != PW_TEST_RUNNING || w->iKeys->iStop || w->iTicks >= KWebTestMaxTicks)
+		{
+		w->iEnded = ETrue;
+		CActiveScheduler::Stop();
+		return 0;
+		}
+	return 1;
+	}
+
+void WebTestThen(PgLinkTest* aTest, void* aCtx)
+	{
+	TRAPD(err, ((CPwAppUi*)aCtx)->WebTestL(aTest));
+	if (err != KErrNone)
+		pg_lt_add_line(aTest, "PsiWeb could not try a page - not enough memory");
+	}
+
+struct TPwTestStacked
+	{
+	CCoeAppUi* iAppUi;
+	CCoeControl* iControl;
+	CPwView* iView;
+	};
+
+static void WebTestUnstack(TAny* aPtr)
+	{
+	TPwTestStacked* t = (TPwTestStacked*)aPtr;
+	t->iAppUi->RemoveFromStack(t->iControl);
+	t->iView->iTesting = EFalse;
+	}
+
+void CPwAppUi::WebTestL(PgLinkTest* aTest)
+	{
+	TInt linkOk = pg_lt_link_ok(aTest);
+	if (!linkOk)
+		return;                          // (the link's own lines say what is wrong)
+	PwShared* s = iView->Shared();
+	if (!s || !iView->EngineRunning())
+		{
+		pg_lt_add_line(aTest, "PsiWeb did not try a page - the browser engine is not running");
+		return;
+		}
+	TBuf<32> route;
+	RouteBusyWords(iView->Settings(), route);
+	TBuf<80> busy;
+	busy.Format(_L("Opening a page from GitHub %S..."), &route);
+	CPwTestKeys* keys = new(ELeave) CPwTestKeys;
+	CleanupStack::PushL(keys);
+	CPeriodic* tick = CPeriodic::NewL(CActive::EPriorityStandard);
+	CleanupStack::PushL(tick);
+	TPwTestStacked stacked;
+	stacked.iAppUi = this;
+	stacked.iControl = keys;
+	stacked.iView = iView;
+	CleanupStack::PushL(TCleanupItem(WebTestUnstack, &stacked));
+	AddToStackL(keys, ECoeStackPriorityAlert, ECoeStackFlagRefusesFocus);
+	iView->iTesting = ETrue;
+	iEikonEnv->BusyMsgL(busy, EHLeftVBottom, TTimeIntervalMicroSeconds32(0));
+	s->test_state = PW_TEST_RUNNING;
+	iView->Command(PW_CMD_TEST, KWebTestUrl);
+	TPwTestWait wait;
+	wait.iShared = s;
+	wait.iKeys = keys;
+	wait.iTicks = 0;
+	wait.iEnded = EFalse;
+	tick->Start(KWebTestTickUs, KWebTestTickUs, TCallBack(WebTestTick, &wait));
+	CActiveScheduler::Start();           // until the page has come or not, Esc, or the limit
+	tick->Cancel();
+	TInt state = s->test_state;
+	if (state == PW_TEST_RUNNING)
+		{
+		iView->Command(PW_CMD_STOP, KNullDesC);   // Esc, the limit, or the app closing
+		s->test_state = PW_TEST_STOPPED;
+		}
+	iEikonEnv->BusyMsgCancel();
+	CleanupStack::PopAndDestroy(3);      // unstack, tick, keys
+	if (!wait.iEnded)
+		{
+		CActiveScheduler::Stop();        // someone else's stop (the app closing): passed on
+		return;
+		}
+	TBuf<PG_LT_LINE> line;
+	if (linkOk == 2 && (state == PW_TEST_OK || (state == PW_TEST_FAILED
+		&& s->test_kind != PW_PROB_PORT_BUSY && s->test_kind != PW_PROB_NO_LINK && s->test_kind != PW_PROB_OTHER)))
+		{
+		// the serial port was held by PsiWeb's own connection, which reached
+		// a server just now: the link's "in use" lines were about us
+		aTest->nlines = 0;
+		pg_lt_add_line(aTest, "PsiWeb's own connection has the serial port and the modem");
+		}
+	if (state == PW_TEST_OK)
+		{
+		TInt ms = s->test_ms;
+		if (ms < 10000)
+			line.Format(_L("A page came %S from GitHub in %d.%d s - the web works"), &route, ms / 1000, (ms % 1000) / 100);
+		else
+			line.Format(_L("A page came %S from GitHub in %d s - the web works"), &route, (ms + 500) / 1000);
+		}
+	else if (state == PW_TEST_FAILED)
+		line.Format(_L("No page came %S from GitHub"), &route);
+	else
+		line = _L("Stopped before a page came from GitHub");
+	TBuf8<PG_LT_LINE> l8;
+	l8.Copy(Clip(line, PG_LT_LINE - 1));
+	pg_lt_add_line(aTest, (const char*)l8.PtrZ());
+	if (state == PW_TEST_FAILED)
+		pg_lt_add_line(aTest, s->test_why);
 	}
 
 TInt StyleNow(const TPwSettings& aS)

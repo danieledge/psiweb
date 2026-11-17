@@ -5,6 +5,10 @@ driver, ARM code from the 1999 EPOC GCC) in an ARM emulator on a PC.
 A copy of web/emu/run_psiweb.py (NetSurf's harness) with, in addition:
   --images         the app's "Show pictures" setting is on at start
   --style N        View > Page style: 0 Full, 1 Lighter, 2 Reader, 3 Text only (0.86)
+  --keep-cookies   Preferences > Cookies: Kept for next time (0.89), in PW_CDISK's
+                   System/Apps/PsiWeb/cookies.txt
+  --busy           log the busy message's figures (0.89: psiweb.h load_host,
+                   load_kb, pics_done, pics_all) as they change
   --netbook        the netBook's screen: 640x480 in EPOC's 256 colours (screenshots in colour)
   --progress       log the toolband's progress figure (psiweb.h progress) as it changes
   --heap-limit N   psiweb's heap limit in bytes (default 10 MB, as on the
@@ -54,6 +58,13 @@ def optval(name):
     return args[args.index(name) + 1] if name in args and args.index(name) + 1 < len(args) else None
 RECORD, REPLAY = optval("--record"), optval("--replay")
 RATE = float(optval("--rate")) if optval("--rate") else 0
+# (0.89) --latency MS: with --replay, each answer (the data after a request)
+# and each new connection waits MS of virtual time first: the round trip and
+# the server's time, which a single connection pays one after another
+LATENCY = float(optval("--latency")) / 1000.0 if optval("--latency") else 0
+# (0.89) --mips N: the virtual clock's speed (standard 15, the 5mx; the
+# netBook's StrongARM does about 5 times as much)
+MIPS = float(optval("--mips")) * 1e6 if optval("--mips") else 15e6
 VCLOCK = bool(REPLAY) or "--vclock" in args
 if VCLOCK:
     COUNT = True
@@ -69,6 +80,8 @@ STYLE = int(optval("--style") or 0)
 # --netbook: the netBook's screen, 640x480 in EPOC's 256 colours
 NETBOOK = "--netbook" in args
 PROGRESS = "--progress" in args       # log the progress figure as it changes
+KEEP_COOKIES = "--keep-cookies" in args   # (0.89) pwb_keep_cookies
+BUSY = "--busy" in args                   # (0.89) log the busy message's figures
 HEAP_LIMIT = 10 * 1024 * 1024
 if "--heap-limit" in args:
     HEAP_LIMIT = int(args[args.index("--heap-limit") + 1])
@@ -77,7 +90,7 @@ PROFILE_N = int(os.environ.get("PROFILE_N", "40"))
 JSON = None
 if "--json" in args:
     JSON = args[args.index("--json") + 1]
-OPTVALS = [args[i + 1] for i, a in enumerate(args) if a in ("--proxy", "--trace", "--heap-limit", "--json", "--callers", "--record", "--replay", "--incl", "--rate", "--style") and i + 1 < len(args)]
+OPTVALS = [args[i + 1] for i, a in enumerate(args) if a in ("--proxy", "--trace", "--heap-limit", "--json", "--callers", "--record", "--replay", "--incl", "--rate", "--style", "--latency", "--mips") and i + 1 < len(args)]
 SCRIPT = [a for a in args if not a.startswith("--") and a not in OPTVALS][0]
 
 MAP = open(os.path.join(BUILD, "psiweb-emu.map")).read()
@@ -126,7 +139,7 @@ if REPLAY:
 def now():
     """the clock the Psion code sees: real, or virtual (--replay/--vclock)"""
     if VCLOCK:
-        return VT["t0"] + insns[0] / 15e6 + VT["slept"]
+        return VT["t0"] + insns[0] / MIPS + VT["slept"]
     return time.time()
 def sleep(s):
     if VCLOCK: VT["slept"] += s
@@ -176,7 +189,8 @@ def page_start(what):
     page_end()
     cur.clear()
     cur.update(what=what, insn0=insns[0], in0=net_bytes["in"], out0=net_bytes["out"],
-               dials0=net_bytes["dials"], t0=time.time(), heap_peak=0, heap_end=0, fails=0)
+               dials0=net_bytes["dials"], t0=time.time(), heap_peak=0, heap_end=0, fails=0,
+               vt0=now(), slept0=VT["slept"], waits0=state.get("waits", 0))
     # the heap peak from here on: links_rt.c's counters, read directly
     live = struct.unpack("<I", rd(sym("rh_live"), 4))[0]
     wr(sym("rh_page_peak"), struct.pack("<I", live))
@@ -205,6 +219,14 @@ def page_end():
         for f, v in sorted(INCL["acc"].items(), key=lambda x: -x[1]):
             print("  %8.1fM %5.1f%%  %s" % (v / 1e6, 100.0 * v / max(n, 1), f))
         rec["incl"] = dict(INCL["acc"])
+    if VCLOCK and cur.get("vt_idle"):
+        # (0.89) the page's time on the virtual clock, to the last time it
+        # stopped being busy, and how much of it was waiting for the network
+        rec["vsecs"] = round(cur["vt_idle"] - cur["vt0"], 2)
+        rec["vwait"] = round(cur["slept_idle"] - cur["slept0"], 2)
+        rec["answers"] = cur["waits_idle"] - cur["waits0"]
+        log("[vclock] %s: %.2f s at %.0f MIPS, %.2f s of it waiting, %d answers" %
+            (rec["what"], rec["vsecs"], MIPS / 1e6, rec["vwait"], rec["answers"]))
     log("[page] %s: %.1fM instructions (~%.1f s at 15 MIPS), heap peak %d KB, %d bytes in, %d out, %d dials, %d failed allocations" %
         (rec["what"], n / 1e6, n / 15e6, rec["heap_peak"] // 1024, rec["bytes_in"], rec["bytes_out"], rec["dials"], rec["alloc_fails"]))
 
@@ -259,6 +281,25 @@ def answer_step():
     state["answer"] = None
     return True
 
+def shared_off(i):
+    return struct.unpack("<i", rd(sym("emu_ask_offsets") + 4 * i, 4))[0]
+
+def shared_watch():
+    """(0.89) Test the connection's web part as it ends (test_*), and with
+    --busy the busy message's figures (load_host, load_kb, pics_*)"""
+    sh = struct.unpack("<I", rd(sym("emu_shared"), 4))[0]
+    i32 = lambda i: struct.unpack("<i", rd(sh + shared_off(i), 4))[0]
+    t = i32(10)
+    if t != state.get("test_state", 0):
+        state["test_state"] = t
+        names = {0: "idle", 1: "running", 2: "ok", 3: "failed", 4: "stopped"}
+        log("[test] %s: %d bytes in %d ms %s" % (names.get(t, t), i32(11), i32(12), cstr(sh + shared_off(13))))
+    if BUSY:
+        f = (cstr(sh + shared_off(14)), i32(15), i32(16), i32(17))
+        if f != state.get("busyfig"):
+            state["busyfig"] = f
+            log("[busy] host %r, %d KB, pictures %d of %d" % f)
+
 def script_step():
     """runs script lines until one produces input or has to wait"""
     while state["script"] and not state["queue"] and not state["cmd"]:
@@ -277,11 +318,17 @@ def script_step():
             continue
         log(">", line)
         cmd, _, rest = line.partition(" ")
-        if cmd in ("open", "cmd"):
+        if cmd in ("open", "cmd", "test"):
             page_start(line)
         if cmd == "open":
             state["cmd"], state["arg"] = 1, rest
             state["busy"] = 1; state["last_draw"] = t
+        elif cmd == "test":                          # (0.89) Test the connection's web part
+            sh = struct.unpack("<I", rd(sym("emu_shared"), 4))[0]
+            wr(sh + shared_off(10), struct.pack("<i", 1))
+            state["test_state"] = 1
+            state["cmd"], state["arg"] = 20, rest
+            state["last_draw"] = t
         elif cmd == "cmd":
             n, _, a = rest.partition(" ")
             state["cmd"], state["arg"] = int(n), a
@@ -333,6 +380,9 @@ replay = {"n": 0, "ev": [], "i": 0, "pending": bytearray(), "close": False, "t0"
 def replay_pump():
     import base64 as _b64
     ev, i = replay["ev"], replay["i"]
+    if LATENCY and i < len(ev) and ev[i][0] == "rx" and not replay["pending"]:
+        replay["due"] = now() + LATENCY              # (0.89) an answer: a round trip first
+        state["waits"] = state.get("waits", 0) + 1
     while i < len(ev) and ev[i][0] != "tx":
         if ev[i][0] == "rx": replay["pending"] += _b64.b64decode(ev[i][1])
         else: replay["close"] = True
@@ -343,6 +393,8 @@ def replay_release():
     """moves what has 'arrived' (--rate) to the receive buffer"""
     p = replay["pending"]
     n = len(p)
+    if LATENCY and now() < replay.get("due", 0):
+        return                                       # (0.89) not here yet
     if RATE and n:
         n = min(n, int((now() - replay["t0"]) * RATE) - replay["sent"])
     if n > 0:
@@ -382,7 +434,10 @@ def pg_dial(host, port, why, maxlen):
         c = conns[replay["n"]]; replay["n"] += 1
         if (c["host"], c["port"]) != (host, port):
             log("REPLAY MISMATCH: wanted %s:%d, recorded %s:%d" % (host, port, c["host"], c["port"]))
+        if LATENCY:
+            sleep(LATENCY)                           # (0.89) the connection's own round trip
         replay.update(ev=c["ev"], i=0, pending=bytearray(), close=False, t0=now(), sent=0)
+
         net["sock"] = "replay"
         replay_pump()
         return 0
@@ -434,6 +489,18 @@ def hc(op, a, b, c, d):
     if op == 27:                                     # ftell
         return files[a].tell()
     if op == 10: return 0                            # mkdir
+    if op in (30, 31):                               # (0.89) unlink, rename
+        def pc(p):
+            p = p.replace("\\", "/")
+            if p.startswith("C:"): return os.environ.get("PW_CDISK", "/tmp/psiwebemu") + p[2:]
+            if p.startswith("D:"): return os.environ.get("PW_DDISK", "/tmp/psiwebemu-d") + p[2:]
+            return p
+        try:
+            if op == 30: os.unlink(pc(cstr(a)))
+            else: os.replace(pc(cstr(a)), pc(cstr(b)))
+            return 0
+        except OSError:
+            return u32(-1)
     if op == 11: return 0                            # getenv
     if op == 20:                                     # maths
         mathcalls[a] = mathcalls.get(a, 0) + 1
@@ -467,6 +534,7 @@ def hc(op, a, b, c, d):
     if op == 212: return 1 if IMAGES else 0          # pwb_load_images
     if op == 213: return 8 if NETBOOK else 4         # pwb_depth
     if op == 214: return STYLE                       # pwb_style (0.86)
+    if op == 215: return 1 if KEEP_COOKIES else 0    # pwb_keep_cookies (0.89)
     if op == 25:                                     # memory report
         mem.update(in_use=a, peak=b, arena=c, n=d)
         log("[heap] in use %d KB, peak %d KB" % (a // 1024, b // 1024)); return 0
@@ -474,6 +542,7 @@ def hc(op, a, b, c, d):
     if op == 200: state["fb4"] = a; return 0
     if op == 201: state["last_draw"] = now(); return 0
     if op == 202:                                    # next event
+        shared_watch()
         if PROGRESS:
             # the toolband's progress (psiweb.h progress) as the engine
             # leaves it, logged when it changes
@@ -502,6 +571,8 @@ def hc(op, a, b, c, d):
     if op == 206: log("[url]", cstr(a)); return 0
     if op == 207:
         state["busy"] = a; state["last_draw"] = now()
+        if not a and cur and "done" not in cur:
+            cur.update(vt_idle=now(), slept_idle=VT["slept"], waits_idle=state.get("waits", 0))
         if a:
             state["insn0"] = insns[0]
             log("[busy] 1")
@@ -563,6 +634,8 @@ def hc(op, a, b, c, d):
             if RATE and replay["pending"]:   # until the next byte is due
                 due = replay["t0"] + (replay["sent"] + 1) / RATE - now()
                 wait = min(wait, max(due, 0.001))
+            if LATENCY and replay["pending"] and now() < replay.get("due", 0):
+                wait = min(wait, max(replay["due"] - now(), 0.001))
             sleep(wait)
             replay_release()
             return 1 if (net["rx"] or net["closed"]) else 0

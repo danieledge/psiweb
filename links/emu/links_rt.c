@@ -21,7 +21,7 @@ enum {
 	HC_EXIT = 1, HC_TIME, HC_GETTIMEOFDAY, HC_FOPEN, HC_FCLOSE, HC_FREAD,
 	HC_FWRITE, HC_FSEEK, HC_FGETC, HC_MKDIR, HC_GETENV, HC_SETENV,
 	HC_MATH = 20, HC_STRTOD, HC_LOCALTIME, HC_MKTIME, HC_STRFTIME, HC_MEM,
-	HC_FTELL, HC_LOG, HC_PAGEMEM = 40
+	HC_FTELL, HC_LOG, HC_UNLINK = 30, HC_RENAME, HC_PAGEMEM = 40
 };
 
 /* ------------------------------------------------------------- memory
@@ -350,8 +350,10 @@ int stat(const char *p, struct stat *st) { (void)p; (void)st; err = 2; return -1
 int access(const char *p, int m) { (void)p; (void)m; return -1; }
 int mkdir(const char *p, int m) { (void)m; return emu_hc(HC_MKDIR, (int)p, 0, 0, 0); }
 int rmdir(const char *p) { (void)p; return -1; }
-int unlink(const char *p) { (void)p; return -1; }
-int rename(const char *a, const char *b) { (void)a; (void)b; return -1; }
+/* (0.89) unlink and rename for Links' config files (cookies.txt: Preferences >
+   Cookies, Kept for next time), in the PC folders that stand for C: and D: */
+int unlink(const char *p) { return emu_hc(HC_UNLINK, (int)p, 0, 0, 0); }
+int rename(const char *a, const char *b) { return emu_hc(HC_RENAME, (int)a, (int)b, 0, 0); }
 void *opendir(const char *p) { (void)p; return 0; }
 void *readdir(void *d) { (void)d; return 0; }
 int closedir(void *d) { (void)d; return 0; }
@@ -359,8 +361,9 @@ int closedir(void *d) { (void)d; return 0; }
    hypercall; descriptors 30 to 37 (Links checks them against FD_SETSIZE,
    and psi_os.c's own start at 40) */
 static int wfd[8];
-int open(const char *p, int fl, ...) { int h, i; if (!(fl & 3)) { err = 2; return -1; } for (i = 0; i < 8 && wfd[i]; i++) ; if (i == 8) { err = 24; return -1; } h = emu_hc(HC_FOPEN, (int)p, (int)"wb", 0, 0); if (h < 0) { err = 2; return -1; } wfd[i] = h + 1; return 30 + i; }
-int read(int fd, void *b, size_t n) { (void)fd; (void)b; (void)n; return -1; }
+/* (0.89) and for reading (Links' config files: cookies.txt) */
+int open(const char *p, int fl, ...) { int h, i; for (i = 0; i < 8 && wfd[i]; i++) ; if (i == 8) { err = 24; return -1; } h = emu_hc(HC_FOPEN, (int)p, (int)((fl & 3) ? "wb" : "rb"), 0, 0); if (h < 0) { err = 2; return -1; } wfd[i] = h + 1; return 30 + i; }
+int read(int fd, void *b, size_t n) { if (fd >= 30 && fd < 38 && wfd[fd - 30]) { int r = emu_hc(HC_FREAD, wfd[fd - 30] - 1, (int)b, n, 0); return r < 0 ? -1 : r; } (void)b; (void)n; return -1; }
 int write(int fd, const void *b, size_t n) { if (fd >= 30 && fd < 38 && wfd[fd - 30]) { int r = emu_hc(HC_FWRITE, wfd[fd - 30] - 1, (int)b, n, 0); return r < 0 ? -1 : r; } (void)b; return n; }
 int close(int fd) { if (fd >= 30 && fd < 38 && wfd[fd - 30]) emu_hc(HC_FCLOSE, wfd[fd - 30] - 1, 0, 0, 0), wfd[fd - 30] = 0; return 0; }
 long lseek(int fd, long o, int w) { (void)fd; (void)o; (void)w; return -1; }

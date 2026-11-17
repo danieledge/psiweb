@@ -45,6 +45,11 @@ typedef struct
  * for even the page's frame). */
 int pw_problem_html(char *aOut, int aMax, const char *aUrl, int aKind, const char *aConnWhy, const PwRoute *aRoute);
 
+/* (0.89) The likely cause in one short line, for the Test the connection
+ * window (at most PW_PROBLEM_SHORT_MAX bytes with its 0) */
+#define PW_PROBLEM_SHORT_MAX 72
+const char *pw_problem_short(int aKind, const PwRoute *aRoute);
+
 /* The engine side (psi_drv.c): the page is kept here until shown */
 #define PW_PROBLEM_MAX 3072
 #endif

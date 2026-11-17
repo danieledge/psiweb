@@ -125,6 +125,27 @@ static const char *cause(int aKind, const PwRoute *r)
 	}
 }
 
+/* (0.89) The same causes in a line of the Test the connection window
+   (PW_PROBLEM_SHORT_MAX with its 0) */
+const char *pw_problem_short(int aKind, const PwRoute *r)
+{
+	int helper = r && r->use_proxy && r->proxy_host && r->proxy_host[0];
+	switch (aKind) {
+	case PW_PROB_PORT_BUSY:  return "Another program has the serial port";
+	case PW_PROB_NO_LINK:    return "There is no connection";
+	case PW_PROB_NAME:       return "The name was not found - the connection may have no name servers";
+	case PW_PROB_REFUSED:    return helper ? "Refused - the web helper may not be running" : "The server refused the connection";
+	case PW_PROB_TIMEOUT:    return "No answer in time - the connection may be slow or down";
+	case PW_PROB_TLS:        return "The secure connection was refused";
+	case PW_PROB_CERT:       return "The site's certificate was not trusted";
+	case PW_PROB_CERT_DATE:  return "The certificate's dates and the Psion's clock disagree (Time, Ctrl+T)";
+	case PW_PROB_BROKE:      return "The connection broke part way";
+	case PW_PROB_BAD_ANSWER: return "The answer made no sense - the site may be down";
+	case PW_PROB_NOT_FOUND:  return "The file was not found on the Psion";
+	default:                 return "The page did not come";
+	}
+}
+
 int pw_problem_html(char *aOut, int aMax, const char *aUrl, int aKind, const char *aConnWhy, const PwRoute *aRoute)
 {
 	Out o;

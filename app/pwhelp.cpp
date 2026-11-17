@@ -29,7 +29,10 @@ static const TPwHelpTopic KHelpTopics[] =
 	  "\n"
 	  "Tools > Set up PsiWeb chooses how the Psion goes online and how pages reach it, the first "
 	  "time PsiWeb starts and whenever you like. A page that cannot be opened says why, with Try "
-	  "again, Test the connection and Set up PsiWeb on it.",
+	  "again, Test the connection and Set up PsiWeb on it. Test the connection checks the modem "
+	  "or the network, then fetches a small file from GitHub by the way pages come, and says "
+	  "whether it came. While a page opens, the message at the bottom left says by which way: "
+	  "direct, through the Atom or through PsiProxy.",
 	  "On the netBook the toolband is shown and the toolbar hidden, so the page has the whole "
 	  "screen, in colour.",
 	  "On the Series 5mx the toolbar is shown on the right; View > Show > Toolband (Shift+Ctrl+T) "
@@ -128,10 +131,12 @@ static const TPwHelpTopic KHelpTopics[] =
 	  "Up and Down scroll a line; Fn+Up and Fn+Down (Pg Up and Pg Dn) a screen; Go > Top of page and "
 	  "End of page go to the ends. Tap a link to follow it, a field to type in it, a button to press "
 	  "it; once a field is chosen, type into it. Left and Right scroll a wide page sideways. The "
-	  "scroll bar beside the page works with the pen.\n"
+	  "scroll bar beside the page, there while the page is longer than the screen, works with "
+	  "the pen.\n"
 	  "\n"
 	  "View > Zoom in and Zoom out (Ctrl+M and Shift+Ctrl+M, or the Zoom icons beside the screen) "
-	  "go round the sizes from 50% to 200%; Normal size is 100%.\n"
+	  "go round the sizes from 50% to 200%; Normal size is 100%. Each machine keeps its own size, "
+	  "so settings copied from a 5mx to a netBook do not bring the 5mx's along.\n"
 	  "\n"
 	  "View > Show pictures (Ctrl+I, or the Pictures button) fetches the pictures of the page "
 	  "showing, and takes them away again; the button stays pressed in while they show. Pictures "

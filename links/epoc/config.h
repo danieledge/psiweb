@@ -76,7 +76,11 @@
 #define HAVE_MEMSET 1
 #define HAVE_GCC_ASSEMBLER 1
 
-#define RENAME_OVER_EXISTING_FILES 1
+/* (0.89) not RENAME_OVER_EXISTING_FILES: EPOC's rename() does not replace
+ * a file that is there (RFs::Rename), so Links' config files (cookies.txt,
+ * Preferences > Cookies > Kept for next time) were written once and never
+ * again. Without it, Links deletes the old file first (default.c
+ * write_to_config_file). */
 
 /* no IPv6, no threads, no fork for DNS: every connection goes through
  * psiglue (core/web/engine/pwnet.c), which also resolves the name */

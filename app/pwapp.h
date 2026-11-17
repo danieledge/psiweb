@@ -37,6 +37,7 @@ extern "C" {
 #include <psiweb.rsg>
 #include "psiweb.hrh"
 #include "pgsetup.h"           // (0.85) the setup assistant (core/ssh)
+#include "pglinktest.h"        // (0.89) PgLinkTest: Test the connection with its web part
 
 const TUid KUidPsiWeb = { 0x01000A7A };
 
@@ -184,6 +185,7 @@ private:
 	// the page is: psiweb.h page_*)
 	void LayoutL();                          // the bar and the page's room in Rect()
 	void UpdateScrollBarL();                 // the thumb where the engine says the page is
+	void ShowScrollBar(TBool aShow);         // (0.89) only while the page does not fit
 	void ScrollTo(TInt aY);
 	void HandleScrollEventL(CEikScrollBar* aScrollBar, TEikScrollEvent aEventType);
 	TInt CountComponentControls() const;
@@ -254,6 +256,15 @@ private:
 	TBool iSbPen;              // the pen went down on the bar: its events are the bar's
 	TInt iPics;                // page_pics last seen (-1: not yet)
 	TBool iLastBusy;           // busy at the last tick: a fall is a page loaded (History)
+	// (0.89) the busy message says the route: "Opening bbc.co.uk through
+	// PsiProxy - 64 KB...", in place of the link's routine notes
+	void LoadBusyL();
+	TBool iLoadBusy;           // that message is up
+	TBuf<100> iLoadShown;      // ...what it says
+	TUint iLoadAt;             // ...and when it last changed (tick count)
+	TBool iSbShown;            // (0.89) the scroll bar shows: only when the page does not fit
+public:
+	TBool iTesting;            // (0.89) Test the connection's web part runs: the link's routine notes are not shown
 	};
 
 // A page or the proxy needs a user name and password (HTTP authentication,
@@ -534,6 +545,10 @@ private:
 	TBuf<16> iRouteShown;               // (0.86) what the route light says
 	TUint iFullBusyAt;                  // (0.88) "Opening in PsiTerm..." went up (0: not up)
 	TInt iLockShown;                    // ...and whether its padlock is shut (-1: not yet)
+	TInt iOtherZoom;                    // (0.89) the other machine's zoom in PsiWeb.ini (0: none), kept
+	                                    // as it was: zoom is remembered per machine
+public:
+	void WebTestL(PgLinkTest* aTest);   // (0.89) Test the connection's web part
 	};
 
 class CPwDocument : public CEikDocument
