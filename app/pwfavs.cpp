@@ -43,7 +43,7 @@ static void ClipPx(TDes& aText, const CFont& aFont, TInt aWidth)
 // a page worth keeping: not empty, not one of PsiWeb's own about: pages
 static TBool RealUrl(const TDesC& aUrl)
 	{
-	return aUrl.Length() > 0 && aUrl.Left(6).CompareF(_L("about:")) != 0;
+	return aUrl.Length() > 0 && Clip(aUrl, 6).CompareF(_L("about:")) != 0;   // (Left(6) of a shorter text panics)
 	}
 
 // the name an entry is shown by: its title, or its address when it has none

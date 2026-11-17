@@ -2381,7 +2381,7 @@ void CPwAppUi::HandleCommandL(TInt aCommand)
 			{
 			TBuf<16> u;
 			FromUtf8(u, sh->url);
-			if (u.Length() == 0 || u.Left(6).Compare(_L("about:")) == 0)
+			if (u.Length() == 0 || Clip(u, 6).Compare(_L("about:")) == 0)   // (Left(6) of a shorter text panics)
 				iEikonEnv->InfoMsg(_L("No pictures to show"));
 			else
 				{
