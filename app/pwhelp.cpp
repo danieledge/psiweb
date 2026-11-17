@@ -49,7 +49,7 @@ static const TPwHelpTopic KHelpTopics[] =
 	  "checked by the Psion itself and nobody in between sees the page. Fast on a network card; "
 	  "slow for big sites over a modem. JPEG, PNG and GIF pictures; some newer kinds show as a box. "
 	  "Works wherever the Psion is online. Direct through the PsiConnect Atom with Modem provides "
-	  "TLS on (PsiMail's Connection settings), the Atom makes the secure connection and checks the "
+	  "TLS on (Set up PsiWeb sets it for the Atom; PsiMail's Connection settings), the Atom makes the secure connection and checks the "
 	  "site instead, which is much quicker; the route light then says Atom.\n"
 	  "\n"
 	  "Atom modem helper: the PsiConnect Atom fetches pages and makes them lighter, about three "

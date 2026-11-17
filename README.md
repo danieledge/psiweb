@@ -14,16 +14,20 @@ A web browser for the **Psion Series 5mx**, the **netBook** and the **Series 7**
 
 Up to 0.61 the engine was NetSurf. Its sources are still in the tree as a fallback (see *The NetSurf engine* below), until Links has been proved on the device. The whole port is described in [`links/PORTING.md`](links/PORTING.md).
 
-**Status: beta (0.90).** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
+**Status: beta (0.91).** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
 
 [![Download PsiWeb.sis](https://img.shields.io/badge/Download-PsiWeb.sis-2ea44f?logo=github)](https://github.com/danieledge/psiterm/raw/main/dist/PsiWeb.sis)
+
+## What's new in 0.91
+
+- **Set up PsiWeb sets *Modem provides TLS* for the Atom.** PsiWeb's own setup assistant now sets the shared connection setting *Modem provides TLS* from the way online chosen, exactly as PsiMail's assistant does: on for the Atom modem, off for another modem. Someone who uses only PsiWeb, direct through the Atom, no longer gets PsiWeb's TLS wrapped inside the Atom's (the site answered "400 Bad Request"). Only that existing setting is set; nothing else in the connection settings changed, and Cancel still changes nothing. In the 5mx emulator (`net.py atomtls`), OK on the assistant's standard choices for a 5mx (the Atom modem, Direct) is now enough for https://example.com/ to come through the Atom's own TLS.
 
 ## What's new in 0.90
 
 - **Direct https through the Atom works.** The PsiConnect Atom, with its standard `AT$TLS=1`, makes the secure connection itself when it is dialled on port 443, and hands the Psion the page in plain. PsiWeb did its own TLS on top of that, so every direct `https://` page through the Atom failed. PsiWeb now honours the shared connection setting *Modem provides TLS* (PsiLink.ini, set in PsiMail's Connection settings and by PsiMail's setup assistant for the Atom), as PsiMail does: on the modem route with it on, an `https://` address on port 443 goes to the Atom in plain HTTP and the Atom does the TLS. The 36 MHz Psion then does no cryptography at all: in the ARM harness example.com took 2.4 million instructions (about 0.2 s on a 5mx) where PsiWeb's own TLS takes 153 million (about 10 s). Nothing in the connection settings changed. On the Psion Internet route, through a web helper, or with the setting off, PsiWeb does its own TLS as before, as it does for an `https://` address with a port of its own.
 - **Who checked the site, said truthfully.** The Atom checks the site's certificate against the Mozilla roots in its firmware and the name in it (unless its `AT$TLSV` is 0; Atom firmware 2.9 also mends a fault that left later calls unchecked after one call with `AT$TLSV=0`). On such a page the padlock is shut and the route light says *Atom* instead of *Direct*, and Page information says "Direct, checked by the Atom modem" rather than "secure, checked by this Psion". When the Atom cannot make the secure connection (an untrusted certificate, another name, a site that is down, no WiFi) it only says NO CARRIER: the *Page not opened* page then says the Atom modem could not make a secure connection, and that the Atom's log says which. Help > Ways to connect says the same.
 - **example.com and other Cloudflare sites on SSL.com's chain** were refused ("Certificate not trusted"). Their chain now ends in SSL.com TLS ECC Root CA 2022, which psion-core's built-in roots did not have (the cross-signed copy they also send leads to AAA Certificate Services, which Mozilla's list no longer has). SSL.com TLS ECC Root CA 2022 and its RSA sibling were added from Mozilla's list (psion-core 4ea0c67, about 1 KB). PsiMail and PsiSync share the roots and get them with their next build.
-- Not changed: PsiWeb's own setup assistant still leaves *Modem provides TLS* as it finds it (it is PsiMail's setting); someone who uses only PsiWeb, direct through the Atom, sets it with PsiMail's Connection settings or turns the Atom's TLS off (`AT$TLS=0`).
+- Not changed in 0.90: PsiWeb's own setup assistant still left *Modem provides TLS* as it found it; 0.91 sets it (above).
 
 ## What's new in 0.89
 

@@ -103,7 +103,7 @@ static void SaveSharedLink(RFs& aFs, const TPwSettings& aSettings)
 
 _LIT(KEngineExe, "psiweb.exe");
 _LIT(KIniFile, "C:\\System\\Apps\\PsiWeb\\PsiWeb.ini");
-_LIT(KVersion, "0.90");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
+_LIT(KVersion, "0.91");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
 _LIT(KDefaultHome, "http://68k.news/");
 const TInt KZoomSteps[] = { 50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200 };
 const TInt KZoomCount = 11;
@@ -3045,6 +3045,15 @@ void CPwSetupDialog::AppSaveL()
 	iSettings.iSearch = ChoiceListCurrentItem(EPwDlgSuSearch) == 1 ? PW_SEARCH_FROGFIND : PW_SEARCH_DDG;
 	TInt style = ChoiceListCurrentItem(EPwDlgSuStyle);
 	iSettings.iStyle = iStyleChosen || style != StandardStyle(Choice()) ? style : -1;
+	// (0.91) "Modem provides TLS", in the shared PsiLink.ini, as PsiMail's
+	// assistant sets it: on for the Atom modem, off for another one (the
+	// Atom does the TLS on 443, so PsiWeb must not wrap its own inside)
+	RFs& fs = iEikonEnv->FsSession();
+	TPsiLink link;
+	link.SetDefaults();
+	link.Load(fs);
+	link.iModemTls = Choice().conn == PG_SU_CONN_ATOM ? 1 : 0;
+	link.Save(fs);
 	}
 
 TInt CPwAppUi::SetupCallback(TAny* aSelf)
