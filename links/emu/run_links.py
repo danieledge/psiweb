@@ -13,6 +13,11 @@ A copy of web/emu/run_psiweb.py (NetSurf's harness) with, in addition:
                    on (implies --modem): see ATOM_TLS below
   --netbook        the netBook's screen: 640x480 in EPOC's 256 colours (screenshots in colour)
   --progress       log the toolband's progress figure (psiweb.h progress) as it changes
+  --wakes          (0.93) PsiWeb.app's wake-ups as on the Psion: a key or a tap
+                   sets net.resized, Stop (cmd 5) net.quit and net.resized, the
+                   engine's network waits end on them (pg_wait's 4 and 8), and the
+                   script goes on while the engine waits for the network, so a key
+                   or Stop can come in the middle of a read
   --heap-limit N   psiweb's heap limit in bytes (default 10 MB, as on the
                    Psion); malloc fails above it
   --profile [N]    instructions per function (needs --count): the top N
@@ -44,7 +49,8 @@ else is the exact ARM code that goes into psiweb.exe.
     run_psiweb.py [--count] [--proxy host:port] SCRIPT
 
 Script lines: as fb/pwhost.c (open URL, idle [ms], wait ms, key N,
-type TEXT, pen X Y, cmd N [arg], shot FILE.png, quit).
+type TEXT, pen X Y, cmd N [arg], shot FILE.png, quit), and (0.93) until
+TEXT: wait until the status line has TEXT in it.
 --count counts ARM instructions to estimate the time on a 36 MHz Psion.
 """
 import os, re, sys, time, socket, select, struct, math
@@ -91,6 +97,7 @@ STYLE = int(optval("--style") or 0)
 # --netbook: the netBook's screen, 640x480 in EPOC's 256 colours
 NETBOOK = "--netbook" in args
 PROGRESS = "--progress" in args       # log the progress figure as it changes
+WAKES = "--wakes" in args             # (0.93) net.resized and net.quit as PsiWeb.app sets them
 KEEP_COOKIES = "--keep-cookies" in args   # (0.89) pwb_keep_cookies
 BUSY = "--busy" in args                   # (0.89) log the busy message's figures
 HEAP_LIMIT = 10 * 1024 * 1024
@@ -295,6 +302,26 @@ def answer_step():
 def shared_off(i):
     return struct.unpack("<i", rd(sym("emu_ask_offsets") + 4 * i, 4))[0]
 
+# (0.93) --wakes: the fields PsiWeb.app sets to wake or stop the engine
+SH_QUIT, SH_RESIZED, SH_QUITTING = 18, 19, 20
+SH_AT = {}
+def sh_addr(i):
+    if i not in SH_AT:          # (sym searches the map: once)
+        SH_AT[i] = struct.unpack("<I", rd(sym("emu_shared"), 4))[0] + shared_off(i)
+    return SH_AT[i]
+def sh_get(i):
+    return struct.unpack("<i", rd(sh_addr(i), 4))[0]
+def sh_set(i, v):
+    wr(sh_addr(i), struct.pack("<i", v))
+def app_wake(stop=False):
+    """what PsiWeb.app does with each key, tap and command (CPwView::Command,
+    SendEvent): net.resized wakes the engine's wait; Stop sets net.quit too"""
+    if not WAKES:
+        return
+    if stop:
+        sh_set(SH_QUIT, 1)
+    sh_set(SH_RESIZED, 1)
+
 def shared_watch():
     """(0.89) Test the connection's web part as it ends (test_*), and with
     --busy the busy message's figures (load_host, load_kb, pics_*)"""
@@ -320,6 +347,9 @@ def script_step():
         if state["wait_until"] and t < state["wait_until"]:
             return
         state["wait_until"] = 0
+        if state.get("until") and state["until"] not in state.get("status", ""):
+            return
+        state["until"] = None
         if state["idle"] is not None:
             if state["busy"] or not state["ready"] or t - state["last_draw"] < state["idle"]:
                 return
@@ -331,6 +361,8 @@ def script_step():
         cmd, _, rest = line.partition(" ")
         if cmd in ("open", "cmd", "test"):
             page_start(line)
+        if cmd in ("key", "type", "pen") or (cmd == "cmd" and rest.split()[0] == "5"):
+            app_wake(stop=cmd == "cmd")
         if cmd == "open":
             state["cmd"], state["arg"] = 1, rest
             state["busy"] = 1; state["last_draw"] = t
@@ -350,6 +382,8 @@ def script_step():
             page_start(rest or "mark")
         elif cmd == "wait":
             state["wait_until"] = t + int(rest) / 1000.0
+        elif cmd == "until":                         # (0.93) until the status line says TEXT
+            state["until"] = rest
         elif cmd == "key":
             state["queue"] += [(1, int(rest), 0, 0), (2, int(rest), 0, 0)]
         elif cmd == "type":
@@ -590,8 +624,10 @@ def hc(op, a, b, c, d):
         c_ = state["cmd"]
         if c_:
             wr(a, state["arg"].encode()[:b - 1] + b"\0"); state["cmd"] = 0
+            if WAKES and not sh_get(SH_QUITTING):
+                sh_set(SH_QUIT, 0)                   # as pwepoc.cpp's pwb_take_command
         return c_
-    if op == 204: log("[status]", cstr(a)); return 0
+    if op == 204: state["status"] = cstr(a); log("[status]", state["status"]); return 0
     if op == 205: log("[title]", cstr(a)); return 0
     if op == 206: log("[url]", cstr(a)); return 0
     if op == 207:
@@ -651,6 +687,8 @@ def hc(op, a, b, c, d):
     if op == 305:                                    # wait(ms, net, kbd)
         ms = s32(a)
         if not b: sleep(max(ms, 0) / 1000.0); return 0
+        if WAKES:
+            return wake_wait(ms)
         if net["rx"] or net["closed"]: return 1
         if REPLAY:
             replay_release()
@@ -672,6 +710,32 @@ def hc(op, a, b, c, d):
         wr(a, data); return len(data)
     log("unknown hypercall", op)
     return 0
+
+def wake_wait(ms):
+    """(0.93) --wakes: pg_wait(ms, net) as psiglue's: 1 data or closed, 4
+    net.resized, 8 net.quit, at once while they are set; the script goes on
+    meanwhile (PsiWeb.app's keys and Stop come while the engine waits)"""
+    end = now() + (60 if ms < 0 else ms / 1000.0)
+    while True:
+        if REPLAY:
+            replay_release()
+        m = (1 if (net["rx"] or net["closed"]) else 0) | (4 if sh_get(SH_RESIZED) else 0) | (8 if sh_get(SH_QUIT) else 0)
+        if m:
+            return m
+        left = end - now()
+        if left <= 0:
+            return 0
+        script_step()
+        if sh_get(SH_RESIZED) or sh_get(SH_QUIT):
+            continue
+        step = min(left, 0.02)
+        if REPLAY:
+            if RATE and replay["pending"]:
+                due = replay["t0"] + (replay["sent"] + 1) / RATE - now()
+                step = min(step, max(due, 0.001))
+            sleep(step)
+        else:
+            rx_fill(step)
 
 SYMS = sorted((int(m.group(1), 16), m.group(2)) for m in re.finditer(r"0x([0-9a-f]+)\s+(\S+)\s*$", MAP, re.M))
 # every function, static ones too, from arm-pe-nm (the map has only globals)

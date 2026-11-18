@@ -808,6 +808,18 @@ void psi_msg_box(unsigned char *title, unsigned char *text)
 	psi_infoprint(line);
 }
 
+/* (0.93) psi_os.c: Stop ended a read on the connection (it fails with a
+   connection error, as Links cannot be told "interrupted" from a read) */
+static int psi_stopped_read(void)
+{
+#ifdef PSI_EPOC
+	extern int psi_net_take_stopped(void);
+	return psi_net_take_stopped();
+#else
+	return 0;
+#endif
+}
+
 /* psi_os.c: a connection could not be made, and pwn said why */
 void psi_conn_failed(const char *why)
 {
@@ -857,7 +869,7 @@ static void psi_test_end(struct status *st, void *data)
 	if (st->state == S__OK) {
 		s->test_why[0] = 0;
 		s->test_state = PW_TEST_OK;
-	} else if (st->state == S_INTERRUPTED) {
+	} else if (st->state == S_INTERRUPTED || psi_stopped_read()) {
 		s->test_state = PW_TEST_STOPPED;
 	} else {
 		struct session *ses = psi_ses();
@@ -956,7 +968,7 @@ void psi_load_failed(unsigned char *why, struct session *ses, unsigned char *url
 	int kind;
 	(void)ses;
 	if (!why) why = cast_uchar "";
-	if (!casestrcmp(why, cast_uchar "Interrupted")) {
+	if (!casestrcmp(why, cast_uchar "Interrupted") || psi_stopped_read()) {
 		if (!psi_cmd_sent || get_time() - psi_cmd_sent > 2000) psi_infoprint("Stopped");
 		psi_cmd_sent = 0;
 		psi_conn_why[0] = 0;

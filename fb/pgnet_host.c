@@ -28,6 +28,7 @@ int pg_link_is_open(void) { return g_fd >= 0; }
 int pg_link_keep(void) { const char *k = getenv("PG_LINK_KEEP"); return k && *k == '1'; }
 void pg_link_suspect(void) { }              /* (no Psion Internet link on a PC) */
 int pg_net_closed(void) { return g_closed; }     /* (0.54) the link says the far end has gone */
+int pg_net_closed_why(void) { return 0; }      /* (psion-core: why it closed; 0 = a clean close) */
 
 int pg_dial(char *why, int max)
 {

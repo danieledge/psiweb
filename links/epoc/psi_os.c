@@ -274,6 +274,7 @@ static struct {
 } pfd[PSI_NFD];
 static int live_fd = -1;
 static int net_eof;		/* pg_wait said "net" with nothing to read: closed */
+static int psi_read_stopped;	/* (0.93) a read ended by Stop: psi_net_take_stopped */
 unsigned long psi_net_bytes_in, psi_net_bytes_out, psi_net_connects;
 
 static int pidx(int fd)
@@ -310,6 +311,7 @@ int psi_sock_connect(unsigned char *host, int port, int tls, unsigned char **why
 	int fd, i, atom;
 
 	end_live();
+	psi_read_stopped = 0;
 	fd = palloc(PF_SOCK);
 	if (fd < 0) return -1;
 	snprintf(msg, sizeof(msg), "Connecting to %s", (char *)host);
@@ -365,8 +367,27 @@ int psi_read(int fd, void *buf, size_t n)
 	r = pwn_read(buf, (int)n, 30000);
 	if (r > 0) { psi_net_bytes_in += r; pfd[i].answered = 1; return r; }
 	if (r == 0) { net_eof = 1; return 0; }
-	errno = r == PWN_TIMEOUT ? ETIMEDOUT : EINTR;
+	if (r == PWN_TIMEOUT) { errno = ETIMEDOUT; return -1; }
+	/* (0.93) Stopped (PWN_CANCEL: Stop or quitting sets net.quit) or a
+	   failed read (a TLS record cut off or damaged). Never EINTR: Links
+	   reads in EINTRLOOP, which calls again at once, and net.quit stays
+	   set until the engine takes the Stop command, so a Stop during an
+	   https read went round for ever. Part of a TLS record may have been
+	   taken, so the connection is no use now: it ends here. */
+	if (r == PWN_CANCEL) psi_read_stopped = 1;
+	pwn_close(1);
+	end_live();
+	errno = ECONNRESET;
 	return -1;
+}
+
+/* (0.93) a read was stopped since the last connection was made: the page
+   that failed with it was stopped, not "not opened" (psi_drv.c) */
+int psi_net_take_stopped(void)
+{
+	int r = psi_read_stopped;
+	psi_read_stopped = 0;
+	return r;
 }
 
 int psi_write(int fd, const void *buf, size_t n)

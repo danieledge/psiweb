@@ -62,6 +62,7 @@ long pw_log_read(int old, long pos, void *b, long max) { (void)old; (void)pos; (
 int pg_link_is_open(void) { return 0; }
 int pg_link_keep(void) { return 0; }
 int pg_net_closed(void) { return 0; }
+int pg_net_closed_why(void) { return 0; }   /* (psion-core: why the link closed; 0 = a clean close) */
 void pg_link_suspect(void) { }
 int pg_net_avail(void) { return emu_hc(HP_AVAIL, 0, 0, 0, 0); }
 int pg_net_read(void *b, int m) { return emu_hc(HP_READ, (int)b, m, 0, 0); }

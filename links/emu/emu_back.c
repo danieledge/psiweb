@@ -52,7 +52,10 @@ const int emu_ask_offsets[] = {
 	/* (0.89) 10..17: Test the connection's web part, the busy message's figures */
 	(int)&((PwShared *)0)->test_state, (int)&((PwShared *)0)->test_bytes, (int)&((PwShared *)0)->test_ms,
 	(int)&((PwShared *)0)->test_why, (int)&((PwShared *)0)->load_host, (int)&((PwShared *)0)->load_kb,
-	(int)&((PwShared *)0)->pics_done, (int)&((PwShared *)0)->pics_all
+	(int)&((PwShared *)0)->pics_done, (int)&((PwShared *)0)->pics_all,
+	/* (0.93) 18..20: what PsiWeb.app sets to wake or stop the engine
+	   (run_links.py --wakes) */
+	(int)&((PwShared *)0)->net.quit, (int)&((PwShared *)0)->net.resized, (int)&((PwShared *)0)->quitting
 };
 PsiShared *pg_shared(void) { return &g_sh.net; }
 
@@ -103,6 +106,7 @@ void pw_log(const char *t) { fwrite(t, 1, strlen(t), __stderr()); fwrite("\n", 1
 int pg_link_is_open(void) { return 0; }
 int pg_link_keep(void) { return 0; }
 int pg_net_closed(void) { return 0; }
+int pg_net_closed_why(void) { return 0; }   /* (psion-core: why the link closed; 0 = a clean close) */
 void pg_link_suspect(void) { }
 int pg_net_avail(void) { return emu_hc(HP_AVAIL, 0, 0, 0, 0); }
 int pg_net_read(void *b, int m) { return emu_hc(HP_READ, (int)b, m, 0, 0); }
