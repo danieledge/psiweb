@@ -92,6 +92,12 @@ int pwb_keep_cookies(void) { return emu_hc(HB_COOKIES, 0, 0, 0, 0); }   /* (0.89
 long psi_save_max(void) { return 4194304L; }
 int pwb_zoom(void) { return 100; }
 unsigned long pwb_ms(void) { return (unsigned long)emu_hc(HB_MS, 0, 0, 0, 0); }
+/* (0.92) sleep and trim (pwepoc.cpp, psi_heap.cpp): the harness never
+   sleeps the engine, and its heap has no free end to give back */
+void pwb_set_sleep_ok(int ok) { g_sh.sleep_ok = ok; }
+int pwb_waking(void) { return g_sh.waking; }
+int pwb_sleeping(void) { return g_sh.sleeping; }
+void psi_heap_compress(void) { }
 
 int pg_dial(char *why, int max) { return emu_hc(HP_DIAL, (int)g_sh.net.host, g_sh.net.port, (int)why, max); }
 void pg_hangup(void) { emu_hc(HP_HANGUP, 0, 0, 0, 0); }
