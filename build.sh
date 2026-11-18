@@ -71,10 +71,22 @@ for l in psiweb:$HERE/app psiwebinc:$HERE psitermssh:$CORE/ssh; do
 	fi
 	ln -sfn "$dir" "$EPOCROOT/ptproj/$name"
 done
+# (0.93) The links are the SDK's, not this checkout's: another program's
+# build on the same SDK while this one runs points psitermssh at its own
+# core, and PsiWeb.app is then built from that core's sources (an older one
+# lacks pg_lt_add_line: "undefined reference", then "relocation truncated").
+# One build at a time on an SDK copy; this says so instead of a link error.
+links_ours() {
+	for l in psiweb:$HERE/app psiwebinc:$HERE psitermssh:$CORE/ssh; do
+		[ "$(readlink "$EPOCROOT/ptproj/${l%%:*}")" = "${l#*:}" ] || {
+			echo "$EPOCROOT/ptproj/${l%%:*} now points at $(readlink "$EPOCROOT/ptproj/${l%%:*}"): another build is using this SDK - build again when it is done"; return 1; }
+	done
+}
 cd "$EPOCROOT/ptproj/psiweb"
 makmake psiweb marm > "$TOP/build/psiweb-makmake.log" 2>&1
 make -f psiweb.marm rel > "$TOP/build/psiweb-app.log" 2>&1 \
-	|| { grep -i -B1 -A4 "error\|undefined" "$TOP/build/psiweb-app.log" | head -40; exit 1; }
+	|| { links_ours; grep -i -B1 -A4 "error\|undefined" "$TOP/build/psiweb-app.log" | head -40; exit 1; }
+links_ours || exit 1
 )
 
 # psihold.exe: holds the Psion Internet connection up after use (core/ssh/psihold.cpp)
