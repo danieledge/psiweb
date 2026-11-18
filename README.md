@@ -14,9 +14,20 @@ A web browser for the **Psion Series 5mx**, the **netBook** and the **Series 7**
 
 Up to 0.61 the engine was NetSurf. Its sources are still in the tree as a fallback (see *The NetSurf engine* below), until Links has been proved on the device. The whole port is described in [`links/PORTING.md`](links/PORTING.md).
 
-**Status: beta (0.91).** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
+**Status: beta (0.92).** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
 
 [![Download PsiWeb.sis](https://img.shields.io/badge/Download-PsiWeb.sis-2ea44f?logo=github)](https://github.com/danieledge/psiterm/raw/main/dist/PsiWeb.sis)
+
+## What's new in 0.92
+
+Memory. On a machine with no swap, PsiWeb held about 5 MB for as long as it was open, in front or not (measured on a netBook: the engine's code 2 MB, its heap and stack 1.9 MB, the screen it shares with PsiWeb 0.35 MB, PsiWeb itself 0.3 MB and its pictures in the bitmap server), and never gave any of it back.
+
+- **Memory comes back after each page.** The engine's heap gives its free end back to the Psion when a page has finished loading (`User::Heap().Compress()`), so the peak of a big page is no longer kept until PsiWeb closes.
+- **Behind another program, PsiWeb gets smaller.** After half a minute behind, the engine drops its caches and the pictures away from the view and gives the freed memory back. They are read again when PsiWeb comes forward. (On a page of text alone this is little: 12 to 20 KB in the emulator.)
+- **After ten minutes behind, the engine sleeps.** If nothing would be lost (no page loading, no file being saved, no question or list open, no form filled in, no page that came from a form), the engine is ended and its code and heap, go back to the Psion (in the netBook emulator, a long page: 4.4 MB of heap and data, and on a machine that runs PsiWeb from a disk its 2 MB of code as well). PsiWeb's window stays as it was. When PsiWeb comes forward, or is sent an address, the engine starts again ("Opening the page again...") on the same page at the same place, with its Back and Forward lists and its cookies (the session's too). Not kept: a password given for a site's own sign-in box (it asks again), and the place down each earlier page. If another address is opened instead, the page of before is one step Back.
+- **Pictures no longer crawl when the Psion is short of memory.** With under about 1.75 MB free on the whole machine, every picture's every allocation threw away the font, layout and picture caches and built them again, only to refuse the picture: a page with pictures could sit on "Opening" for minutes. Dropping the caches is now tried again at most every two seconds while it does not help. The pictures that do not fit are still shown as boxes with "Page too big - not all the pictures are shown".
+- **PsiWeb closed with WSERV 1** just after its scroll bar went while the engine was not running (found when the engine first slept under a long page). The likely cause: the page's window is a backed-up one, and was asked for a redraw (`Invalidate`) that such a window does not have. The strip the bar leaves is now drawn directly, and the bar is left alone while the engine sleeps; which of the two cured it was not separated.
+- Tested in the netBook emulator (a test build with the waits at 10 and 25 seconds): a long page, PsiWeb sent behind Word, trimmed, slept (engine gone, 4.4 MB back), brought forward ("Opening the page again...", the page back), Ctrl+B to the page before and Ctrl+F forward again (`docs/img/2026-11-18-sleep/`). Not tested: cookies and the place down the page across a sleep (the test pages were files), a real netBook or 5mx.
 
 ## What's new in 0.91
 

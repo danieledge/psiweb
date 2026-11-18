@@ -202,7 +202,15 @@ typedef struct
 	volatile int load_kb;
 	volatile int pics_done;
 	volatile int pics_all;
-	int spare[8];
+	/* (0.92) memory: sleep_ok is the engine's word that ending it now and
+	   starting it again on the same address would lose nothing (no
+	   transfer, no form filled in, no page that came from a form); waking
+	   is the app's word to a starting engine that Sleep's history and
+	   cookies are to be taken up (else they are deleted): links/psi_drv.c */
+	volatile int sleep_ok;
+	volatile int waking;
+	volatile int sleeping;             /* set with quitting: the engine writes Sleep's files as it goes */
+	int spare[5];
 
 	unsigned char fb[PW_MAX_H * PW_STRIDE8];   /* MUST stay last: see above */
 	} PwShared;

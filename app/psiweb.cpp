@@ -114,7 +114,7 @@ static TBool PwDiagOn()
 	return CEikonEnv::Static()->FsSession().Entry(_L("C:\\System\\Data\\PsiDiag.on"), e) == KErrNone;
 	}
 _LIT(KIniFile, "C:\\System\\Apps\\PsiWeb\\PsiWeb.ini");
-_LIT(KVersion, "0.91");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
+_LIT(KVersion, "0.92");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
 _LIT(KDefaultHome, "http://68k.news/");
 const TInt KZoomSteps[] = { 50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200 };
 const TInt KZoomCount = 11;
@@ -215,6 +215,13 @@ CPwView::~CPwView()
 	{
 	StartBusyCancel();
 	StopEngine();
+	if (iAsleep)
+		{
+		// closed while asleep: Sleep's history and cookies are not for the next session
+		RFs& fs = iCoeEnv->FsSession();
+		fs.Delete(_L("C:\\System\\Apps\\PsiWeb\\Sleep\\history.txt"));
+		fs.Delete(_L("C:\\System\\Apps\\PsiWeb\\Sleep\\cookies.txt"));
+		}
 	delete iSBFrame;
 	delete iAsker;
 	delete iStarter;
@@ -300,6 +307,11 @@ void CPwView::OpenUrlL(const TDesC& aUrl)
 	else
 		{
 		iStartUrl = Clip(aUrl, iStartUrl.MaxLength());
+		if (iAsleep)
+			{
+			iWaking = ETrue;                 // (0.92) asleep: the page of before becomes a step Back
+			iWakeY = -1;
+			}
 		if (iStarter && !iStarter->IsActive())
 			StartEngineL();
 		}
@@ -315,6 +327,14 @@ void CPwView::StartEngineL()
 		iBellWaiter->Cancel();               // (before the bell it waits on is cleared)
 	iEngRinger.Close();                      // (a new engine: a new thread)
 	TickFast();                              // (and the tick follows it from the start)
+	if (iBehindAt)
+		{
+		// (0.92) started behind another program (a link from PsiMail): its half minute and ten begin now
+		iBehindAt = User::TickCount();
+		if (!iBehindAt)
+			iBehindAt = 1;
+		iTrimmed = EFalse;
+		}
 	Mem::FillZ(s, PW_SHARED_SIZE(0, 0));
 	s->width = w;
 	s->height = h;
@@ -360,6 +380,9 @@ void CPwView::StartEngineL()
 	CopyToC(s->net.save_as, sizeof(s->net.save_as), iUpdateFile);
 	CopyToC(s->home_url, sizeof(s->home_url), iSettings.iHome);
 	CopyToC(s->start_url, sizeof(s->start_url), iStartUrl);
+	s->waking = iWaking;                     // (0.92) Sleep's history and cookies: taken up, or deleted
+	iWaking = EFalse;
+	iAsleep = EFalse;
 
 	// the engine and its resources (Messages, CSS) live next to the app
 	TParse parse;
@@ -480,10 +503,11 @@ void CPwView::LoadBusyL()
 	iLoadAt = now;
 	}
 
-void CPwView::StopEngine()
+void CPwView::StopEngine(TBool aSleep)
 	{
 	if (!iRunning)
 		return;
+	iShared->sleeping = aSleep;          // (0.92) the engine writes its history and cookies for WakeL
 	iShared->quitting = 1;
 	iShared->net.quit = 1;
 	iShared->cmd = PW_CMD_QUIT;
@@ -500,6 +524,105 @@ void CPwView::StopEngine()
 		}
 	iProcess.Close();
 	iRunning = EFalse;
+	}
+
+// (0.92) Memory. PsiWeb.app and psiweb.exe together hold some 5 MB while a
+// page is open, and held it for as long as PsiWeb was open, in front or
+// not. Behind another program:
+//  - after half a minute the engine drops its caches and the pictures away
+//    from the view, and gives the free end of its heap back (PW_CMD_TRIM);
+//  - after ten minutes, if the engine says nothing would be lost (no
+//    transfer or dialog, no form filled in, no page that came from a form:
+//    sleep_ok), the engine is ended: its code and heap go back to the Psion.
+//    It starts again when PsiWeb comes forward, or is sent an address, on
+//    the page it showed, at the same place, with its Back and Forward lists
+//    and its cookies (the engine's side: links/psi_drv.c).
+const TUint KTrimAfterSecs = 30;
+const TUint KSleepAfterSecs = 600;
+
+void CPwView::SetForeground(TBool aFront)
+	{
+	if (!aFront)
+		{
+		if (!iBehindAt)
+			{
+			iBehindAt = User::TickCount();
+			if (!iBehindAt)
+				iBehindAt = 1;
+			iTrimmed = EFalse;
+			}
+		return;
+		}
+	iBehindAt = 0;
+	if (iAsleep)
+		{
+		TRAPD(err, WakeL());
+		(void)err;
+		}
+	}
+
+void CPwView::MemoryTick()
+	{
+	PwShared* s = iShared;
+	if (!s || !iRunning || !iBehindAt || s->busy || s->state != PW_STATE_READY)
+		return;
+	TUint behind = (User::TickCount() - iBehindAt) / 64;
+#ifdef PW_SLEEP_TEST
+	// (a test build: 10 s and 25 s, for the emulator)
+	const TUint trimAfter = 10, sleepAfter = 25;
+#else
+	const TUint trimAfter = KTrimAfterSecs, sleepAfter = KSleepAfterSecs;
+#endif
+	if (!iTrimmed && behind >= trimAfter)
+		{
+		if (s->cmd != PW_CMD_NONE)
+			return;                          // (a command still waits: next tick)
+		iTrimmed = ETrue;
+		CopyToC(s->cmd_arg, sizeof(s->cmd_arg), KNullDesC);
+		s->cmd = PW_CMD_TRIM;
+		s->net.resized = 1;                  // wakes the engine's wait (see psi_os.c)
+		RingEngine();
+		return;
+		}
+	if (behind < sleepAfter || !s->sleep_ok || s->cmd != PW_CMD_NONE)
+		return;
+	// nothing of the app's own going on with the engine either
+	if (iAsking || iStartBusy || iLinkBusy || iUpdDlg || iTesting || iLogState == PW_LOG_RUNNING
+		|| iUpdState == PW_UPD_RUNNING || iUpdState == -1
+		|| s->auth_state == PW_ASK_ASKING || s->save_state == PW_ASK_ASKING || s->app_cmd != PW_APP_NONE
+		|| iEikonEnv->EikAppUi()->IsDisplayingMenuOrDialog())
+		return;
+	Sleep();
+	}
+
+void CPwView::Sleep()
+	{
+	TBuf<PW_URL_MAX> url;
+	FromUtf8(url, iShared->url);
+	if (!url.Length() || url.Compare(_L("about:blank")) == 0)
+		return;                              // (no page: nothing to come back to)
+	iWakeY = iShared->page_y;
+	StopEngine(ETrue);
+	if (iRunning)
+		return;
+	// (the doorbell's handle on the engine's thread kept the ended process's
+	// data, 370 KB, until the next start: closed now, as StartEngineL does)
+	if (iBellWaiter)
+		iBellWaiter->Cancel();
+	iEngRinger.Close();
+	iStartUrl = url;
+	iAsleep = ETrue;
+	}
+
+// The engine again, on the page it slept on (iStartUrl; OpenUrlL may have
+// put another address there: then the page of before is one step Back)
+void CPwView::WakeL()
+	{
+	if (!iAsleep || iRunning)
+		return;
+	iWaking = ETrue;
+	StartBusy(_L("Opening the page again..."));
+	StartEngineL();
 	}
 
 // Stops the engine and starts it again, on the page it was showing if asked
@@ -579,6 +702,8 @@ void CPwView::UpdateScrollBarL()
 	{
 	PwShared* s = iShared;
 	TInt h = 0, y = 0, vh = 0;
+	if (iAsleep)
+		return;                              // (0.92) asleep: the page and its bar stay as they were
 	if (s && iRunning && !iShowMsg && s->page_h > 0 && s->page_vh > 0)
 		{
 		h = s->page_h;
@@ -626,7 +751,13 @@ void CPwView::ShowScrollBar(TBool aShow)
 		strip.iTl.iX = iPageArea.iBr.iX;
 		if (!strip.IsEmpty())
 			{
-			Window().Invalidate(strip);
+			// (0.92) drawn here: the view's window is backed up, which has
+			// no redraw to ask for. Invalidate() is a request such a window
+			// does not know, and the window server closed PsiWeb for it
+			// (WSERV 1) when the bar went
+			ActivateGc();
+			Draw(strip);
+			DeactivateGc();
 			}
 		}
 	}
@@ -753,6 +884,13 @@ void CPwView::ShowMessage(const TDesC& aLine1, const TDesC& aLine2)
 
 void CPwView::Command(TInt aCmd, const TDesC& aArg)
 	{
+	if (!iRunning && iAsleep)
+		{
+		// (0.92) asleep: the engine first, on its page (the command is not kept)
+		TRAPD(err, WakeL());
+		(void)err;
+		return;
+		}
 	if (!iRunning)
 		{
 		iEikonEnv->InfoMsg(_L("Not available - the browser engine has stopped"));
@@ -840,6 +978,7 @@ void CPwView::Tick()
 	PwShared* s = iShared;
 	if (s)
 		s->app_beat++;                   // "still here": see pwepoc.cpp
+	MemoryTick();                        // (0.92) behind another program: trim, then sleep
 	// (0.81) the pace: quick while anything is going on, else slow with the
 	// doorbell armed (the heartbeat above still goes every 2 s)
 	if (TickWanted())
@@ -937,7 +1076,17 @@ void CPwView::Tick()
 		TBool busy = s->busy != 0;
 		CPwAppUi* ui = (CPwAppUi*)iEikonEnv->EikAppUi();
 		if (iLastBusy && !busy)
+			{
 			ui->PageLoaded();
+			if (iWakeY > 0)
+				{
+				// (0.92) woken: back to the place it slept at
+				TBuf<12> y;
+				y.Num(iWakeY);
+				iWakeY = -1;
+				Command(PW_CMD_SCROLL, y);
+				}
+			}
 		else if (!busy)
 			ui->PageTick();
 		iLastBusy = busy;
@@ -1865,6 +2014,8 @@ void CPwAppUi::HandleWsEventL(const TWsEvent& aEvent, CCoeControl* aDestination)
 	if (aEvent.Type() == EEventFocusGained || aEvent.Type() == EEventFocusLost)
 		{
 		iForeground = aEvent.Type() == EEventFocusGained;
+		if (iView)
+			iView->SetForeground(iForeground);   // (0.92) memory: trim and sleep while behind
 		UpdateReading();
 		if (iFullBusyAt)                     // (0.88) PsiTerm came in front: "Opening in PsiTerm..." goes
 			{
@@ -2058,7 +2209,7 @@ void CPwAppUi::ChromeTick()
 	if (!iEditing)
 		{
 		TBuf<PW_URL_MAX> url;
-		if (iView->EngineRunning())
+		if (iView->EngineRunning() || iView->Asleep())   // (0.92) asleep: the address stays
 			FromUtf8(url, s->url);
 		if (url.Compare(_L("about:problem")) == 0)
 			FromUtf8(url, s->problem_url);   // (0.85) the address that did not open, to correct

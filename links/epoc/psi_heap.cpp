@@ -39,6 +39,14 @@ extern "C" long psi_heap_room()
 	return sys < room ? sys : room;
 	}
 
+// (0.92) The heap's free end goes back to the system (RHeap gives back
+// only what is free at its top): after each page, and when PsiWeb has
+// been behind another program for a while (psi_drv.c psi_trim).
+extern "C" void psi_heap_compress()
+	{
+	User::Heap().Compress();
+	}
+
 extern "C" void psi_mem_page_start()
 	{
 	}
@@ -46,6 +54,7 @@ extern "C" void psi_mem_page_start()
 extern "C" void psi_mem_report(const char* aWhat)
 	{
 	TInt cells = 0, used = 0;
+	User::Heap().Compress();               // (0.92) a page done: what its loading freed, back to the system
 	cells = User::AllocSize(used);
 	TInt size = User::Heap().Size();       // what the heap has taken from the system
 	TMemoryInfoV1Buf mem;

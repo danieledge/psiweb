@@ -160,7 +160,13 @@ public:
 	PwShared* Shared() { return iShared; }
 	TBool EngineRunning() const { return iRunning; }
 	void StartEngineL();
-	void StopEngine();
+	void StopEngine(TBool aSleep = EFalse);
+	// (0.92) memory: behind another program, the engine is trimmed after
+	// half a minute and put to sleep (ended, to start again on the same
+	// page) after ten, when nothing would be lost
+	void SetForeground(TBool aFront);
+	TBool Asleep() const { return iAsleep; }
+	void WakeL();
 	void StartBusy(const TDesC& aText);      // busy message until the engine draws
 	void StartBusyCancel();
 	void Command(TInt aCmd, const TDesC& aArg);
@@ -256,6 +262,13 @@ private:
 	TBool iSbPen;              // the pen went down on the bar: its events are the bar's
 	TInt iPics;                // page_pics last seen (-1: not yet)
 	TBool iLastBusy;           // busy at the last tick: a fall is a page loaded (History)
+	void MemoryTick();
+	void Sleep();
+	TUint iBehindAt;           // tick count when PsiWeb went behind another program (0: in front)
+	TBool iTrimmed;            // PW_CMD_TRIM sent since then
+	TBool iAsleep;             // the engine was ended to free its memory: WakeL starts it again
+	TBool iWaking;             // the engine starting now is to take up Sleep's history and cookies
+	TInt iWakeY;               // the page's place when it slept, to scroll back to (-1: none)
 	// (0.89) the busy message says the route: "Opening bbc.co.uk through
 	// PsiProxy - 64 KB...", in place of the link's routine notes
 	void LoadBusyL();

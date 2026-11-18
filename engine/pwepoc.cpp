@@ -560,6 +560,10 @@ extern "C" const char* pwb_res_dir() { return Pw()->res_dir; }
 extern "C" int pwb_load_images() { return Pw()->load_images; }
 extern "C" int pwb_style() { return Pw()->style; }
 extern "C" int pwb_keep_cookies() { return Pw()->keep_cookies; }
+// (0.92) memory: see psiweb.h sleep_ok and waking
+extern "C" void pwb_set_sleep_ok(int aOk) { Pw()->sleep_ok = aOk; }
+extern "C" int pwb_waking() { return Pw()->waking; }
+extern "C" int pwb_sleeping() { return Pw()->sleeping; }
 
 // (0.87) File > Save's limit: the free room on the disk the file goes to
 // (the one chosen, else the roomier of C: and D:), less 256 KB for the

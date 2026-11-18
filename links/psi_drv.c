@@ -82,6 +82,13 @@ static void load_start(void);
 static void report_page(void);
 static void psi_load_figures(struct session *ses, int busy);
 static void psi_cookies(int save);
+#ifdef PSI_EPOC
+/* (0.92) memory: trim and sleep, below */
+static int psi_waking;
+static void psi_sleep_restore(struct session *ses);
+static int psi_sleep_ok(struct session *ses);
+void pwb_set_sleep_ok(int ok);
+#endif
 
 static void present_bh(void *p)
 {
@@ -638,12 +645,23 @@ static void report_state(int force)
 	save_progress();
 	if (force || busy != last_busy) {
 		if (last_busy == 1 && !busy) {
+#ifdef PSI_EPOC
+			/* (0.92) the first page after a waking: the lists of before */
+			if (psi_waking && ses && !list_empty(ses->history)) {
+				psi_sleep_restore(ses);
+				back = ses->history.next->next != &ses->history;
+				fwd = !list_empty(ses->forward_history);
+			}
+#endif
 			psi_mem_report(cast_const_char u);
 			psi_cookies(1);		/* (0.87) a page done: its cookies kept, if asked (a crash keeps them too) */
 		}
 		last_busy = busy;
 		pwb_set_busy(busy);
 	}
+#ifdef PSI_EPOC
+	pwb_set_sleep_ok(!busy && psi_sleep_ok(ses));
+#endif
 	if (force || back != last_back || fwd != last_fwd) {
 		last_back = back; last_fwd = fwd;
 		pwb_set_nav(back, fwd);
@@ -1000,9 +1018,21 @@ static void psi_too_big(int stop)
 
 int psi_heap_tight(size_t size)
 {
+	/* (0.92) when the Psion itself is short of memory, dropping the caches
+	   does not make room, and doing it again for every picture's every
+	   allocation (each time the font, layout and picture caches thrown
+	   away and built again) made a page with pictures take minutes: once
+	   it has not helped, not again for two seconds */
+	static uttime shrunk_at;
+	static int shrunk_in_vain;
 	if (psi_heap_room() - (long)size >= PSI_HEAP_SOFT) return 0;
-	shrink_memory(SH_FREE_SOMETHING, 0);	/* (psi_evict_pictures(1) among others) */
-	if (psi_heap_room() - (long)size >= PSI_HEAP_SOFT) return 0;
+	if (!shrunk_in_vain || get_time() - shrunk_at >= 2000) {
+		shrink_memory(SH_FREE_SOMETHING, 0);	/* (psi_evict_pictures(1) among others) */
+		shrunk_at = get_time();
+		shrunk_in_vain = 0;
+		if (psi_heap_room() - (long)size >= PSI_HEAP_SOFT) return 0;
+		shrunk_in_vain = 1;
+	}
 #ifdef PSI_DEBUG_MEM
 	fprintf(stderr, "[mem] refused %lu bytes, room %ld KB\n", (unsigned long)size, psi_heap_room() >> 10);
 	if (global_cimg) {
@@ -1379,6 +1409,174 @@ static void psi_goto(struct session *ses, const char *url)
 	goto_url_utf8(ses, cast_uchar url);
 }
 
+/* ---------- (0.92) memory: trim and sleep ----------
+ * Trim (PW_CMD_TRIM): PsiWeb.app sends it once PsiWeb has been behind
+ * another program for half a minute. Sleep: after ten minutes there, when
+ * sleep_ok says nothing would be lost, the engine is asked to quit with
+ * "sleeping" set, so it is ended (its code and heap, about 4 MB, go back to the Psion) and started
+ * again when PsiWeb comes forward: on the same address, with the Back and
+ * Forward lists and the cookies of before (Sleep\history.txt and
+ * Sleep\cookies.txt in PsiWeb's folder, written here, read and deleted by
+ * the engine that wakes). */
+#ifdef PSI_EPOC
+#define PSI_SLEEP_HOME PSI_COOKIE_HOME "Sleep\\"
+#define PSI_SLEEP_HISTORY PSI_SLEEP_HOME "history.txt"
+#define PSI_SLEEP_COOKIES PSI_SLEEP_HOME "cookies.txt"
+#define PSI_SLEEP_MAX 40		/* addresses kept each way */
+void psi_heap_compress(void);		/* epoc/psi_heap.cpp */
+void pwb_set_sleep_ok(int ok);
+int pwb_waking(void);
+int pwb_sleeping(void);
+static int psi_waking;			/* this engine was started to wake: the history is still to be taken up */
+
+static void psi_trim(void)
+{
+	if (!list_empty(queue) || !list_empty(downloads)) return;	/* (busy: at the page's end instead) */
+	shrink_memory(SH_FREE_ALL, 0);
+	psi_evict_pictures(1);
+	psi_heap_compress();
+	psi_mem_report("trim");
+}
+
+/* a form field of the page that no longer holds what the page gave it */
+static int psi_form_changed(struct f_data_c *fd)
+{
+	struct view_state *vs;
+	struct form_control *fc;
+	struct list_head *lfc;
+	if (!fd || !fd->f_data || !(vs = fd->vs)) return 0;
+	foreach(struct form_control, fc, lfc, fd->f_data->forms) {
+		struct form_state *fs;
+		if (fc->g_ctrl_num < 0 || fc->g_ctrl_num >= vs->form_info_len) continue;	/* (never shown) */
+		fs = &vs->form_info[fc->g_ctrl_num];
+		if (fs->form_num != fc->form_num || fs->ctrl_num != fc->ctrl_num || fs->type != fc->type) continue;
+		switch (fc->type) {
+		case FC_TEXT: case FC_PASSWORD: case FC_FILE_UPLOAD: case FC_TEXTAREA:
+			if (strcmp(fs->string ? cast_const_char fs->string : "", fc->default_value ? cast_const_char fc->default_value : "")) return 1;
+			break;
+		case FC_CHECKBOX: case FC_RADIO: case FC_SELECT:
+			if (fs->state != fc->default_state) return 1;
+			break;
+		}
+	}
+	return 0;
+}
+
+static int psi_sleep_ok(struct session *ses)
+{
+	struct location *loc;
+	struct list_head *lloc;
+	if (!ses || !ses->term || !ses->win) return 0;
+	if (!list_empty(queue) || !list_empty(downloads) || ses->rq) return 0;
+	if (ses->term->windows.next != &ses->win->list_entry) return 0;	/* a list or dialog of Links' is open */
+	if (list_empty(ses->history)) return 0;
+	/* a page that came from a form (its address carries what was sent):
+	   opening it again would send the form again */
+	foreach(struct location, loc, lloc, ses->history)
+		if (!loc->url || strchr(cast_const_char loc->url, POST_CHAR)) return 0;
+	foreach(struct location, loc, lloc, ses->forward_history)
+		if (!loc->url || strchr(cast_const_char loc->url, POST_CHAR)) return 0;
+	if (!list_empty(cur_loc(ses)->subframes)) return 0;	/* (frames: not looked into) */
+	if (psi_form_changed(ses->screen)) return 0;
+	return 1;
+}
+
+static void psi_sleep_save(struct session *ses)
+{
+	static int saved;
+	FILE *f;
+	if (!pwb_sleeping() || saved) return;
+	saved = 1;
+	mkdir(PSI_SLEEP_HOME, 0777);
+	f = fopen(PSI_SLEEP_HISTORY, "w");
+	if (f) {
+		struct location *loc;
+		struct list_head *lloc;
+		int n = 0;
+		if (ses) foreach(struct location, loc, lloc, ses->history) {
+			if (n > PSI_SLEEP_MAX) break;
+			fprintf(f, "%c %s\n", n++ ? 'B' : 'C', cast_const_char loc->url);
+		}
+		n = 0;
+		if (ses) foreach(struct location, loc, lloc, ses->forward_history) {
+			if (n++ >= PSI_SLEEP_MAX) break;
+			fprintf(f, "F %s\n", cast_const_char loc->url);
+		}
+		fclose(f);
+	}
+	/* every cookie, the session's too, whatever Keep cookies says: they
+	   are deleted as soon as the waking engine has read them */
+	if (!links_home) {
+		links_home = stracpy(cast_uchar PSI_SLEEP_HOME);
+		do_save_cookies();
+		mem_free(links_home);
+		links_home = NULL;
+	}
+}
+
+/* at the start: Sleep's cookies taken up if this is a waking, and deleted
+   either way (a Sleep left by an engine that was never woken: PsiWeb was
+   closed, or the Psion restarted) */
+static void psi_sleep_start(void)
+{
+	psi_waking = pwb_waking();
+	if (psi_waking && !links_home) {
+		links_home = stracpy(cast_uchar PSI_SLEEP_HOME);
+		init_cookies();
+		mem_free(links_home);
+		links_home = NULL;
+	}
+	remove(PSI_SLEEP_COOKIES);
+	if (!psi_waking) remove(PSI_SLEEP_HISTORY);
+}
+
+static void psi_sleep_location(struct session *ses, const char *url, int forward)
+{
+	static unsigned id = 0x70000000;	/* (session.c's own ids count up from 1) */
+	struct location *loc = mem_calloc(sizeof(struct location));
+	loc->location_id = ++id;
+	init_list(loc->subframes);
+	loc->vs = create_vs();
+	loc->url = stracpy(cast_uchar url);
+	if (forward) add_to_list_end(ses->forward_history, loc);
+	else add_to_list_end(ses->history, loc);
+}
+
+/* the first page after a waking is in the history: the Back and Forward
+   lists of before, round it. If another address was opened instead (a
+   link from PsiMail woke PsiWeb), the page of before is one step back and
+   there is no Forward. */
+static void psi_sleep_restore(struct session *ses)
+{
+	static char line[4200];
+	FILE *f;
+	int fwd_ok = 1;
+	psi_waking = 0;
+	f = fopen(PSI_SLEEP_HISTORY, "r");
+	if (!f) return;
+	while (fgets(line, sizeof(line), f)) {
+		size_t n = strlen(line);
+		if (!n || line[n - 1] != '\n') {	/* (too long: the rest of it skipped) */
+			int c;
+			while ((c = fgetc(f)) != EOF && c != '\n') ;
+			continue;
+		}
+		line[--n] = 0;
+		if (n < 3 || line[1] != ' ' || strchr(line, POST_CHAR)) continue;
+		if (line[0] == 'C') {
+			if (!strcmp(line + 2, cast_const_char cur_loc(ses)->url)) continue;
+			fwd_ok = 0;
+			psi_sleep_location(ses, line + 2, 0);
+		} else if (line[0] == 'B')
+			psi_sleep_location(ses, line + 2, 0);
+		else if (line[0] == 'F' && fwd_ok)
+			psi_sleep_location(ses, line + 2, 1);
+	}
+	fclose(f);
+	remove(PSI_SLEEP_HISTORY);
+}
+#endif
+
 static void run_command(int cmd, char *arg)
 {
 	struct session *ses = psi_ses();
@@ -1459,8 +1657,16 @@ static void run_command(int cmd, char *arg)
 		break;
 	case PW_CMD_QUIT:
 		psi_cookies(1);			/* (0.89) before Links frees them: see psi_shutdown_driver */
+#ifdef PSI_EPOC
+		psi_sleep_save(ses);		/* (0.92) if this is Sleep */
+#endif
 		terminate_loop = 1;
 		break;
+#ifdef PSI_EPOC
+	case PW_CMD_TRIM:
+		psi_trim();
+		break;
+#endif
 	case PW_CMD_HANGUP:
 		abort_all_connections();
 #ifdef PSI_EPOC
@@ -1587,6 +1793,9 @@ static void poll_fn(void *p)
 			break;
 		case PWB_QUIT:
 			psi_cookies(1);		/* (0.89) before Links frees them: see psi_shutdown_driver */
+#ifdef PSI_EPOC
+			psi_sleep_save(psi_ses());	/* (0.92) if this is Sleep */
+#endif
 			terminate_loop = 1;
 			in_poll = 0;
 			return;
@@ -1661,6 +1870,9 @@ static unsigned char *psi_init_driver(unsigned char *param, unsigned char *displ
 	dds.display_images = pwb_load_images() ? 1 : 0;
 #endif
 	psi_cookies(0);			/* (0.87) the cookies kept from before */
+#ifdef PSI_EPOC
+	psi_sleep_start();		/* (0.92) and, waking, those of the engine that slept */
+#endif
 	last_status = get_time();
 	last_active = last_status;		/* (quick while starting) */
 	poll_timer = install_timer(POLL_MS, poll_fn, NULL);

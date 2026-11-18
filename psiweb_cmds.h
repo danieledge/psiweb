@@ -33,7 +33,10 @@ enum
 	                                   page is laid out again, with no restart */,
 	PW_CMD_TEST                     /* 0.89: Test the connection's web part: fetch
 	                                   cmd_arg (a small page) through the route in
-	                                   use, not shown; test_* say how it went */
+	                                   use, not shown; test_* say how it went */,
+	PW_CMD_TRIM                     /* 0.92: PsiWeb has been behind another program for
+	                                   a while: caches and pictures away from the view
+	                                   are dropped and the heap's free end given back */
 	};
 
 /* test_state (psiweb.h, 0.89) */
