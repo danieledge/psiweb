@@ -234,6 +234,61 @@ CPwView::~CPwView()
 		iChunk.Close();
 	}
 
+// (0.93) psiweb.exe processes but this one's own (it has none yet): the
+// last PsiWeb's engine, killed by name. The kernel takes back its handles
+// (the serial port, the chunk); NIFMAN's timers are given back from here.
+static void KillStrayEngines()
+	{
+	TFindProcess find(_L("psiweb.exe*"));     // (the match ignores case: "psiweb*" would be this app too)
+	TFullName name;
+	TProcessId me = RProcess().Id();
+	TInt killed = 0;
+	while (find.Next(name) == KErrNone)
+		{
+		RProcess p;
+		if (p.Open(find) != KErrNone)
+			continue;
+		if (p.Id() != me && p.ExitType() == EExitPending)
+			{
+			p.Kill(0);
+			killed++;
+			}
+		p.Close();
+		}
+	if (killed)
+		PsiLinkTimersBack();
+	}
+
+// (0.93) The chunk was there already: the last PsiWeb's engine is still on
+// it (that PsiWeb crashed or was closed from the task list, under a minute
+// ago: the engine stops by itself only after a minute without the app's
+// heartbeat). Clearing the chunk under it, as before, let it carry on with
+// this app's fresh heartbeat beside the engine started here: two engines
+// on one event queue and one screen, the old one holding the serial port
+// and its connection in an unknown state. So it is not taken over: it is
+// asked to stop (as Close does, StopEngine), given up to 4 s to hang up,
+// then killed, and this app starts with a new chunk and a new engine.
+static void EndLastEngine(RChunk& aChunk)
+	{
+	PwShared* s = (PwShared*)aChunk.Base();
+	if (aChunk.Size() >= PW_SHARED_SIZE(0, 0) && s->magic == PW_MAGIC && s->state != PW_STATE_EXITED)
+		{
+		s->quitting = 1;
+		s->net.quit = 1;
+		s->cmd = PW_CMD_QUIT;
+		s->net.resized = 1;
+		if (s->net.bell_magic == PSI_BELL_MAGIC)
+			{
+			TPsiBellRinger ringer;           // (it may be waiting on its doorbell)
+			ringer.Ring(&s->net.eng_bell);
+			ringer.Close();
+			}
+		for (TInt i = 0; i < 40 && s->state != PW_STATE_EXITED; i++)
+			User::After(100000);
+		}
+	KillStrayEngines();                      // (gone, stopping, or stuck: none is left)
+	}
+
 void CPwView::ConstructL(const TRect& aRect, const TPwSettings& aSettings)
 	{
 	iSettings = aSettings;
@@ -270,8 +325,23 @@ void CPwView::ConstructL(const TRect& aRect, const TPwSettings& aSettings)
 	// (only as big as this screen needs: fb is last in the chunk)
 	iChunkSize = PW_SHARED_SIZE(iMaxH, stride);
 	TInt r = iChunk.CreateGlobal(_L(PSI_SHARED_NAME), iChunkSize, iChunkSize);
+	if (r == KErrAlreadyExists && iChunk.OpenGlobal(_L(PSI_SHARED_NAME), EFalse) == KErrNone)
+		{
+		EndLastEngine(iChunk);               // (0.93) not taken over
+		iChunk.Close();
+		r = iChunk.CreateGlobal(_L(PSI_SHARED_NAME), iChunkSize, iChunkSize);
+		}
 	if (r == KErrAlreadyExists)
+		{
+		// still held (a process not yet cleared away): use it if it is big
+		// enough for this screen (an older PsiWeb's may not be)
 		r = iChunk.OpenGlobal(_L(PSI_SHARED_NAME), EFalse);
+		if (r == KErrNone && iChunk.Size() < iChunkSize)
+			{
+			iChunk.Close();
+			r = KErrInUse;
+			}
+		}
 	User::LeaveIfError(r);
 	iChunkOpen = ETrue;
 	iShared = (PwShared*)iChunk.Base();
