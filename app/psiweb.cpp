@@ -102,6 +102,17 @@ static void SaveSharedLink(RFs& aFs, const TPwSettings& aSettings)
 	}
 
 _LIT(KEngineExe, "psiweb.exe");
+
+// Coda's debug mode (the netBook's Control panel > Diagnostics, or the
+// 5mx's with PsiExtras): while C:\System\Data\PsiDiag.on is there the
+// engine keeps PsiWeb.log as with Keep a log, and Coda's PsiDiag.exe copies
+// its new lines into the system log. Nothing more is logged than Keep a log
+// logs.
+static TBool PwDiagOn()
+	{
+	TEntry e;
+	return CEikonEnv::Static()->FsSession().Entry(_L("C:\\System\\Data\\PsiDiag.on"), e) == KErrNone;
+	}
 _LIT(KIniFile, "C:\\System\\Apps\\PsiWeb\\PsiWeb.ini");
 _LIT(KVersion, "0.91");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
 _LIT(KDefaultHome, "http://68k.news/");
@@ -340,7 +351,7 @@ void CPwView::StartEngineL()
 	s->keep_cookies = (iSettings.iFlags & KPwFlagKeepCookies) != 0;   // (0.87)
 	s->zoom = iSettings.iZoom;
 	s->display = (iSettings.iDisplay & KPwDisplayScaledText) ? PW_DISPLAY_SCALED_TEXT : 0;
-	s->net.log_on = (iSettings.iDisplay & KPwKeepLog) ? 1 : 0;   // (0.77) Tools > Keep a log; the engine reads it at each line
+	s->net.log_on = (iSettings.iDisplay & KPwKeepLog) || PwDiagOn() ? 1 : 0;   // (0.77) Tools > Keep a log; the engine reads it at each line; or Coda's debug mode
 	CopyToC(s->net.version, sizeof(s->net.version), KVersion);
 	// updates are saved to the CF card if there is one (D:), else C:
 	TVolumeInfo vol;
@@ -2925,7 +2936,7 @@ void CPwAppUi::HandleCommandL(TInt aCommand)
 		st.iDisplay ^= KPwKeepLog;
 		SaveSettings(st);
 		if (iView->Shared())
-			iView->Shared()->net.log_on = (st.iDisplay & KPwKeepLog) ? 1 : 0;
+			iView->Shared()->net.log_on = (st.iDisplay & KPwKeepLog) || PwDiagOn() ? 1 : 0;
 		iEikonEnv->InfoMsg((st.iDisplay & KPwKeepLog) ? _L("Keeping a log") : _L("Not keeping a log"));
 		break;
 	case EPwCmdAbout:
