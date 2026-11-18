@@ -14,9 +14,15 @@ A web browser for the **Psion Series 5mx**, the **netBook** and the **Series 7**
 
 Up to 0.61 the engine was NetSurf. Its sources are still in the tree as a fallback (see *The NetSurf engine* below), until Links has been proved on the device. The whole port is described in [`links/PORTING.md`](links/PORTING.md).
 
-**Status: beta (0.92).** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
+**Status: beta (0.93).** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
 
 [![Download PsiWeb.sis](https://img.shields.io/badge/Download-PsiWeb.sis-2ea44f?logo=github)](https://github.com/danieledge/psiterm/raw/main/dist/PsiWeb.sis)
+
+## What's new in 0.93
+
+- **Stop during an https page no longer hangs PsiWeb.** Stop while a page was coming over PsiWeb's own secure connection left the browser engine reading for ever: nothing on the screen changed and no key did anything until PsiWeb was closed. Now the read ends at once, the connection is closed and the page says Stopped. A read that fails for another reason (a damaged record) ends the connection the same way, as a connection error, instead of going round.
+- **A PsiWeb started again no longer takes over the last one's engine.** When PsiWeb crashed or was closed from the task list, its browser engine ran on for up to a minute. A PsiWeb started in that minute cleared the shared memory under it, and the old engine then carried on for good beside the new one, holding the serial port and its connection. The new PsiWeb now asks the old engine to stop, gives it up to 4 seconds to hang up, ends it if it has not, and starts a fresh one.
+- **A key or a tap while an https page is coming no longer ends it.** Every key and tap wakes the browser engine, and PsiWeb's own TLS took that wake as the end of the connection: the page said *Page not opened*. It now waits on through it for the rest of the page (psion-core 1d259b2).
 
 ## What's new in 0.92
 
