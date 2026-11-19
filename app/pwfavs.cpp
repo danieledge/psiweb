@@ -19,6 +19,7 @@
 #include <eikmenup.h>
 
 _LIT(KFavsFile, "C:\\System\\Apps\\PsiWeb\\Favourites.dat");
+#include "psikeep.h"
 _LIT(KHistFile, "C:\\System\\Apps\\PsiWeb\\History.dat");
 const TInt KPwFileVer = 1;
 const TInt KPwHistWatch = 6 * 64;      // ticks (64 a second) to wait for a page's title
@@ -171,6 +172,10 @@ void CPwList::Save()
 			r = iFs.Replace(tmpName, iFile);
 		if (r != KErrNone)
 			iFs.Delete(tmpName);
+		// (0.95) the favourites kept on the card too (psikeep.h); never
+		// the history
+		else if (iFile.CompareF(KFavsFile) == 0)
+			PsiKeepData(iFs, iFile, d);
 		}
 	delete buf;
 	}

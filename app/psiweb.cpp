@@ -30,6 +30,7 @@
 #include <engine/pwproblem.h>    // (0.89) PW_PROB_*: Test the connection's web part
 #include "psigreyui.h"
 #include "pwaddr.h"              // (0.85) an address, or words to search for
+#include "psikeep.h"             // (0.95) settings kept on the card (never the cookies)
 
 // The link settings, proxy included, are shared with PsiTerm and PsiMail
 // (psilink.h). The proxy fields of TPwSettings are only a copy of the shared
@@ -115,7 +116,9 @@ static TBool PwDiagOn()
 	return CEikonEnv::Static()->FsSession().Entry(_L("C:\\System\\Data\\PsiDiag.on"), e) == KErrNone;
 	}
 _LIT(KIniFile, "C:\\System\\Apps\\PsiWeb\\PsiWeb.ini");
-_LIT(KVersion, "0.94");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
+_LIT(KUpdIniFile, "C:\\System\\Apps\\PsiWeb\\Update.ini");
+_LIT(KFavsKept, "C:\\System\\Apps\\PsiWeb\\Favourites.dat");   // (pwfavs.cpp's KFavsFile)
+_LIT(KVersion, "0.95");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
 _LIT(KDefaultHome, "http://68k.news/");
 const TInt KZoomSteps[] = { 50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200 };
 const TInt KZoomCount = 11;
@@ -2041,6 +2044,15 @@ TBool CPwPrefsDialog::OkToExitL(TInt aButtonId)
 void CPwAppUi::ConstructL()
 	{
 	BaseConstructL();
+	// (0.95) Coda's rule for settings on C: (psikeep.h): a new C: (a new
+	// image, a cold start, a flat battery) takes the card's copies of the
+	// settings and the favourites; cookies and the history are never copied
+	RFs& kfs = iCoeEnv->FsSession();
+	TBool keptBack = PsiKeepRestore(kfs, KIniFile);
+	if (PsiKeepRestore(kfs, KFavsKept))
+		keptBack = ETrue;
+	PsiKeepRestore(kfs, KUpdIniFile);
+	PsiKeepRestore(kfs, KPsiLinkFile);
 	TPwSettings settings;
 	LoadSettings(settings);
 	iShownProgress = -1;
@@ -2099,6 +2111,13 @@ void CPwAppUi::ConstructL()
 		iSetupIdle = CIdle::NewL(CActive::EPriorityIdle);
 		iSetupIdle->Start(TCallBack(SetupCallback, this));
 		}
+	// (0.95) the card's copies up to date (settings from an older PsiWeb)
+	PsiKeepFile(kfs, KIniFile);
+	PsiKeepFile(kfs, KFavsKept);
+	PsiKeepFile(kfs, KUpdIniFile);
+	PsiKeepFile(kfs, KPsiLinkFile);
+	if (keptBack)
+		iEikonEnv->InfoMsg(_L("Settings and favourites put back from the card"));
 	}
 
 // ----- Reading mode (docs/display.md) ----------------------------------------------
@@ -2854,6 +2873,11 @@ void CPwAppUi::SaveSettings(const TPwSettings& aSettings)
 		r = fs.Replace(tmpName, KIniFile);
 	if (r != KErrNone)
 		fs.Delete(tmpName);
+	else
+		{
+		PsiKeepFile(fs, KIniFile);           // (0.95) and the card's copy
+		PsiKeepFile(fs, KPsiLinkFile);
+		}
 	}
 
 void CPwAppUi::DynInitMenuPaneL(TInt aMenuId, CEikMenuPane* aMenuPane)
@@ -3038,7 +3062,6 @@ void CPwAppUi::AboutL()
 	dlg->ExecuteLD(R_PW_ABOUT_DIALOG);
 	}
 
-_LIT(KUpdIniFile, "C:\\System\\Apps\\PsiWeb\\Update.ini");
 
 // Tools > Update PsiWeb: where from (Update.ini, in PsiMail's words:
 // "github", "github-dev" or "host:port" - the engine reads it), then the
@@ -3094,6 +3117,7 @@ void CPwAppUi::UpdateL()
 		f.Write(b);
 		f.Close();
 		}
+	PsiKeepFile(fs, KUpdIniFile);            // (0.95)
 	iView->StartUpdateL();
 	}
 
