@@ -200,7 +200,7 @@ static void con_flush_line(void)
 	if (!*p) return;
 	pw_log(p);
 	if (strstr(p, "out of memory"))
-		pwb_fatal("Not enough memory for this page - Tools > Restart browser engine starts it again");
+		pwb_fatal("Not enough memory for this page - Tools > Log > Restart browser engine starts it again");
 	else if (!strncmp(p, "ERROR", 5) || !strncmp(p, "INTERNAL ERROR", 14) || !strncmp(p, "Internal error", 14))
 		pwb_fatal(p);
 }

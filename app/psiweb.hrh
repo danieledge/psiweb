@@ -52,6 +52,7 @@ enum TPwCommands
 	EPwCmdRouteLight,        // (0.86) the toolband's route light: Page information
 	EPwCmdReloadStop,        // (0.87) the toolband's Reload, which is Stop while a page loads
 	EPwCmdFullBrowser,       // (0.88) File > Open in full browser...
+	EPwCmdCopyAddress,       // (0.94) Edit > Copy page address
 	EPwCmdFav0 = 0x1100,     // the favourites on the menu: 16 slots
 	EPwCmdHist0 = 0x1120     // the History cascade's pages: 16 slots
 	};

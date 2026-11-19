@@ -14,9 +14,17 @@ A web browser for the **Psion Series 5mx**, the **netBook** and the **Series 7**
 
 Up to 0.61 the engine was NetSurf. Its sources are still in the tree as a fallback (see *The NetSurf engine* below), until Links has been proved on the device. The whole port is described in [`links/PORTING.md`](links/PORTING.md).
 
-**Status: beta (0.93).** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
+**Status: beta (0.94).** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
 
 [![Download PsiWeb.sis](https://img.shields.io/badge/Download-PsiWeb.sis-2ea44f?logo=github)](https://github.com/danieledge/psiterm/raw/main/dist/PsiWeb.sis)
+
+## What's new in 0.94
+
+- **Cut, Copy and Paste.** A new Edit menu, with Ctrl+X, Ctrl+C and Ctrl+V and the Clipboard icon beside the screen: while an address is typed in (Ctrl+L), they work on it as in any EPOC text box, and Ctrl+A chooses all of it. Paste with no address being typed puts the clipboard's text into the box on the page that has the cursor (its first line, up to 60 characters), or else into the address, ready for Enter. *Edit > Copy page address* puts the address of the page showing on the clipboard for another program.
+- **The engine sleeps only when memory is short.** After ten minutes behind another program, the engine is now ended only if the Psion has under 3 MB free; with plenty free, coming back to PsiWeb no longer reads the engine from the card again and fetches the page again for nothing. (The half-minute trim behind is as before.)
+- **Preferences no longer always restart the engine.** The home page, the search page, the page style and keeping cookies take effect at once; the engine starts again, losing what was typed into a form, only when *Text* or *Pictures* changed. Connection settings restart it only when the route changed.
+- **Messages say what is wrong.** A message that named *Tools > Restart browser engine* now gives its real place, *Tools > Log > Restart browser engine*. An engine that cannot start says when memory is short or the card is not ready, rather than always to reinstall PsiWeb. When the Psion itself is short of memory, a page says "Not enough memory - only part of the page is shown" (or "not all the pictures are shown") instead of "Page too big". A long reason on the page goes on two lines.
+- **The start page is built safely.** Eight favourites with very long addresses could overrun the start page's buffer; what does not fit is now left out.
 
 ## What's new in 0.93
 

@@ -489,6 +489,7 @@ public:
 	void ChromeTick();
 	TBool AddressKeyL(const TKeyEvent& aKeyEvent, TEventCode aType);   // ETrue: the address had it
 	TBool Editing() const { return iEditing; }
+	void SelectAllAddressL();           // (0.94) Ctrl+A while the address is typed in
 	void EndAddressL(TBool aGo);        // the address shows the page again (and goes there)
 	void PageLoaded();                  // a page has loaded: History (pwfavs.cpp)
 	void PageTick();                    // ...and its title may arrive a moment later
@@ -542,6 +543,9 @@ private:
 	TRect PageRect();                   // the bars laid out as they are shown: the page's room
 	TBool TallScreen() const;           // 480 lines (the netBook): the toolband at first, not the toolbar
 	void StartAddressL();               // a tap on the address, or Ctrl+L
+	void ClipboardL(TInt aCommand);     // (0.94) Edit > Cut, Copy, Paste: the address, or a page's field
+	void CopyAddressL();                // (0.94) Edit > Copy page address
+	void PasteToPageL();                // (0.94) the clipboard's text typed into the page's field
 	void CompleteAddressL();            // (0.87) the address offered as it is typed
 	void HandleControlEventL(CCoeControl* aControl, TCoeEvent aEventType);
 	void SetAddressL(const TDesC& aText);

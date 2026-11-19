@@ -1017,6 +1017,7 @@ void psi_load_failed(unsigned char *why, struct session *ses, unsigned char *url
  *  - a page still loading when the room left falls below PSI_HEAP_STOP
  *    is stopped where it is: what has come stays on the screen. */
 long psi_heap_room(void);	/* emu/links_rt.c, epoc/psi_heap.cpp, psi_mem.c */
+int psi_heap_system_short(void);	/* (0.94) the Psion's free memory is the limit, not the engine's */
 static int too_big_said;	/* 1: pictures, 2: the page; per page */
 
 static void psi_too_big(int stop)
@@ -1024,8 +1025,14 @@ static void psi_too_big(int stop)
 	int what = stop ? 2 : 1;
 	if (too_big_said >= what) return;
 	too_big_said = what;
-	psi_infoprint(stop ? "Page too big - only part of it is shown"
-		: "Page too big - not all the pictures are shown");
+	/* (0.94) "too big" only when it is the page: when the Psion itself is
+	   short of memory, that is what is said */
+	if (psi_heap_system_short())
+		psi_infoprint(stop ? "Not enough memory - only part of the page is shown"
+			: "Not enough memory - not all the pictures are shown");
+	else
+		psi_infoprint(stop ? "Page too big - only part of it is shown"
+			: "Page too big - not all the pictures are shown");
 }
 
 int psi_heap_tight(size_t size)

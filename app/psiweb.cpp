@@ -13,6 +13,7 @@
 #include <eikcmbut.h>
 #include <eikbtpan.h>
 #include <txtetext.h>
+#include <baclipb.h>
 #include <eiktbar.h>
 #include <eikimage.h>
 #include <apgcli.h>
@@ -114,7 +115,7 @@ static TBool PwDiagOn()
 	return CEikonEnv::Static()->FsSession().Entry(_L("C:\\System\\Data\\PsiDiag.on"), e) == KErrNone;
 	}
 _LIT(KIniFile, "C:\\System\\Apps\\PsiWeb\\PsiWeb.ini");
-_LIT(KVersion, "0.93");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
+_LIT(KVersion, "0.94");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
 _LIT(KDefaultHome, "http://68k.news/");
 const TInt KZoomSteps[] = { 50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200 };
 const TInt KZoomCount = 11;
@@ -480,8 +481,16 @@ void CPwView::StartEngineL()
 	if (r != KErrNone)
 		{
 		StartBusyCancel();
-		TBuf<80> e;
-		if (r == KErrNotFound || r == KErrPathNotFound)
+		// (0.94) why, as far as the error says: reinstalling helps only
+		// when the file is missing or damaged
+		TBuf<120> e;
+		if (r == KErrNoMemory)
+			e = _L("Not enough memory - close other programs, then Tools > Log > Restart browser engine");
+		else if (r == KErrNotReady || r == KErrDisMounted)
+			e = _L("The card is not ready - put it back, then Tools > Log > Restart browser engine");
+		else if (r == KErrInUse || r == KErrLocked)
+			e = _L("psiweb.exe is in use - try Tools > Log > Restart browser engine in a moment");
+		else if (r == KErrNotFound || r == KErrPathNotFound)
 			e = _L("psiweb.exe is not next to PsiWeb - reinstall PsiWeb from its .sis file");
 		else
 			e.Format(_L("Could not start psiweb.exe (%d) - reinstall PsiWeb from its .sis file"), r);
@@ -607,8 +616,12 @@ void CPwView::StopEngine(TBool aSleep)
 //    It starts again when PsiWeb comes forward, or is sent an address, on
 //    the page it showed, at the same place, with its Back and Forward lists
 //    and its cookies (the engine's side: links/psi_drv.c).
+//    (0.94) Only while the Psion is short of memory (under KSleepUnderKb
+//    free): with plenty free, waking cost 2.2 MB read from the card and the
+//    page fetched again for nothing.
 const TUint KTrimAfterSecs = 30;
 const TUint KSleepAfterSecs = 600;
+const TInt KSleepUnderKb = 3072;
 
 void CPwView::SetForeground(TBool aFront)
 	{
@@ -656,6 +669,14 @@ void CPwView::MemoryTick()
 		}
 	if (behind < sleepAfter || !s->sleep_ok || s->cmd != PW_CMD_NONE)
 		return;
+#ifndef PW_SLEEP_TEST
+	{
+	TMemoryInfoV1Buf mem;
+	UserHal::MemoryInfo(mem);
+	if (mem().iFreeRamInBytes / 1024 >= KSleepUnderKb)
+		return;                          // (looked at again next tick)
+	}
+#endif
 	// nothing of the app's own going on with the engine either
 	if (iAsking || iStartBusy || iLinkBusy || iUpdDlg || iTesting || iLogState == PW_LOG_RUNNING
 		|| iUpdState == PW_UPD_RUNNING || iUpdState == -1
@@ -934,13 +955,13 @@ void CPwView::EngineEnded()
 	if (type == EExitPanic)
 		PsiLinkTimersBack();             // (0.54) the crash skipped the engine's own clean-up
 	if (type == EExitPanic)
-		why.Format(_L("%S %d - Tools > Restart browser engine starts it again"), &cat, reason);
+		why.Format(_L("%S %d - Tools > Log > Restart browser engine starts it again"), &cat, reason);
 	else if (iShared->exit_msg[0])
 		{
 		FromUtf8(why, iShared->exit_msg);
 		}
 	else
-		why.Format(_L("It closed (%d) - Tools > Restart browser engine starts it again"), reason);
+		why.Format(_L("It closed (%d) - Tools > Log > Restart browser engine starts it again"), reason);
 	ShowMessage(_L("The browser engine has stopped"), why);
 	}
 
@@ -1653,7 +1674,16 @@ void CPwView::Draw(const TRect& aRect) const
 		gc.DiscardFont();
 		font = iEikonEnv->NormalFont();
 		gc.UseFont(font);
-		gc.DrawText(iMsg2, TPoint(20, 120));
+		// (0.94) a reason too wide for the page: its remedy, after " - ",
+		// on a line of its own
+		TInt dash = iMsg2.Find(_L(" - "));
+		if (dash > 0 && font->TextWidthInPixels(iMsg2) > iPageArea.Width() - 40)
+			{
+			gc.DrawText(iMsg2.Left(dash), TPoint(20, 120));
+			gc.DrawText(iMsg2.Mid(dash + 3), TPoint(20, 120 + font->HeightInPixels() + 4));
+			}
+		else
+			gc.DrawText(iMsg2, TPoint(20, 120));
 		gc.DiscardFont();
 		return;
 		}
@@ -1713,6 +1743,12 @@ TKeyResponse CPwView::OfferKeyEventL(const TKeyEvent& aKeyEvent, TEventCode aTyp
 	// but for the menu's shortcuts
 	if (ui->Editing() && !(mods & EModifierCtrl) && ui->AddressKeyL(aKeyEvent, aType))
 		return EKeyWasConsumed;
+	// (0.94) Ctrl+A in the address: all of it chosen
+	if (ui->Editing() && (mods & EModifierCtrl) && !(mods & EModifierShift) && (code == 1 || (code | 0x20) == 'a'))
+		{
+		ui->SelectAllAddressL();
+		return EKeyWasConsumed;
+		}
 	// the Zoom in and Zoom out icons beside the screen: as View > Zoom in
 	// and Zoom out (Ctrl+M, Shift+Ctrl+M)
 	if (code == (TUint)EEikSidebarZoomInKey || code == (TUint)EEikSidebarZoomOutKey)
@@ -1742,6 +1778,7 @@ TKeyResponse CPwView::OfferKeyEventL(const TKeyEvent& aKeyEvent, TEventCode aTyp
 				{
 				case 'e': case 'l': case 'o': case 'h': case 'r': case 'b':
 				case 'f': case 'm': case 'i': case 't': case 'k': case 'u':
+				case 'x': case 'c': case 'v':    // (0.94) Edit's Cut, Copy, Paste
 					return EKeyWasNotConsumed;
 				}
 			}
@@ -2409,6 +2446,143 @@ void CPwAppUi::EndAddressL(TBool aGo)
 		}
 	}
 
+// (0.94) Edit > Cut, Copy and Paste (Ctrl+X, C, V; the Clipboard icon beside
+// the screen): on the address while it is typed in. Paste with no address
+// being typed: into the box on the page that has the cursor, else into the
+// address (all of it chosen first, so Enter goes there).
+void CPwAppUi::ClipboardL(TInt aCommand)
+	{
+	if (iEditing && iAddress)
+		{
+		TBool sel = iAddress->SelectionLength() > 0;
+		if (aCommand == EEikCmdEditCut || aCommand == EEikCmdEditCopy)
+			{
+			if (!sel)
+				{
+				iEikonEnv->InfoMsg(aCommand == EEikCmdEditCut ? _L("Nothing to cut") : _L("Nothing to copy"));
+				return;
+				}
+			iAddress->ClipboardL(aCommand == EEikCmdEditCut ? CEikEdwin::ECut : CEikEdwin::ECopy);
+			if (aCommand == EEikCmdEditCopy)
+				iEikonEnv->InfoMsg(_L("Copied"));
+			}
+		else
+			iAddress->ClipboardL(CEikEdwin::EPaste);
+		iAddress->DrawNow();
+		return;
+		}
+	if (aCommand != EEikCmdEditPaste)
+		{
+		iEikonEnv->InfoMsg(aCommand == EEikCmdEditCut ? _L("Nothing to cut") : _L("Nothing to copy"));
+		return;
+		}
+	PwShared* s = iView->Shared();
+	if (s && iView->EngineRunning() && s->field_active)
+		{
+		PasteToPageL();
+		return;
+		}
+	if (!iAddress || !iToolBand->IsVisible())
+		{
+		iEikonEnv->InfoMsg(_L("Nothing to paste into - Shift+Ctrl+T shows the address"));
+		return;
+		}
+	StartAddressL();
+	if (iEditing)
+		{
+		iAddress->ClipboardL(CEikEdwin::EPaste);
+		iAddress->DrawNow();
+		}
+	}
+
+void CPwAppUi::SelectAllAddressL()
+	{
+	if (!iEditing || !iAddress)
+		return;
+	iAddress->SelectAllL();
+	iAddress->DrawNow();
+	}
+
+// the clipboard's text, or KErrNotFound
+static TInt ClipboardText(RFs& aFs, TDes& aText)
+	{
+	aText.Zero();
+	CClipboard* cb = NULL;
+	TRAPD(r, cb = CClipboard::NewForReadingL(aFs));
+	if (r != KErrNone)
+		return KErrNotFound;
+	CPlainText* t = NULL;
+	TRAP(r, t = CPlainText::NewL());
+	if (r == KErrNone)
+		TRAP(r, t->PasteFromStoreL(cb->Store(), cb->StreamDictionary(), 0));
+	if (r == KErrNone)
+		t->Extract(aText, 0, Min(t->DocumentLength(), aText.MaxLength()));
+	delete t;
+	delete cb;
+	return r == KErrNone && aText.Length() ? KErrNone : KErrNotFound;
+	}
+
+// a box on the page has the cursor: the clipboard's text typed into it, as
+// keys (the engine has no clipboard of its own), as much as the key queue
+// holds; a line break ends it
+void CPwAppUi::PasteToPageL()
+	{
+	TBuf<PW_EVQ> text;
+	if (ClipboardText(iCoeEnv->FsSession(), text) != KErrNone)
+		{
+		iEikonEnv->InfoMsg(_L("Nothing to paste"));
+		return;
+		}
+	PwShared* s = iView->Shared();
+	TInt room = PW_EVQ - (s->ev_head - s->ev_tail) - 4;
+	TInt n = 0;
+	for (; n < text.Length() && n < room; n++)
+		{
+		TUint c = text[n];
+		if (c == CEditableText::EParagraphDelimiter || c == CEditableText::ELineBreak || c < 0x20)
+			break;
+		iView->Key(c, 0);
+		}
+	if (n < text.Length())
+		iEikonEnv->InfoMsg(_L("Only the first line pasted"));
+	}
+
+// the address of the page showing (none for PsiWeb's own pages), as the
+// toolband shows it, whether the toolband is shown or not
+static void PageAddress(CPwView* aView, TDes& aUrl)
+	{
+	aUrl.Zero();
+	PwShared* s = aView ? aView->Shared() : NULL;
+	if (!s || !(aView->EngineRunning() || aView->Asleep()))
+		return;
+	FromUtf8(aUrl, s->url);
+	if (aUrl.Compare(_L("about:problem")) == 0)
+		FromUtf8(aUrl, s->problem_url);
+	else if (Clip(aUrl, 6).Compare(_L("about:")) == 0)
+		aUrl.Zero();
+	}
+
+// Edit > Copy page address: the address of the page showing, to the
+// clipboard, for another program
+void CPwAppUi::CopyAddressL()
+	{
+	TBuf<PW_URL_MAX> url;
+	PageAddress(iView, url);
+	if (url.Length() == 0)
+		{
+		iEikonEnv->InfoMsg(_L("No page address to copy"));
+		return;
+		}
+	CClipboard* cb = CClipboard::NewForWritingLC(iCoeEnv->FsSession());
+	CPlainText* t = CPlainText::NewL();
+	CleanupStack::PushL(t);
+	t->InsertL(0, url);
+	t->CopyToStoreL(cb->Store(), cb->StreamDictionary(), 0, url.Length());
+	cb->CommitL();
+	CleanupStack::PopAndDestroy(2);     // t, cb
+	iEikonEnv->InfoMsg(_L("Address copied"));
+	}
+
 // keys while the address is being typed in: Enter goes, Esc leaves it;
 // the menu's shortcuts still work (they never reach here)
 TBool CPwAppUi::AddressKeyL(const TKeyEvent& aKeyEvent, TEventCode aType)
@@ -2702,6 +2876,16 @@ void CPwAppUi::DynInitMenuPaneL(TInt aMenuId, CEikMenuPane* aMenuPane)
 		// route's stays as it was: the engine frees the port)
 		aMenuPane->SetItemDimmed(EPwCmdHangup, iView->Settings().iNetMode && !PgLinkUp());
 		}
+	else if (aMenuId == R_PW_EDIT_MENU)
+		{
+		// (0.94) Cut and Copy work on the address being typed in
+		TBool sel = iEditing && iAddress && iAddress->SelectionLength() > 0;
+		aMenuPane->SetItemDimmed(EEikCmdEditCut, !sel);
+		aMenuPane->SetItemDimmed(EEikCmdEditCopy, !sel);
+		TBuf<PW_URL_MAX> url;
+		PageAddress(iView, url);
+		aMenuPane->SetItemDimmed(EPwCmdCopyAddress, url.Length() == 0);
+		}
 	else if (aMenuId == R_PW_LOG_MENU)
 		{
 		// dimmed, not gone, until a proxy is set: the log goes to it;
@@ -2913,6 +3097,15 @@ void CPwAppUi::UpdateL()
 	iView->StartUpdateL();
 	}
 
+// (0.94) the connection settings the engine reads at its start
+static TBool RouteChanged(const TPwSettings& aWas, const TPwSettings& aNow)
+	{
+	return aWas.iBaudIndex != aNow.iBaudIndex || aWas.iRtsCts != aNow.iRtsCts
+		|| aWas.iNetMode != aNow.iNetMode || aWas.iPppStart.Compare(aNow.iPppStart) != 0
+		|| aWas.iUseProxy != aNow.iUseProxy || aWas.iProxyHost.Compare(aNow.iProxyHost) != 0
+		|| aWas.iProxyPort != aNow.iProxyPort;
+	}
+
 void CPwAppUi::HandleCommandL(TInt aCommand)
 	{
 	TPwSettings& st = iView->Settings();
@@ -2922,8 +3115,10 @@ void CPwAppUi::HandleCommandL(TInt aCommand)
 	if (aCommand == EEikCmdZoomIn) aCommand = EPwCmdZoomIn;
 	else if (aCommand == EEikCmdZoomOut) aCommand = EPwCmdZoomOut;
 	else if (aCommand == EEikCmdZoomNormal) aCommand = EPwCmdZoomNormal;
-	// any other command leaves the address as it was (a button, a menu)
-	if (iEditing && aCommand != EPwCmdAddress)
+	// any other command leaves the address as it was (a button, a menu);
+	// (0.94) not the clipboard's, which work on it
+	if (iEditing && aCommand != EPwCmdAddress && aCommand != EEikCmdEditCut
+		&& aCommand != EEikCmdEditCopy && aCommand != EEikCmdEditPaste)
 		EndAddressL(EFalse);
 	switch (aCommand)
 		{
@@ -3069,6 +3264,14 @@ void CPwAppUi::HandleCommandL(TInt aCommand)
 		break;
 	case EPwCmdStyleMenu:
 		break;
+	case EEikCmdEditCut:
+	case EEikCmdEditCopy:
+	case EEikCmdEditPaste:
+		ClipboardL(aCommand);
+		break;
+	case EPwCmdCopyAddress:
+		CopyAddressL();
+		break;
 	case EPwCmdAddFav:
 		AddFavouriteL();
 		break;
@@ -3101,25 +3304,42 @@ void CPwAppUi::HandleCommandL(TInt aCommand)
 		break;
 	case EPwCmdConnSettings:
 		{
+		TPwSettings was(st);
 		CPwConnDialog* dlg = new(ELeave) CPwConnDialog(st);
 		if (dlg->ExecuteLD(R_PW_CONN_DIALOG))
 			{
 			SaveSettings(st);
 			UseSharedLink(iCoeEnv->FsSession(), st);
 			UpdateStartPageL();
-			RestartEngineL();
+			// (0.94) the engine started again only if the route changed:
+			// a restart loses what was typed into the page's forms
+			if (RouteChanged(was, st))
+				RestartEngineL();
 			}
 		break;
 		}
 	case EPwCmdPrefs:
 		{
+		TPwSettings was(st);
 		CPwPrefsDialog* dlg = new(ELeave) CPwPrefsDialog(st);
 		if (dlg->ExecuteLD(R_PW_PREFS_DIALOG))
 			{
 			SaveSettings(st);
 			UpdateStartPageL();
 			ShowPicturesState(st.iImages);   // (pictures on every page, or not)
-			RestartEngineL();
+			// (0.94) what the engine reads as it goes is handed over; it is
+			// started again (losing what was typed into a form) only for
+			// what it reads at its start: the text, and pictures on every page
+			if (sh)
+				{
+				CopyToC(sh->home_url, sizeof(sh->home_url), st.iHome);
+				sh->keep_cookies = (st.iFlags & KPwFlagKeepCookies) != 0;
+				}
+			TBool textChanged = (was.iDisplay & KPwDisplayScaledText) != (st.iDisplay & KPwDisplayScaledText);
+			if (textChanged || (was.iImages != 0) != (st.iImages != 0))
+				RestartEngineL();
+			else if (StyleNow(was) != StyleNow(st))
+				SetStyleL(StyleNow(st));
 			}
 		break;
 		}

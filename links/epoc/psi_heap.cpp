@@ -39,6 +39,21 @@ extern "C" long psi_heap_room()
 	return sys < room ? sys : room;
 	}
 
+// (0.94) the Psion's own free memory, not the engine's 10 MB, is what is
+// short: the page is not too big, the machine is too full ("Page too big"
+// said so either way)
+extern "C" int psi_heap_system_short()
+	{
+	const TInt KHeapMax = (pwb_depth() == 8 ? 20 : 10) * 1024 * 1024;
+	const TInt KSystemReserve = 256 * 1024;
+	TInt biggest = 0;
+	TInt avail = User::Heap().Available(biggest);
+	TInt used = User::Heap().Size() - avail;
+	TMemoryInfoV1Buf mem;
+	UserHal::MemoryInfo(mem);
+	return mem().iFreeRamInBytes + avail - KSystemReserve < KHeapMax - used;
+	}
+
 // (0.92) The heap's free end goes back to the system (RHeap gives back
 // only what is free at its top): after each page, and when PsiWeb has
 // been behind another program for a while (psi_drv.c psi_trim).

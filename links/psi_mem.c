@@ -152,6 +152,8 @@ void psi_mem_report(const char *what)
 
 /* bytes the heap may still grow by (psi_drv.c: the soft ceiling); with no
    PSI_HEAP_LIMIT, as if the limit were the Psion's 10 MB */
+int psi_heap_system_short(void) { return 0; }	/* (the PC: only the limit) */
+
 long psi_heap_room(void)
 {
 	over(0);

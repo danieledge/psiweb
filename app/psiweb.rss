@@ -126,8 +126,10 @@ RESOURCE TOOLBAND r_pw_toolband
 // preferences, Shift+Ctrl+H help, Shift+Ctrl+A about), the built-in Email program's Ctrl+U
 // (disconnect) and Shift+Ctrl+Q (status information = Page info), and the
 // browser's own: Ctrl+L also opens an address, Ctrl+H home, Ctrl+R reload,
-// Ctrl+B back, Ctrl+F forward, Ctrl+I show pictures. Ctrl+A/C/V/X/Z stay with the
-// page (select all, copy, paste...); Esc stops a page loading.
+// Ctrl+B back, Ctrl+F forward, Ctrl+I show pictures. (0.94) Ctrl+X, C and V
+// are Edit's Cut, Copy and Paste (the address, or Paste into a box on the
+// page); Ctrl+A selects the address being typed in, else stays with the
+// page, as Ctrl+Z does; Esc stops a page loading.
 RESOURCE HOTKEYS r_pw_hotkeys
 	{
 	control=
@@ -143,7 +145,10 @@ RESOURCE HOTKEYS r_pw_hotkeys
 		HOTKEY { command=EPwCmdImages; key='i'; },
 		HOTKEY { command=EPwCmdToggleToolbar; key='t'; },
 		HOTKEY { command=EPwCmdPrefs; key='k'; },
-		HOTKEY { command=EPwCmdHangup; key='u'; }
+		HOTKEY { command=EPwCmdHangup; key='u'; },
+		HOTKEY { command=EEikCmdEditCut; key='x'; },
+		HOTKEY { command=EEikCmdEditCopy; key='c'; },
+		HOTKEY { command=EEikCmdEditPaste; key='v'; }
 		};
 	shift_control=
 		{
@@ -165,10 +170,24 @@ RESOURCE MENU_BAR r_pw_menubar
 	titles=
 		{
 		MENU_TITLE { menu_pane=r_pw_file_menu; txt="File"; },
+		MENU_TITLE { menu_pane=r_pw_edit_menu; txt="Edit"; },
 		MENU_TITLE { menu_pane=r_pw_view_menu; txt="View"; },
 		MENU_TITLE { menu_pane=r_pw_go_menu; txt="Go"; },
 		MENU_TITLE { menu_pane=r_pw_favs_menu; txt="Favourites"; },
 		MENU_TITLE { menu_pane=r_pw_tools_menu; txt="Tools"; }
+		};
+	}
+
+// (0.94) Edit: the clipboard, for the address being typed in (Ctrl+L) or,
+// for Paste, a box on the page; and the page's address to the clipboard
+RESOURCE MENU_PANE r_pw_edit_menu
+	{
+	items=
+		{
+		MENU_ITEM { command=EEikCmdEditCut; txt="Cut"; },
+		MENU_ITEM { command=EEikCmdEditCopy; txt="Copy"; },
+		MENU_ITEM { command=EEikCmdEditPaste; txt="Paste"; flags=EEikMenuItemSeparatorAfter; },
+		MENU_ITEM { command=EPwCmdCopyAddress; txt="Copy page address"; }
 		};
 	}
 
