@@ -148,6 +148,7 @@ void CPwList::Save()
 	HBufC8* buf = HBufC8::New(4 + iCount * (4 + KPwTitleMax + PW_URL_MAX));
 	if (!buf)
 		return;
+	iDirty = EFalse;
 	TPtr8 d(buf->Des());
 	d.Append('P');
 	d.Append('W');
@@ -203,7 +204,7 @@ void CPwList::AddFront(const TDesC& aTitle, const TDesC& aUrl)
 		iItems[i] = iItems[i - 1];
 	iItems[0].iTitle = title;
 	iItems[0].iUrl = Clip(aUrl, PW_URL_MAX);
-	Save();
+	Touched();
 	}
 
 TInt CPwList::AddEnd(const TDesC& aTitle, const TDesC& aUrl)
@@ -233,7 +234,7 @@ void CPwList::SetTitleOnly(TInt aIndex, const TDesC& aTitle)
 	if (aIndex < 0 || aIndex >= iCount)
 		return;
 	iItems[aIndex].iTitle = Clip(aTitle, KPwTitleMax);
-	Save();
+	Touched();
 	}
 
 void CPwList::Delete(TInt aIndex)
@@ -378,6 +379,20 @@ TBool CPwListDialog::OkToExitL(TInt aButtonId)
 			iEikonEnv->InfoMsg(_L("Nothing to delete"));
 			return EFalse;
 			}
+		// (0.96, review R114) the fact, then the question, as Clear history
+		TBuf<KPwTitleMax + 2> name;
+		name.Append('"');
+		TBuf<KPwTitleMax> shown;
+		ShownName(iList.At(cur), shown);
+		if (shown.Length() > 40)
+			{
+			shown.SetLength(39);             // (the question stays the size of Psion's own)
+			shown.Append((TChar)0x85);
+			}
+		name.Append(shown);
+		name.Append('"');
+		if (!iEikonEnv->QueryWinL(name, _L("Delete this favourite?")))
+			return EFalse;
 		iList.Delete(cur);
 		FillL();
 		iEikonEnv->InfoMsg(_L("Deleted"));
@@ -483,6 +498,15 @@ TBool CPwAppUi::HavePage() const
 	return RealUrl(url);
 	}
 
+// (0.96) History.dat written now, if a page changed it
+void CPwAppUi::SaveHistory()
+	{
+	if (!iHist)
+		return;
+	iHist->SaveIfChanged();
+	iHistSavedAt = User::TickCount();
+	}
+
 // the engine has finished loading a page: into History (CPwView::Tick)
 void CPwAppUi::PageLoaded()
 	{
@@ -508,6 +532,8 @@ void CPwAppUi::PageLoaded()
 // few seconds, a changed title is put right
 void CPwAppUi::PageTick()
 	{
+	if (iHist && iHist->Changed() && User::TickCount() - iHistSavedAt > 64 * 60)
+		SaveHistory();
 	if (!iHistUntil || !iHist)
 		return;
 	if ((TInt)(User::TickCount() - iHistUntil) > 0)
@@ -580,7 +606,7 @@ void CPwAppUi::OrganiseL()
 		}
 	TInt pick = -1;
 	CPwListDialog* dlg = new(ELeave) CPwListDialog(*iFavs, ETrue, pick);
-	dlg->ExecuteLD(R_PW_ORGANISE_DIALOG);
+	dlg->ExecuteLD(TallScreen() ? R_PW_ORGANISE_DIALOG_TALL : R_PW_ORGANISE_DIALOG);
 	UpdateStartPageL();                      // (0.87) the speed dial
 	}
 
@@ -594,7 +620,9 @@ void CPwAppUi::PickAndOpenL(CPwList& aList)
 		}
 	TInt pick = -1;
 	CPwListDialog* dlg = new(ELeave) CPwListDialog(aList, EFalse, pick);
-	if (dlg->ExecuteLD(&aList == iFavs ? R_PW_PICK_FAVS_DIALOG : R_PW_PICK_HISTORY_DIALOG) && pick >= 0)
+	TInt res = &aList == iFavs ? (TallScreen() ? R_PW_PICK_FAVS_DIALOG_TALL : R_PW_PICK_FAVS_DIALOG)
+		: (TallScreen() ? R_PW_PICK_HISTORY_DIALOG_TALL : R_PW_PICK_HISTORY_DIALOG);
+	if (dlg->ExecuteLD(res) && pick >= 0)
 		OpenFromListL(aList, pick);
 	}
 

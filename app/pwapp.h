@@ -93,7 +93,13 @@ public:
 	void Delete(TInt aIndex);
 	void Clear();
 	void Save();
+	// (0.96, review R115) History: a page loaded only marks the list, which
+	// is written at most once a minute, when PsiWeb goes behind and at Close
+	void SetLazy() { iLazy = ETrue; }
+	TBool Changed() const { return iDirty; }
+	void SaveIfChanged() { if (iDirty) Save(); }
 private:
+	void Touched() { if (iLazy) iDirty = ETrue; else Save(); }
 	CPwList(RFs& aFs, TInt aMax) : iFs(aFs), iMax(aMax) {}
 	void ConstructL(const TDesC& aFile);
 	void Load();
@@ -102,6 +108,8 @@ private:
 	TInt iCount;
 	TPwEntry* iItems;
 	TFileName iFile;
+	TBool iLazy;
+	TBool iDirty;
 	};
 
 struct TPwSettings
@@ -165,6 +173,7 @@ public:
 	// half a minute and put to sleep (ended, to start again on the same
 	// page) after ten, when nothing would be lost
 	void SetForeground(TBool aFront);
+	void LinkToShared();                    // (0.96) PsiLink.ini into the chunk (review R60)
 	TBool Asleep() const { return iAsleep; }
 	void WakeL();
 	void StartBusy(const TDesC& aText);      // busy message until the engine draws
@@ -493,6 +502,7 @@ public:
 	void EndAddressL(TBool aGo);        // the address shows the page again (and goes there)
 	void PageLoaded();                  // a page has loaded: History (pwfavs.cpp)
 	void PageTick();                    // ...and its title may arrive a moment later
+	void SaveHistory();                 // (0.96) History.dat, if changed (review R115)
 	void EngineCommandL(TInt aCmd);     // (0.85) a "Page not opened" page's links (PW_APP_*)
 	void SetStyleL(TInt aStyle);        // (0.86) View > Page style
 	void UpdateStartPageL();            // (0.87) the start page (pwstart.cpp)
@@ -512,6 +522,7 @@ private:
 	CPwList* iFavs;
 	CPwList* iHist;
 	TUint iHistUntil;                   // tick count to watch for the page's title until (0: not)
+	TUint iHistSavedAt;                 // (0.96) when History.dat was last written (ticks)
 	// Reading mode (ssh/psidisp.h): on while PsiWeb is in front with the
 	// tick on; off in the background, at switch-on and on closing
 	void HandleWsEventL(const TWsEvent& aEvent, CCoeControl* aDestination);

@@ -452,7 +452,7 @@ int pw_update_run(void)
 	say(PW_UPD_RUNNING, "Checking the release signature...");
 	if (verify_file(net->save_as, remote, sig) != 0) {
 		remove(net->save_as);
-		snprintf(why, sizeof(why), "SIGNATURE CHECK FAILED - the download was deleted");
+		snprintf(why, sizeof(why), "The release signature does not match - the download was deleted");
 		r = -1; goto fail;
 	}
 	say(PW_UPD_READY, "PsiWeb %s is downloaded and its signature checks out", remote);

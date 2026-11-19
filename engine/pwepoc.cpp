@@ -86,6 +86,9 @@ extern "C" long pw_utc()
 // no file is made, and nothing is written. The lines carry status text, so
 // the addresses of pages; a user name and password in an address
 // (http://name:password@host/) never go in.
+// (0.96, review R115) at most 128 KB: then it goes to PsiWeb.old and a new
+// one starts, so a log left on never fills C:. An address's query (after
+// "?": search words, tokens) is left out too: "...?..." in its place.
 // (a test build can put it on the emulator's card, where it can be read
 // back: web/links/epoc.mk PWEPOC_DEFS=-DPW_LOG_ON_D)
 #ifdef PW_LOG_ON_D
@@ -99,6 +102,8 @@ static RFs gLogFs;
 static RFile gLog;
 static TInt gLogOpen = 0;       // 0 not tried, 1 open, -1 failed
 static TUint gLogT0 = 0;
+static TInt gLogLen = 0;
+const TInt KLogMax = 128 * 1024;
 static char gLogLast[96];
 static PwShared* gPw = 0;
 
@@ -115,7 +120,24 @@ static void LogOpen()
 		return;
 		}
 	gLogT0 = User::TickCount();
+	gLogLen = 0;
 	gLogOpen = 1;
+	}
+
+// (0.96) the log full: it becomes PsiWeb.old and a new one starts (the time
+// goes on from the same start)
+static void LogTurn()
+	{
+	gLog.Close();
+	gLogFs.Delete(KLogOld);
+	gLogFs.Rename(KLogFile, KLogOld);
+	if (gLog.Replace(gLogFs, KLogFile, EFileWrite | EFileShareAny) != KErrNone)
+		{
+		gLogFs.Close();
+		gLogOpen = -1;
+		return;
+		}
+	gLogLen = 0;
 	}
 
 extern "C" void pw_log(const char* aText)
@@ -131,14 +153,27 @@ extern "C" void pw_log(const char* aText)
 	line.AppendFormat(_L8("%02u:%02u.%u "), (t / 600) % 100, (t / 10) % 60, t % 10);
 	TInt n = 0;
 	while (aText[n] && n < 120) n++;
-	// "scheme://name:password@host": the part before the @ is left out
+	// "scheme://name:password@host": the part before the @ is left out;
+	// (0.96) and an address's query, after its "?"
+	TBool inUrl = EFalse;
 	for (TInt i = 0; i < n && line.Length() < line.MaxLength() - 8; )
 		{
+		if (aText[i] == ' ')
+			inUrl = EFalse;
+		else if (inUrl && aText[i] == '?')
+			{
+			line.Append(_L8("?..."));
+			while (i < n && aText[i] != ' ')
+				i++;
+			inUrl = EFalse;
+			continue;
+			}
 		line.Append((TUint8)aText[i]);
 		if (i + 2 < n && aText[i] == ':' && aText[i + 1] == '/' && aText[i + 2] == '/')
 			{
 			line.Append(_L8("//"));
 			i += 3;
+			inUrl = ETrue;
 			TInt j = i;
 			while (j < n && aText[j] != '@' && aText[j] != '/' && aText[j] != ' ' && aText[j] != '?')
 				j++;
@@ -152,7 +187,14 @@ extern "C" void pw_log(const char* aText)
 		i++;
 		}
 	line.Append(_L8("\r\n"));
-	gLog.Write(line);
+	if (gLogLen + line.Length() > KLogMax)
+		{
+		LogTurn();
+		if (gLogOpen != 1)
+			return;
+		}
+	if (gLog.Write(line) == KErrNone)
+		gLogLen += line.Length();
 	gLog.Flush();
 	}
 

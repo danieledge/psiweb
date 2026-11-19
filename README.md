@@ -14,9 +14,19 @@ A web browser for the **Psion Series 5mx**, the **netBook** and the **Series 7**
 
 Up to 0.61 the engine was NetSurf. Its sources are still in the tree as a fallback (see *The NetSurf engine* below), until Links has been proved on the device. The whole port is described in [`links/PORTING.md`](links/PORTING.md).
 
-**Status: beta (0.94).** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
+**Status: beta (0.96).** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
 
 [![Download PsiWeb.sis](https://img.shields.io/badge/Download-PsiWeb.sis-2ea44f?logo=github)](https://github.com/danieledge/psiterm/raw/main/dist/PsiWeb.sis)
+
+## What's new in 0.96
+
+- **A route changed in another program is used at once.** Coming back to PsiWeb, it reads the shared connection settings again, so the next page goes by the route PsiMail, PsiTerm or Connection settings chose, without restarting the engine.
+- **Quieter.** While the engine sleeps, PsiWeb no longer wakes the Psion every 2 seconds. History.dat is written at most once a minute, when PsiWeb goes behind another program and at Close, not again for every page.
+- **The log stays small.** PsiWeb.log is at most 128 KB (it then becomes PsiWeb.old and starts again), and the part of an address after "?" is left out of it.
+- **Messages say what went wrong in words**, not as a number. With PsiWeb on the card and the card out, it says "PsiWeb is on the Coda card - put the card in", not to reinstall it.
+- **Wording.** The toolbar's Go to is now Address, like File > Open address. View > Show > Bright screen says "Bright screen on" and "off". Organise favourites > Delete asks first, as Clear history does. On the netBook the favourites and history lists are as tall as its own programs' lists.
+
+0.95 kept the preferences, the favourites and the update choice on the card, in \System\Data\Kept\, and put them back if the internal memory is cleared.
 
 ## What's new in 0.94
 
@@ -85,7 +95,7 @@ Memory. On a machine with no swap, PsiWeb held about 5 MB for as long as it was 
 - **The route light.** On the toolband: *Direct*, *Atom* or *PsiProxy*, a padlock for a secure page checked on the way, and L, R or T for the page style. A tap opens Page information, which now says how the page came, whether it is secure and who checked it, its style, its size (and how much was kept) and the pictures left out.
 - **AES-128-GCM** as a second TLS 1.3 cipher (psion-core's `ssh/aesgcm.c`), for servers that offer AES only: eBay, the one site of 50 that PsiWeb could not reach direct, now connects. ChaCha20-Poly1305 stays first.
 - **Bars without a restart.** Showing or hiding the toolbar (Ctrl+T) or the toolband (Shift+Ctrl+T) lays the page out again at the new width, on the same page and place; the engine no longer restarts (no "Restarting the browser engine..." and no blank page).
-- **The toolbar**: Go to, Back, Start, Pictures. **The toolband**: Back, Forward, Reload (Stop while a page loads, one button), Start, the address, the route light, Pictures. The progress bar runs along the bottom of the address while a page loads, and is gone when idle (no empty gap beside the address).
+- **The toolbar**: Address (File > Open address), Back, Start, Pictures. **The toolband**: Back, Forward, Reload (Stop while a page loads, one button), Start, the address, the route light, Pictures. The progress bar runs along the bottom of the address while a page loads, and is gone when idle (no empty gap beside the address).
 - **Address completion.** As you type in the toolband's address, the first favourite or recent page that begins the same way is offered, chosen, so typing on replaces it and Enter takes it.
 - **Help on the netBook** uses a dialog the size of the netBook's own large dialogs, its text taking the room; a new topic, *Page styles*.
 - Pictures are asked for as JPEG, PNG or GIF (the Accept header no longer offers WebP); the netBook's engine may grow to 20 MB (the 5mx stays at 10 MB).

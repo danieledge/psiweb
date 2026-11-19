@@ -124,6 +124,13 @@ int pg_bells(void) { return 0; }
 int pg_bell_wait(int ms) { pg_msleep(ms); return 0; }
 void pg_ring_app(void) { }
 int pg_entropy(unsigned char *o, int m) { return emu_hc(HP_ENTROPY, (int)o, m, 0, 0); }
+/* (psion-core 98f359d, ssh/psiwork.h) work memory: TLS's record buffers and
+   the certificate chain, taken per connection; here the harness's heap */
+void *calloc(unsigned int, unsigned int);
+void free(void *);
+void *pg_work_alloc(unsigned long n) { return calloc(1, (unsigned int)n); }
+void pg_work_free(void *p) { free(p); }
+void pg_work_trim(void) { }
 
 /* Tools > Update PsiWeb: not in the emulator build */
 int pw_update_run(void) { return 4; }

@@ -58,7 +58,7 @@ RESOURCE TOOLBAR r_pw_toolbar
 			length=KEikStdFileNameLabelHeight;
 			control=LABEL { txt="PsiWeb"; horiz_align=EEikLabelAlignHCenter; vert_align=EEikLabelAlignVCenter; };
 			},
-		TBAR_BUTTON { id=EPwCmdOpen; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Go to"; flags=EEikToolBarCtrlHasSetMinLength; length=KEikStdToolBarButtonHeight; },
+		TBAR_BUTTON { id=EPwCmdOpen; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Address"; flags=EEikToolBarCtrlHasSetMinLength; length=KEikStdToolBarButtonHeight; },
 		TBAR_BUTTON { id=EPwCmdBack; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Back"; flags=EEikToolBarCtrlHasSetMinLength; length=KEikStdToolBarButtonHeight; },
 		TBAR_BUTTON { id=EPwCmdStart; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Start"; flags=EEikToolBarCtrlHasSetMinLength; length=KEikStdToolBarButtonHeight; },
 		TBAR_BUTTON { id=EPwCmdImages; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Pictures"; flags=EEikToolBarCtrlHasSetMinLength; length=KEikStdToolBarButtonHeight; },
@@ -366,6 +366,20 @@ RESOURCE DIALOG r_pw_organise_dialog
 		};
 	}
 
+// (0.96, review R114) the netBook and Series 7: the list as tall as their own
+// programs' list dialogs, not the 5mx's six lines
+RESOURCE DIALOG r_pw_organise_dialog_tall
+	{
+	title="Organise favourites";
+	flags=EEikDialogFlagWait;
+	buttons=r_pw_organise_buttons;
+	items=
+		{
+		DLG_LINE { type=EEikCtColListBox; id=EPwDlgOrgList;
+			control=LISTBOX { height=14; width=40; }; }
+		};
+	}
+
 RESOURCE DLG_BUTTONS r_pw_organise_buttons
 	{
 	buttons=
@@ -389,6 +403,20 @@ RESOURCE DIALOG r_pw_pick_favs_dialog
 		};
 	}
 
+// (0.96, review R114) the netBook and Series 7: the list as tall as their own
+// programs' list dialogs, not the 5mx's six lines
+RESOURCE DIALOG r_pw_pick_favs_dialog_tall
+	{
+	title="Favourites";
+	flags=EEikDialogFlagWait;
+	buttons=r_pw_pick_buttons;
+	items=
+		{
+		DLG_LINE { type=EEikCtColListBox; id=EPwDlgOrgList;
+			control=LISTBOX { height=14; width=40; }; }
+		};
+	}
+
 RESOURCE DIALOG r_pw_pick_history_dialog
 	{
 	title="History";
@@ -398,6 +426,20 @@ RESOURCE DIALOG r_pw_pick_history_dialog
 		{
 		DLG_LINE { type=EEikCtColListBox; id=EPwDlgOrgList;
 			control=LISTBOX { height=6; width=34; }; }
+		};
+	}
+
+// (0.96, review R114) the netBook and Series 7: the list as tall as their own
+// programs' list dialogs, not the 5mx's six lines
+RESOURCE DIALOG r_pw_pick_history_dialog_tall
+	{
+	title="History";
+	flags=EEikDialogFlagWait;
+	buttons=r_pw_pick_buttons;
+	items=
+		{
+		DLG_LINE { type=EEikCtColListBox; id=EPwDlgOrgList;
+			control=LISTBOX { height=14; width=40; }; }
 		};
 	}
 

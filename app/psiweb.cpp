@@ -31,6 +31,7 @@
 #include "psigreyui.h"
 #include "pwaddr.h"              // (0.85) an address, or words to search for
 #include "psikeep.h"             // (0.95) settings kept on the card (never the cookies)
+#include "psierr.h"              // (0.96) Coda's words for an error (review R105)
 
 // The link settings, proxy included, are shared with PsiTerm and PsiMail
 // (psilink.h). The proxy fields of TPwSettings are only a copy of the shared
@@ -69,6 +70,38 @@ static void UseSharedLink(RFs& aFs, TPwSettings& aSettings)
 	aSettings.iUseProxy = link.iUseProxy;
 	aSettings.iProxyHost = link.iProxyHost;
 	aSettings.iProxyPort = link.iProxyPort;
+	}
+
+// (0.96) is the disk with this letter in? (the card, for a PsiWeb on it)
+static TBool DiskThere(RFs& aFs, TChar aLetter)
+	{
+	TInt drive;
+	if (RFs::CharToDrive(aLetter, drive) != KErrNone)
+		return ETrue;
+	TVolumeInfo v;
+	return aFs.Volume(v, drive) == KErrNone;
+	}
+
+// (0.96, review R105) a line in PsiWeb.log from the app, while Tools > Log >
+// Keep a log is ticked: the number behind a message that says it in words
+static void AppLog(PwShared* aShared, RFs& aFs, const TDesC& aText)
+	{
+	if (!aShared || !aShared->net.log_on)
+		return;
+	RFile f;
+	_LIT(KLog, "C:\\System\\Data\\PsiWeb.log");
+	TInt r = f.Open(aFs, KLog, EFileWrite | EFileShareAny);
+	if (r == KErrNotFound)
+		r = f.Create(aFs, KLog, EFileWrite | EFileShareAny);
+	if (r != KErrNone)
+		return;
+	TInt end = 0;
+	f.Seek(ESeekEnd, end);
+	TBuf8<140> line(_L8("app: "));
+	line.Append(aText.Left(Min(aText.Length(), 130)));
+	line.Append(_L8("\r\n"));
+	f.Write(line);
+	f.Close();
 	}
 
 // (0.90) "Modem provides TLS" (PsiLink.ini iModemTls, set in PsiMail's
@@ -118,7 +151,7 @@ static TBool PwDiagOn()
 _LIT(KIniFile, "C:\\System\\Apps\\PsiWeb\\PsiWeb.ini");
 _LIT(KUpdIniFile, "C:\\System\\Apps\\PsiWeb\\Update.ini");
 _LIT(KFavsKept, "C:\\System\\Apps\\PsiWeb\\Favourites.dat");   // (pwfavs.cpp's KFavsFile)
-_LIT(KVersion, "0.95");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
+_LIT(KVersion, "0.96");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
 _LIT(KDefaultHome, "http://68k.news/");
 const TInt KZoomSteps[] = { 50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200 };
 const TInt KZoomCount = 11;
@@ -490,13 +523,31 @@ void CPwView::StartEngineL()
 		if (r == KErrNoMemory)
 			e = _L("Not enough memory - close other programs, then Tools > Log > Restart browser engine");
 		else if (r == KErrNotReady || r == KErrDisMounted)
-			e = _L("The card is not ready - put it back, then Tools > Log > Restart browser engine");
+			{
+			// (0.96, review R103) Coda's one wording for the card
+			PsiOnCardMsg(e, _L("PsiWeb"));
+			e.Append(_L(", then Tools > Log > Restart browser engine"));
+			}
 		else if (r == KErrInUse || r == KErrLocked)
 			e = _L("psiweb.exe is in use - try Tools > Log > Restart browser engine in a moment");
+		else if (exe.Length() && exe[0] != 'C' && exe[0] != 'c' && exe[0] != 'Z' && exe[0] != 'z'
+			&& !DiskThere(iCoeEnv->FsSession(), exe[0]))
+			{
+			// (0.96, review R103) PsiWeb is on the card and the card is out:
+			// Coda's one wording for it, not "reinstall"
+			PsiOnCardMsg(e, _L("PsiWeb"));
+			}
 		else if (r == KErrNotFound || r == KErrPathNotFound)
 			e = _L("psiweb.exe is not next to PsiWeb - reinstall PsiWeb from its .sis file");
+		else if (r == KErrCorrupt || r == KErrNotSupported)
+			e = _L("psiweb.exe is damaged - reinstall PsiWeb from its .sis file");
 		else
-			e.Format(_L("Could not start psiweb.exe (%d) - reinstall PsiWeb from its .sis file"), r);
+			PsiErrMsg(e, _L("Could not start psiweb.exe"), r);   // (0.96: in words, review R105)
+		{
+		TBuf<60> l;
+		l.Format(_L("psiweb.exe did not start (error %d)"), r);
+		AppLog(iShared, iCoeEnv->FsSession(), l);
+		}
 		ShowMessage(_L("The browser engine did not start"), e);
 		return;
 		}
@@ -645,6 +696,29 @@ void CPwView::SetForeground(TBool aFront)
 		TRAPD(err, WakeL());
 		(void)err;
 		}
+	else if (iRunning)
+		LinkToShared();                      // (0.96, review R60) a route changed in another program
+	}
+
+// (0.96, review R60) the shared connection settings (PsiLink.ini) into the
+// running engine's chunk, read again on coming to the front: the engine
+// takes the route up at its next dial with no link open (psiglue's
+// pg_dial), so a route changed in PsiMail, PsiTerm or Connection settings
+// is used without restarting the engine. The proxy goes in the same way.
+void CPwView::LinkToShared()
+	{
+	PwShared* s = iShared;
+	if (!s)
+		return;
+	UseSharedLink(iCoeEnv->FsSession(), iSettings);
+	s->net.baud_index = iSettings.iBaudIndex;
+	s->net.rtscts = iSettings.iRtsCts;
+	s->net.net_mode = iSettings.iNetMode;
+	s->net.modem_tls = SharedModemTls(iCoeEnv->FsSession(), iSettings);
+	CopyToC(s->net.ppp_start, sizeof(s->net.ppp_start), iSettings.iPppStart);
+	s->use_proxy = iSettings.iUseProxy;
+	CopyToC(s->proxy_host, sizeof(s->proxy_host), iSettings.iProxyHost);
+	s->proxy_port = iSettings.iProxyPort;
 	}
 
 void CPwView::MemoryTick()
@@ -706,6 +780,12 @@ void CPwView::Sleep()
 	iEngRinger.Close();
 	iStartUrl = url;
 	iAsleep = ETrue;
+	// (0.96, review R115) asleep, nothing comes from an engine and nothing
+	// is drawn: no tick at all until it wakes (StartEngineL's TickFast
+	// starts it again; coming to the front is what wakes it)
+	if (iTimer)
+		iTimer->Cancel();
+	iTickQuiet = ETrue;
 	}
 
 // The engine again, on the page it slept on (iStartUrl; OpenUrlL may have
@@ -957,14 +1037,23 @@ void CPwView::EngineEnded()
 	TBuf<120> why;
 	if (type == EExitPanic)
 		PsiLinkTimersBack();             // (0.54) the crash skipped the engine's own clean-up
+	// (0.96, review R105) in words; the panic or the number to the log
+	{
+	TBuf<60> l;
 	if (type == EExitPanic)
-		why.Format(_L("%S %d - Tools > Log > Restart browser engine starts it again"), &cat, reason);
+		l.Format(_L("the engine stopped: %S %d"), &cat, reason);
+	else
+		l.Format(_L("the engine closed (%d)"), reason);
+	AppLog(iShared, iCoeEnv->FsSession(), l);
+	}
+	if (type == EExitPanic)
+		why = _L("It stopped unexpectedly - Tools > Log > Restart browser engine starts it again");
 	else if (iShared->exit_msg[0])
 		{
 		FromUtf8(why, iShared->exit_msg);
 		}
 	else
-		why.Format(_L("It closed (%d) - Tools > Log > Restart browser engine starts it again"), reason);
+		why = _L("It closed - Tools > Log > Restart browser engine starts it again");
 	ShowMessage(_L("The browser engine has stopped"), why);
 	}
 
@@ -1636,7 +1725,10 @@ void CPwView::StartInstallerL()
 		return;
 		}
 	TBuf<160> m;
-	m.Format(_L("Could not start the installer (%d) - open %S from the System screen"), err, &iUpdateFile);
+	PsiErrMsg(m, _L("Could not start the installer"), err);   // (0.96: in words, review R105)
+	m.Append(_L(" - open "));
+	m.Append(iUpdateFile.Left(Min(iUpdateFile.Length(), m.MaxLength() - m.Length() - 23)));
+	m.Append(_L(" from the System screen"));
 	iEikonEnv->InfoWinL(_L("Update downloaded"), m);
 	}
 
@@ -2091,6 +2183,7 @@ void CPwAppUi::ConstructL()
 	ShowPicturesState(settings.iImages);
 	iFavs = CPwList::NewL(iCoeEnv->FsSession(), _L("C:\\System\\Apps\\PsiWeb\\Favourites.dat"), KPwMaxFavs);
 	iHist = CPwList::NewL(iCoeEnv->FsSession(), _L("C:\\System\\Apps\\PsiWeb\\History.dat"), KPwMaxHist);
+	iHist->SetLazy();                        // (0.96, review R115) not rewritten whole for every page
 	SeedFavouritesL();                       // (0.87) a new PsiWeb: its first tiles
 	iView = new(ELeave) CPwView;
 	iView->ConstructL(PageRect(), settings);
@@ -2142,6 +2235,8 @@ void CPwAppUi::HandleWsEventL(const TWsEvent& aEvent, CCoeControl* aDestination)
 		iForeground = aEvent.Type() == EEventFocusGained;
 		if (iView)
 			iView->SetForeground(iForeground);   // (0.92) memory: trim and sleep while behind
+		if (!iForeground)
+			SaveHistory();                   // (0.96) the pages of this visit, once
 		UpdateReading();
 		if (iFullBusyAt)                     // (0.88) PsiTerm came in front: "Opening in PsiTerm..." goes
 			{
@@ -2704,6 +2799,7 @@ CPwAppUi::~CPwAppUi()
 		delete iView;
 		}
 	delete iFavs;
+	SaveHistory();                           // (0.96) what the last minute added
 	delete iHist;
 	delete iSetupIdle;
 	delete iBar;
@@ -3271,7 +3367,7 @@ void CPwAppUi::HandleCommandL(TInt aCommand)
 		st.iDisplay ^= KPwDisplayReading;
 		SaveSettings(st);
 		UpdateReading();
-		iEikonEnv->InfoMsg((st.iDisplay & KPwDisplayReading) ? _L("Reading mode on") : _L("Reading mode off"));
+		iEikonEnv->InfoMsg((st.iDisplay & KPwDisplayReading) ? _L("Bright screen on") : _L("Bright screen off"));
 		break;
 	case EPwCmdPageInfo:
 	case EPwCmdRouteLight:
