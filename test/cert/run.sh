@@ -99,6 +99,11 @@ check "self-signed ECDSA"             "Certificate not trusted - localhost | its
 	$C "$B/selfec.msg" localhost
 check "npr in 2040 (expired)"         "Certificate not trusted - text.npr.org | its certificate has expired" \
 	env PW_NOW=2208988800 $C "$B/npr.msg" text.npr.org
+# (0.98, psion-core CR-20) with the clock reset (before the build year), no chain is trusted, and PsiWeb says to set the date
+check "npr with the clock reset"      "Clock not set - the certificate of text.npr.org cannot be checked | the Psion's clock is not set" \
+	env PW_NOW=86400 $C "$B/npr.msg" text.npr.org
+check "wikipedia with the clock in 2001" "Clock not set - the certificate of en.m.wikipedia.org cannot be checked" \
+	env PW_NOW=1000000000 $C "$B/wikipedia.msg" en.m.wikipedia.org
 check "handshake turned down"         "Secure connection refused - example.org" $C --alert example.org
 echo "$pass passed, $fail failed"
 [ $fail = 0 ]

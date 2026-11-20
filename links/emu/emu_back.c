@@ -14,7 +14,7 @@ int emu_hc(int op, int a, int b, int c, int d);
 void emu_mem_report(void);
 enum {
 	HB = 200, HB_OPEN = HB, HB_PRESENT, HB_EVENT, HB_CMD, HB_STATUS, HB_TITLE,
-	HB_URL, HB_BUSY, HB_READY, HB_MS, HB_CONFIG, HB_UPDCFG, HB_IMAGES, HB_DEPTH, HB_STYLE, HB_COOKIES, HB_MODEMTLS,
+	HB_URL, HB_BUSY, HB_READY, HB_MS, HB_CONFIG, HB_UPDCFG, HB_IMAGES, HB_DEPTH, HB_STYLE, HB_COOKIES, HB_MODEMTLS, HB_WAKING,
 	HP = 300, HP_DIAL = HP, HP_HANGUP, HP_AVAIL, HP_READ, HP_WRITE, HP_WAIT, HP_ENTROPY
 };
 
@@ -39,6 +39,7 @@ static void emu_config(void)
 	done = 1;
 	emu_hc(HB_CONFIG, (int)&g_sh.use_proxy, (int)g_sh.proxy_host, (int)&g_sh.proxy_port, (int)&g_sh.net.net_mode);
 	g_sh.net.modem_tls = emu_hc(HB_MODEMTLS, 0, 0, 0, 0);   /* (0.90) run_links.py --atom-tls */
+	g_sh.waking = emu_hc(HB_WAKING, 0, 0, 0, 0);            /* (0.98) run_links.py --waking */
 }
 void *pwb_shared(void) { emu_config(); return &g_sh; }
 /* for the harness's "auth" and "save" script lines (run_links.py): the
@@ -55,7 +56,10 @@ const int emu_ask_offsets[] = {
 	(int)&((PwShared *)0)->pics_done, (int)&((PwShared *)0)->pics_all,
 	/* (0.93) 18..20: what PsiWeb.app sets to wake or stop the engine
 	   (run_links.py --wakes) */
-	(int)&((PwShared *)0)->net.quit, (int)&((PwShared *)0)->net.resized, (int)&((PwShared *)0)->quitting
+	(int)&((PwShared *)0)->net.quit, (int)&((PwShared *)0)->net.resized, (int)&((PwShared *)0)->quitting,
+	/* (0.98) 21..22: the app commands of about:cmd- links (logged and taken
+	   as the app would), Sleep (run_links.py "sleep") */
+	(int)&((PwShared *)0)->app_cmd, (int)&((PwShared *)0)->sleeping
 };
 PsiShared *pg_shared(void) { return &g_sh.net; }
 

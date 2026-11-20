@@ -1523,28 +1523,18 @@ static void psi_sleep_save(struct session *ses)
 		}
 		fclose(f);
 	}
-	/* every cookie, the session's too, whatever Keep cookies says: they
-	   are deleted as soon as the waking engine has read them */
-	if (!links_home) {
-		links_home = stracpy(cast_uchar PSI_SLEEP_HOME);
-		do_save_cookies();
-		mem_free(links_home);
-		links_home = NULL;
-	}
+	/* (0.98) No cookies are written for Sleep: only what Preferences >
+	   Cookies keeps (cookies.txt, psi_cookies) is ever on C:, so a cookie
+	   meant to end with PsiWeb is never left on the disk. */
 }
 
-/* at the start: Sleep's cookies taken up if this is a waking, and deleted
-   either way (a Sleep left by an engine that was never woken: PsiWeb was
-   closed, or the Psion restarted) */
+/* at the start: a Sleep's cookie file, which PsiWebs before 0.98 wrote,
+   deleted (unread), and a Sleep's history too unless this is a waking (a
+   Sleep left by an engine that was never woken: PsiWeb was closed, or
+   the Psion restarted) */
 static void psi_sleep_start(void)
 {
 	psi_waking = pwb_waking();
-	if (psi_waking && !links_home) {
-		links_home = stracpy(cast_uchar PSI_SLEEP_HOME);
-		init_cookies();
-		mem_free(links_home);
-		links_home = NULL;
-	}
 	remove(PSI_SLEEP_COOKIES);
 	if (!psi_waking) remove(PSI_SLEEP_HISTORY);
 }

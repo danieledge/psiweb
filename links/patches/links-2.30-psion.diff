@@ -350,7 +350,7 @@ Display (docs/display.md, fonts):
  		put_chrs(x, 7);
  		if (!F) par_format.leftmargin += 2;
  		par_format.align = AL_LEFT;
-@@ -1727,6 +1926,26 @@
+@@ -1727,6 +1926,53 @@
  	form->num = (int)(a - startf);
  }
  
@@ -362,22 +362,49 @@ Display (docs/display.md, fonts):
 + * (META, TITLE, STYLE, SCRIPT, BODY; FORM), but parsed every tag of the
 + * page in full to find them: on BBC two more passes over 416 KB of tags,
 + * each as costly as the real parse. Now they parse only the tags that
-+ * start with the right two letters, and step from '<' to '<' over the
-+ * rest (phase 5). The one difference: a '<' inside an attribute value of
-+ * a skipped tag is looked at as a tag, which can only find one of these
-+ * elements where a page has written one inside an attribute. */
++ * start with the right two letters, and step over the rest with
++ * psi_skip_tag (phase 5). */
 +static inline int psi_tag2(unsigned char *s, unsigned char *eof)
 +{
 +	if (eof - s < 3) return 0;
 +	return ((s[1] | 0x20) << 8) | (s[2] | 0x20);
 +}
 +#define PSI_T2(a, b) (((a) << 8) | (b))
++
++/* (0.98) The end of the tag at s (after its '>', or at a '<' that ends
++ * it), stepping over quoted attribute values as parse_element does, so
++ * that a '<' inside a value (which HTML allows) is not taken for a tag;
++ * NULL when s does not start a tag (the caller steps one byte, as
++ * parse_element failing does). Far cheaper than parse_element. */
++static unsigned char *psi_skip_tag(unsigned char *s, unsigned char *eof)
++{
++	unsigned char *e = s + 1;
++	if (e < eof && *e == '/') e++;
++	if (e >= eof || !isA(*e)) return NULL;
++	while (e < eof) {
++		unsigned char c = *e;
++		if (c == '>') return e + 1;
++		if (c == '<') return e;
++		e++;
++		if (c == '=') {
++			while (e < eof && WHITECHAR(*e)) e++;
++			if (e < eof && U(*e)) {
++				unsigned char *q = psi_scan_quote(e + 1, eof, *e);
++				if (q >= eof || *q != *e) return NULL;
++				e = q + 1;
++			} else {
++				while (e < eof && !WHITECHAR(*e) && *e != '>' && *e != '<') e++;
++			}
++		}
++	}
++	return NULL;
++}
 +#endif
 +
  static void find_form_for_input(unsigned char *i)
  {
  	unsigned char *s, *ss, *name, *attr, *lf, *la;
-@@ -1749,15 +1968,36 @@
+@@ -1749,15 +1995,41 @@
  	} else {
  		lf = NULL, la = NULL;
  		s = startf;
@@ -409,12 +436,17 @@ Display (docs/display.md, fonts):
  	}
  	ss = s;
 +#ifdef PSIWEB
-+	if (psi_tag2(s, i) != PSI_T2('f', 'o')) goto sp;
++	if (psi_tag2(s, i) != PSI_T2('f', 'o')) {
++		unsigned char *te = psi_skip_tag(s, i);
++		if (!te) goto sp;
++		s = te;
++		goto se;
++	}
 +#endif
  	if (parse_element(s, i, &name, &namelen, &attr, &s)) goto sp;
  	if (namelen != 4 || casecmp(name, cast_uchar "FORM", 4)) goto se;
  	lf = ss;
-@@ -1772,6 +2012,10 @@
+@@ -1772,6 +2044,10 @@
  		get_html_form(la, &form);
  	} else {
  		last_form_tag = NULL;
@@ -425,7 +457,7 @@ Display (docs/display.md, fonts):
  	}
  }
  
-@@ -2739,6 +2983,18 @@
+@@ -2739,6 +3015,18 @@
  	    !casestrcmp(name, cast_uchar "preconnect") ||
  	    !casestrcmp(name, cast_uchar "stylesheet") ||
  	    casestrstr(name, cast_uchar "icon") ||
@@ -444,7 +476,7 @@ Display (docs/display.md, fonts):
  	    0) goto skip;
  	if (!casestrcmp(name, cast_uchar "prefetch") ||
  	    !casestrcmp(name, cast_uchar "prerender") ||
-@@ -2780,6 +3036,9 @@
+@@ -2780,6 +3068,9 @@
  	void (*func)(unsigned char *);
  	int linebreak;
  	int nopair; /* Somehow relates to paired elements */
@@ -454,7 +486,7 @@ Display (docs/display.md, fonts):
  };
  
  static struct element_info elements[] = {
-@@ -2960,6 +3219,9 @@
+@@ -2960,6 +3251,9 @@
  	if (head) process_head(head);
  
  	set_lt:
@@ -464,7 +496,7 @@ Display (docs/display.md, fonts):
  
  	/*set_globals;*/
  
-@@ -2970,6 +3232,25 @@
+@@ -2970,6 +3264,25 @@
  		int namelen;
  		struct element_info *ei;
  		int inv;
@@ -490,7 +522,7 @@ Display (docs/display.md, fonts):
  		if (par_format.align != AL_NO && par_format.align != AL_NO_BREAKABLE && WHITECHAR(*html)) {
  			unsigned char *h = html;
  			/*if (putsp == -1) {
-@@ -3052,6 +3333,10 @@
+@@ -3052,6 +3365,10 @@
  			continue;
  		}
  		element:
@@ -501,7 +533,7 @@ Display (docs/display.md, fonts):
  		html_format_changed = 1;
  		inv = *name == '/'; name += inv; namelen -= inv;
  		if (html_top.invisible == INVISIBLE_SCRIPT && !(inv && namelen == 6 && !casecmp(name, cast_uchar "SCRIPT", 6))) {
-@@ -3076,9 +3361,20 @@
+@@ -3076,9 +3393,20 @@
  			ng:;
  		}
  		html = end;
@@ -522,7 +554,7 @@ Display (docs/display.md, fonts):
  			if (ei - elements > 4) {
  				struct element_info e = *ei;
  				memmove(elements + 1, elements, (ei - elements) * sizeof(struct element_info));
-@@ -3235,6 +3531,9 @@
+@@ -3235,6 +3563,9 @@
  	pos = 0;
  	/*line_breax = 1;*/
  	was_br = 0;
@@ -532,7 +564,7 @@ Display (docs/display.md, fonts):
  #undef set_globals
  }
  
-@@ -3420,12 +3719,30 @@
+@@ -3420,12 +3751,35 @@
  	if (title) *title = init_str();
  	add_chr_to_str(head, hdl, '\n');
  	se:
@@ -557,7 +589,12 @@ Display (docs/display.md, fonts):
 +	{
 +		int t = psi_tag2(s, eof);
 +		if (t != PSI_T2('m', 'e') && t != PSI_T2('t', 'i') && t != PSI_T2('s', 't') &&
-+		    t != PSI_T2('s', 'c') && t != PSI_T2('b', 'o')) goto sp;
++		    t != PSI_T2('s', 'c') && t != PSI_T2('b', 'o')) {
++			unsigned char *te = psi_skip_tag(s, eof);
++			if (!te) goto sp;
++			s = te;
++			goto se;
++		}
 +	}
 +#endif
  	if (parse_element(s, eof, &name, &namelen, &attr, &s)) goto sp;
@@ -684,7 +721,7 @@ Display (docs/display.md, fonts):
  			}
  		}
  	}
-@@ -554,6 +602,88 @@
+@@ -554,6 +602,90 @@
  	if (!use_strip) drv->register_bitmap(&(cimg->bmp));
  }
  
@@ -712,9 +749,10 @@ Display (docs/display.md, fonts):
 +	if (!dst) return 0;
 +	sx = mem_alloc_mayfail(sizeof(int) * (ox + 1));
 +	if (!sx) { mem_free(dst); return 0; }
++	/* (0.98) the source columns under each new one: made wider, a source
++	   column is under several new ones (each takes one column, below) */
 +	for (i = 0; i <= ox; i++) {
 +		sx[i] = (int)((long long)i * ix / ox);
-+		if (i && sx[i] <= sx[i - 1]) sx[i] = sx[i - 1] + 1;
 +		if (sx[i] > ix) sx[i] = (int)ix;
 +		if (i && sx[i] - sx[i - 1] > maxbx) maxbx = sx[i] - sx[i - 1];
 +	}
@@ -732,7 +770,8 @@ Display (docs/display.md, fonts):
 +			int x0 = sx[i], x1 = sx[i + 1], x, n;
 +			unsigned r = 0, g = 0, b = 0, f;
 +			const unsigned char *row;
-+			if (x0 >= ix) x0 = (int)ix - 1, x1 = (int)ix;
++			if (x1 <= x0) x1 = x0 + 1;
++			if (x1 > ix) x1 = (int)ix, x0 = x1 - 1;
 +			n = (x1 - x0) * (int)(y1 - y0);
 +			for (y = y0; y < y1; y++) {
 +				row = cimg->buffer + ((size_t)y * ix + x0) * 3;
@@ -773,7 +812,7 @@ Display (docs/display.md, fonts):
  /* Takes the buffer and resamples the data into the bitmap. Automatically
   * destroys the previous bitmap. Must be called only when cimg->buffer is valid.
   * Sets bmp_used to non-zero.
-@@ -590,6 +720,35 @@
+@@ -590,6 +722,35 @@
  	ox=cimg->xww;
  	oy=cimg->yww;
  	if (ix==ox&&iy==oy) gonna_be_smart=1;
@@ -809,7 +848,7 @@ Display (docs/display.md, fonts):
  	else{
  		gonna_be_smart=0;
  		if (ix && (size_t)ix * (size_t)iy / (size_t)ix != (size_t)iy) overalloc();
-@@ -616,7 +775,13 @@
+@@ -616,7 +777,13 @@
  	if (cimg->bmp_used) drv->unregister_bitmap(&cimg->bmp);
  	cimg->bmp.x = (int)ox;
  	cimg->bmp.y = (int)oy;
@@ -823,7 +862,7 @@ Display (docs/display.md, fonts):
  		if (!gonna_be_smart) {
  			if (tmp) {
  				mem_free(tmp);
-@@ -624,6 +789,9 @@
+@@ -624,6 +791,9 @@
  		}
  		goto bitmap_failed;
  	}
@@ -833,7 +872,7 @@ Display (docs/display.md, fonts):
  	if (gonna_be_smart){
  		if (dither_images) {
  			if ((size_t)cimg->width > MAX_SIZE_T / 3 / sizeof(*dregs)) overalloc();
-@@ -642,12 +810,19 @@
+@@ -642,12 +812,19 @@
  				(*round_fn)(tmp, &cimg->bmp);
  			mem_free(tmp);
  		} else {
@@ -853,7 +892,7 @@ Display (docs/display.md, fonts):
  		}
  		bitmap_failed:
  		drv->register_bitmap(&(cimg->bmp));
-@@ -982,6 +1157,15 @@
+@@ -982,6 +1159,15 @@
  		/* We must not perform end with chopped because some
  		 * unprocessed data still wait for us :)
  		 */
@@ -869,7 +908,7 @@ Display (docs/display.md, fonts):
  		if (!chopped){
  			if (!((cimg->state^8)&9)) {
  #ifdef HAVE_TIFF
-@@ -1181,6 +1365,12 @@
+@@ -1181,6 +1367,12 @@
  
  	if (!(goi->goti.go.xw && goi->goti.go.yw))
  		return; /* At least one dimension is zero */
@@ -882,7 +921,7 @@ Display (docs/display.md, fonts):
  
  	memcpy(&r, &fdatac->ses->term->dev->clip, sizeof(struct rect));
  	if (fdatac->vs->g_display_link && fdatac->active && fdatac->vs->current_link != -1 && fdatac->vs->current_link == goi->goti.link_num) {
-@@ -1192,6 +1382,9 @@
+@@ -1192,6 +1384,9 @@
  
  	global_goi=goi;
  	global_cimg=goi->cimg;
@@ -892,7 +931,7 @@ Display (docs/display.md, fonts):
  	if (img_process_download(goi, fdatac)) goto ret; /* Choked with data, will not
  							* draw. */
  	/* Now we will only draw... */
-@@ -1209,6 +1402,9 @@
+@@ -1209,6 +1404,9 @@
  		draw_picture(fdatac, goi, x, y);
  	}
  ret:
@@ -902,7 +941,7 @@ Display (docs/display.md, fonts):
  	set_clip_area(fdatac->ses->term->dev, &r);
  #ifdef LINKS_TESTMODE_IMAGE_AUTO_EXIT
  	if (cimg->state & 1)
-@@ -1258,6 +1454,10 @@
+@@ -1258,6 +1456,10 @@
  		cimg->eof_hit = 0;
  		cimg->last_count = -1;
  		cimg->last_count2 = -1;
@@ -913,7 +952,7 @@ Display (docs/display.md, fonts):
  		if (cimg->wanted_xw >= 0 && cimg->wanted_yw >=0) cimg->state |= 2;
  		add_image_to_cache(cimg);
  	}
-@@ -1277,6 +1477,7 @@
+@@ -1277,6 +1479,7 @@
  
  	image=mem_calloc(sizeof(struct g_object_image));
  	global_goi = image;
@@ -921,7 +960,7 @@ Display (docs/display.md, fonts):
  	image->goti.go.mouse_event = g_text_mouse;
  	image->goti.go.draw = img_draw_image;
  	image->goti.go.destruct = img_destruct_image;
-@@ -1342,17 +1543,143 @@
+@@ -1342,17 +1545,143 @@
  	find_or_make_cached_image(image, im->url, d_opt->image_scale);
  	cimg = global_cimg;
  
@@ -2440,7 +2479,23 @@ Display (docs/display.md, fonts):
  	ses = list_struct(term->windows.prev, struct window)->data;
  	get_convert_table(rq->ce_internal->head, term_charset(term), ses->ds.assume_cp, &net_cp, NULL, ses->ds.hard_assume);
  	if (rq->ce_internal->http_code == 407) {
-@@ -387,6 +433,16 @@
+@@ -354,6 +400,15 @@
+ 		}
+ #endif
+ 		if (stat->ce && rq->state == O_WAITING && stat->ce->redirect) {
++#ifdef PSIWEB
++			/* (0.98) never to PsiWeb's own pages (about:start,
++			   about:cmd-setup...): a site cannot open them */
++			unsigned char *own = join_urls(rq->url, stat->ce->redirect);
++			int is_own = own && !casecmp(own, cast_uchar "about:", 6);
++			if (own) mem_free(own);
++			if (is_own) rq->stat.state = S_BAD_URL;
++			else
++#endif
+ 			if (rq->redirect_cnt++ < MAX_REDIRECTS) {
+ 				int cache, allow_flags;
+ 				unsigned char *u, *pos, *url_host;
+@@ -387,6 +442,16 @@
  			unsigned char *realm = get_auth_realm(rq->url, stat->ce->head, stat->ce->http_code == 407);
  			unsigned char *user;
  			if (!realm) goto xx;

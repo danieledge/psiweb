@@ -26,6 +26,7 @@ int main(void)
 	CHECK(pw_problem_kind("Something new", "") == PW_PROB_OTHER);
 	CHECK(pw_problem_kind("x", "the serial port is in use by another program") == PW_PROB_PORT_BUSY);
 	CHECK(pw_problem_kind("x", "Certificate not trusted - www.x.org") == PW_PROB_CERT);
+	CHECK(pw_problem_kind("x", "Clock not set - the certificate of www.x.org cannot be checked") == PW_PROB_CLOCK);   /* (0.98) */
 	CHECK(pw_problem_kind("x", "Certificate cannot be checked - www.x.org") == PW_PROB_CERT);
 	CHECK(pw_problem_kind("x", "its certificate has expired (is the Psion's clock right?)") == PW_PROB_CERT_DATE);
 	CHECK(pw_problem_kind("x", "Secure connection refused - www.ebay.co.uk") == PW_PROB_TLS);

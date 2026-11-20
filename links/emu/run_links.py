@@ -32,7 +32,10 @@ A copy of web/emu/run_psiweb.py (NetSurf's harness) with, in addition:
                    virtual time (e.g. 10000 for a modem link), as it would
                    over the Psion's link; by default all at once
   --vclock         the virtual clock without --replay
-(environment: PW_CDISK / PW_DDISK, the PC folders that stand for C: and D:,
+  --waking         (0.98) the engine starts as after a Sleep (psiweb.h waking);
+                   the script line "sleep" ends it as Sleep does
+(environment: PW_CLOCK_OFFSET seconds added to the Psion's clock (0.98: e.g.
+-800000000 for a clock reset to 2001); PW_CDISK / PW_DDISK, the PC folders that stand for C: and D:,
 e.g. a C:\System\Data\PsiGrey.ini to try a grey calibration)
   --callers f1,f2  who calls these functions (CALLSITES=1: the exact places)
   --incl f1,f2     instructions spent inside these functions, callees
@@ -327,6 +330,10 @@ def shared_watch():
     --busy the busy message's figures (load_host, load_kb, pics_*)"""
     sh = struct.unpack("<I", rd(sym("emu_shared"), 4))[0]
     i32 = lambda i: struct.unpack("<i", rd(sh + shared_off(i), 4))[0]
+    a = i32(21)                                  # (0.98) an about:cmd- link handed to the app
+    if a:
+        log("[app_cmd] %d" % a)
+        wr(sh + shared_off(21), struct.pack("<i", 0))
     t = i32(10)
     if t != state.get("test_state", 0):
         state["test_state"] = t
@@ -398,6 +405,9 @@ def script_step():
         elif cmd in ("auth", "save"):
             state["answer"] = (cmd, rest.split())
         elif cmd == "quit":
+            state["queue"].append((4, 0, 0, 0))
+        elif cmd == "sleep":                         # (0.98) Sleep: as quit, with sleeping set
+            sh_set(22, 1)
             state["queue"].append((4, 0, 0, 0))
     if not state["script"] and not state["queue"] and not state["cmd"] and state["exit"] is None:
         state["queue"].append((4, 0, 0, 0))
@@ -514,7 +524,7 @@ def hc(op, a, b, c, d):
     if op == 1:                                      # exit
         state["exit"] = s32(a); uc.emu_stop(); return 0
     if op == 3:                                      # gettimeofday
-        t = now()
+        t = now() + float(os.environ.get("PW_CLOCK_OFFSET", "0"))   # (0.98) a Psion clock that is wrong
         # PW_COARSE=1: whole seconds only, like the Psion's RTC (TTime and
         # gettimeofday have no finer step there)
         wr(a, struct.pack("<ii", int(t), 0 if os.environ.get("PW_COARSE") else int((t % 1) * 1e6))); return 0
@@ -594,6 +604,7 @@ def hc(op, a, b, c, d):
     if op == 214: return STYLE                       # pwb_style (0.86)
     if op == 215: return 1 if KEEP_COOKIES else 0    # pwb_keep_cookies (0.89)
     if op == 216: return 1 if ATOM_TLS else 0        # modem_tls (0.90)
+    if op == 217: return 1 if "--waking" in args else 0   # (0.98) waking from a Sleep
     if op == 25:                                     # memory report
         mem.update(in_use=a, peak=b, arena=c, n=d)
         log("[heap] in use %d KB, peak %d KB" % (a // 1024, b // 1024)); return 0

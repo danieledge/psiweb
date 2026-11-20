@@ -28,6 +28,7 @@ int pw_problem_kind(const char *aEngineWhy, const char *aConnWhy)
 	const char *c = aConnWhy ? aConnWhy : "";
 	const char *e = aEngineWhy ? aEngineWhy : "";
 	if (*c) {
+		if (starts(c, "Clock not set")) return PW_PROB_CLOCK;     /* (0.98) pwcert.c */
 		if (has(c, "clock") || has(c, "out of date") || has(c, "expired") || has(c, "not valid yet"))
 			return PW_PROB_CERT_DATE;
 		if (starts(c, "Certificate")) return PW_PROB_CERT;
@@ -123,6 +124,8 @@ static const char *cause(int aKind, const PwRoute *r)
 		return "The file was not found on the Psion";
 	case PW_PROB_ATOM_TLS:
 		return "The Atom modem could not make a secure connection to the site - the site's certificate may not be trusted, the site may be down, or the Atom may have no WiFi (the Atom's log says which)";
+	case PW_PROB_CLOCK:
+		return "The Psion's clock is not set, so no site's certificate can be checked - set the date first (Time, Ctrl+T)";
 	default:
 		return "The page did not load";
 	}
@@ -146,6 +149,7 @@ const char *pw_problem_short(int aKind, const PwRoute *r)
 	case PW_PROB_BAD_ANSWER: return "The answer made no sense - the site may be down";
 	case PW_PROB_NOT_FOUND:  return "The file was not found on the Psion";
 	case PW_PROB_ATOM_TLS:   return "The Atom modem did not make the secure connection";
+	case PW_PROB_CLOCK:      return "The Psion's clock is not set - set the date first (Time, Ctrl+T)";
 	default:                 return "The page did not come";
 	}
 }

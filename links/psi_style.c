@@ -28,6 +28,7 @@
 
 /* the simplified page of the page showing, before any note */
 static struct cache_entry *k_ce;
+static tcount k_gen;		/* (0.98) k_ce's count2: a new entry, or new data from the start */
 static int k_style = -1;
 static unsigned char *k_body;	/* (Links' mem_alloc) */
 static int k_len;
@@ -181,8 +182,12 @@ unsigned char *psi_style_page(struct cache_entry *ce, unsigned char *start, size
 	/* Links lays a page out again and again while it comes: the simplifier
 	   runs once over the page, a piece at a time, kept between the calls
 	   (each call feeds only what came since), and ends when the page is
-	   whole. A different page, style or start begins again. */
-	if (k_ce != ce || k_style != style || !k_body || (size_t)k_fed > *len
+	   whole. A different page, style or start begins again. (0.98) A
+	   page is its cache entry and the entry's count2, which Links
+	   changes for a new entry (even one at the old one's address) and
+	   for data that does not carry on from the end (a reload): pages
+	   with the same first bytes are not taken for each other. */
+	if (k_ce != ce || k_gen != ce->count2 || k_style != style || !k_body || (size_t)k_fed > *len
 	    || memcmp(k_head, start, *len < sizeof(k_head) ? *len : sizeof(k_head))) {
 		if (k_body) mem_free(k_body);
 		k_body = init_str();
@@ -195,6 +200,7 @@ unsigned char *psi_style_page(struct cache_entry *ce, unsigned char *start, size
 		memcpy(k_head, start, *len < sizeof(k_head) ? *len : sizeof(k_head));
 		psi_simp_begin(mode, put, NULL);
 		k_ce = ce;
+		k_gen = ce->count2;
 		k_style = style;
 	}
 	if (!k_done && (size_t)k_fed < *len) {

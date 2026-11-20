@@ -140,7 +140,14 @@ void psi_about_func(struct connection *c)
 	else if (!casecmp(u, cast_uchar "about:cmd-test", 14) || !casecmp(u, cast_uchar "about:cmd-setup", 15)
 		|| !casecmp(u, cast_uchar "about:cmd-help", 14) || !casecmp(u, cast_uchar "about:cmd-favs", 14)) {
 		/* (0.85) a "Page not opened" page's links, (0.87) the start page's:
-		   the app acts, the page stays */
+		   the app acts, the page stays. (0.98) Only from PsiWeb's own
+		   pages (about:start, about:problem): a link, a frame, a refresh
+		   or a redirect from a web page does nothing. */
+		if (!c->prev_url || casecmp(c->prev_url, cast_uchar "about:", 6)) {
+			setcstate(c, S_BAD_URL);
+			abort_connection(c);
+			return;
+		}
 		psi_app_command(u[10] == 't' ? PW_APP_TEST : u[10] == 's' ? PW_APP_SETUP : u[10] == 'h' ? PW_APP_HELP : PW_APP_FAVS);
 		setcstate(c, S_INTERRUPTED);
 		abort_connection(c);

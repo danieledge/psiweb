@@ -24,6 +24,7 @@ enum
 	PW_PROB_BAD_ANSWER,     /* the server's answer made no sense, or was empty */
 	PW_PROB_NOT_FOUND,      /* a file on the Psion was not found */
 	PW_PROB_ATOM_TLS,       /* (0.90) the Atom modem did not make the secure connection (its certificate check, the name, the site) */
+	PW_PROB_CLOCK,          /* (0.98) the Psion's clock is not set: no certificate can be checked */
 	PW_PROB_COUNT
 	};
 

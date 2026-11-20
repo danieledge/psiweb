@@ -127,6 +127,14 @@ int pw_cert_why(const char *host, char *why, int whymax)
 	unsigned i;
 	if (!why || whymax <= 0)
 		return 0;
+	/* (0.98) with the clock reset no chain is trusted (certcheck.c): say
+	   that, not that the site is not trusted (pwproblem.c PW_PROB_CLOCK) */
+	if (problem && strstr(problem, "clock is not set")) {
+		snprintf(line, sizeof(line), "certificate of %.80s: %.60s - %.70s", host, why, problem);
+		pw_log(line);
+		snprintf(why, whymax, "Clock not set - the certificate of %s cannot be checked", host);
+		return 1;
+	}
 	for (i = 0; !untrusted && i < sizeof(k_untrusted) / sizeof(k_untrusted[0]); i++)
 		if (!strcmp(why, k_untrusted[i])) untrusted = 1;
 	if (!untrusted && (strstr(why, "key is of a kind") || strstr(why, "used a signature")))

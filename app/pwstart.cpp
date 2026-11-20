@@ -7,6 +7,7 @@
 // a line of each. Keys 1 to 8 open the tiles (CPwView::OfferKeyEventL).
 #include "pwapp.h"
 #include "pwaddr.h"
+#include "pwhtml.h"
 
 // A new PsiWeb's favourites, which are its first tiles: light sites that
 // work direct (the speed dial's eighth tile is Add... until there are eight)
@@ -69,6 +70,26 @@ static void Esc(TDes8& aOut, const TDesC& aText, TInt aMax)
 		aOut.Append((TUint8)0x85);                 // "..." (Windows-1252)
 	}
 
+// (0.98) "<a href=\"address\">" with the whole address, or nothing (EFalse)
+// when it does not fit: never a cut address, which would open another page
+static TBool AddLinkStart(TDes8& aOut, const TDesC& aUrl)
+	{
+	TInt start = aOut.Length();
+	TInt room = aOut.MaxLength() - KReserve - start - 11;    // <a href=" and ">
+	if (room <= 0)
+		return EFalse;
+	aOut.Append(_L8("<a href=\""));
+	TInt n = pw_attr_esc((unsigned char*)aOut.Ptr() + aOut.Length(), room, (const unsigned char*)aUrl.Ptr(), aUrl.Length());
+	if (n < 0)
+		{
+		aOut.SetLength(start);
+		return EFalse;
+		}
+	aOut.SetLength(aOut.Length() + n);
+	aOut.Append(_L8("\">"));
+	return ETrue;
+	}
+
 // The tiles' headers in EPOC's own colours on the netBook (its dark blue,
 // maroon and teal); the 5mx's dark grey, with the number in white
 static const TText8* const KTileColours[] = { _S8("#000080"), _S8("#800000"), _S8("#008080"), _S8("#000080") };
@@ -107,11 +128,10 @@ void CPwAppUi::UpdateStartPageL()
 		if (t < n)
 			{
 			const TPwEntry& e = iFavs->At(t);
-			Add(p, _L8("<a href=\""));
-			Esc(p, e.iUrl, 300);
-			Add(p, _L8("\">"));
+			TBool link = AddLinkStart(p, e.iUrl);
 			Esc(p, e.iTitle.Length() ? (const TDesC&)e.iTitle : (const TDesC&)e.iUrl, tall ? 16 : 11);
-			Add(p, _L8("</a>"));
+			if (link)
+				Add(p, _L8("</a>"));
 			}
 		else if (t == n)
 			Add(p, _L8("<a href=\"about:cmd-favs\">Add...</a>"));
@@ -136,11 +156,12 @@ void CPwAppUi::UpdateStartPageL()
 			for (TInt i = 0; i < iHist->Count() && i < 4; i++)
 				{
 				const TPwEntry& e = iHist->At(i);
-				Add(p, _L8("<li><a href=\""));
-				Esc(p, e.iUrl, 300);
-				Add(p, _L8("\">"));
+				Add(p, _L8("<li>"));
+				TBool link = AddLinkStart(p, e.iUrl);
 				Esc(p, e.iTitle.Length() ? (const TDesC&)e.iTitle : (const TDesC&)e.iUrl, 60);
-				Add(p, _L8("</a></li>"));
+				if (link)
+					Add(p, _L8("</a>"));
+				Add(p, _L8("</li>"));
 				}
 			Add(p, _L8("</ul>"));
 			}
@@ -164,11 +185,10 @@ void CPwAppUi::UpdateStartPageL()
 				{
 				const TPwEntry& e = iHist->At(i);
 				if (i) Add(p, _L8(" | "));
-				Add(p, _L8("<a href=\""));
-				Esc(p, e.iUrl, 300);
-				Add(p, _L8("\">"));
+				TBool link = AddLinkStart(p, e.iUrl);
 				Esc(p, e.iTitle.Length() ? (const TDesC&)e.iTitle : (const TDesC&)e.iUrl, 30);
-				Add(p, _L8("</a>"));
+				if (link)
+					Add(p, _L8("</a>"));
 				}
 			}
 		Add(p, _L8("</small></p>"));
