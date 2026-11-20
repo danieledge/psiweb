@@ -32,26 +32,7 @@
 #include "pwaddr.h"              // (0.85) an address, or words to search for
 #include "psikeep.h"             // (0.95) settings kept on the card (never the cookies)
 #include "psierr.h"              // (0.96) Coda's words for an error (review R105)
-#include "psimem.h"              // (0.97) short of memory: PsiHub's Free memory dialog (core/ssh)
-// (0.97) the Free memory dialog's word and the answers (psion-netbook's
-// psisys/psimem.h, PsiHub 0.62), here if core's psimem.h has not had them yet
-#ifndef KPsiMemSleepNow
-#define KPsiMemSleepNow _L8("sleepnow")
-#define KPsiMemSlept  _L8("slept")
-#define KPsiMemCannot _L8("cannot")
-static TBool PsiMemAnswer(RWsSession& aWs, TUint aUid, const TDesC8& aWord, const TDesC& aWhy)
-	{
-	TBuf8<96> m(aWord);
-	m.AppendFormat(_L8(" %08x"), aUid);
-	if (aWhy.Length())
-		{
-		m.Append(' ');
-		for (TInt i = 0; i < aWhy.Length() && m.Length() < m.MaxLength(); i++)
-			m.Append((TUint8)aWhy[i]);
-		}
-	return PsiMemTell(aWs, m);
-	}
-#endif
+#include "psimem.h"              // (0.97) short of memory: PsiHub's Free memory dialog, its words and answers (core/ssh)
 
 // The link settings, proxy included, are shared with PsiTerm and PsiMail
 // (psilink.h). The proxy fields of TPwSettings are only a copy of the shared
