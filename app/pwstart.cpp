@@ -200,6 +200,17 @@ void CPwAppUi::UpdateStartPageL()
 	CleanupStack::PopAndDestroy();          // page
 	}
 
+// (0.98) after the favourites change from the start page (Add..., Organise):
+// the page showing is laid out again, so the new tile is there at once
+void CPwAppUi::RefreshStartPageL()
+	{
+	UpdateStartPageL();
+	PwShared* s = iView ? iView->Shared() : NULL;
+	if (s && iView->EngineRunning() && !s->busy
+		&& TPtrC8((const TUint8*)s->url).Compare(_L8("about:start")) == 0)
+		iView->Command(PW_CMD_RELOAD, KNullDesC);
+	}
+
 // a tile chosen with 1 to 8 (the start page's own links do the same by pen)
 void CPwAppUi::OpenTileL(TInt aIndex)
 	{
@@ -207,5 +218,5 @@ void CPwAppUi::OpenTileL(TInt aIndex)
 	if (aIndex < n)
 		OpenFromListL(*iFavs, aIndex);
 	else if (aIndex == n)
-		HandleCommandL(EPwCmdOrganiseFav);
+		AddNewFavouriteL();                  // (0.98) the Add... tile
 	}

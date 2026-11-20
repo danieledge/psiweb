@@ -1434,7 +1434,7 @@ static void psi_goto(struct session *ses, const char *url)
  * sleep_ok says nothing would be lost, the engine is asked to quit with
  * "sleeping" set, so it is ended (its code and heap, about 4 MB, go back to the Psion) and started
  * again when PsiWeb comes forward: on the same address, with the Back and
- * Forward lists and the cookies of before (Sleep\history.txt and
+ * Forward lists and the cookies of before, the session's too (Sleep\history.txt and
  * Sleep\cookies.txt in PsiWeb's folder, written here, read and deleted by
  * the engine that wakes). */
 #ifdef PSI_EPOC
@@ -1442,6 +1442,11 @@ static void psi_goto(struct session *ses, const char *url)
 #define PSI_SLEEP_HISTORY PSI_SLEEP_HOME "history.txt"
 #define PSI_SLEEP_COOKIES PSI_SLEEP_HOME "cookies.txt"
 #define PSI_SLEEP_MAX 40		/* addresses kept each way */
+/* (0.98) Links' cookies.txt keeps only cookies with a date: for Sleep, the
+   session's (no date: expires -1) are written with this one instead, and
+   given back their -1 as they are read. 32-bit time_t; no site's date is
+   this exact second in practice */
+#define PSI_SLEEP_SESSION ((time_t)2147480047L)
 void psi_heap_compress(void);		/* epoc/psi_heap.cpp */
 void pwb_set_sleep_ok(int ok);
 int pwb_waking(void);
@@ -1523,19 +1528,45 @@ static void psi_sleep_save(struct session *ses)
 		}
 		fclose(f);
 	}
-	/* (0.98) No cookies are written for Sleep: only what Preferences >
-	   Cookies keeps (cookies.txt, psi_cookies) is ever on C:, so a cookie
-	   meant to end with PsiWeb is never left on the disk. */
+	/* (0.98) every cookie the engine holds now, the session's too, as an
+	   engine that stayed awake would still have them: Sleep is not
+	   closing PsiWeb. The waking engine reads the file once and deletes
+	   it at once; one never woken from is deleted at the next start.
+	   (PsiBoot's backups leave Sleep\cookies.txt out: pbbackup.cpp.) */
+	if (!links_home) {
+		struct cookie *c;
+		struct list_head *lc;
+		foreach(struct cookie, c, lc, all_cookies)
+			if (c->expires == (time_t)-1) c->expires = PSI_SLEEP_SESSION;
+		links_home = stracpy(cast_uchar PSI_SLEEP_HOME);
+		do_save_cookies();
+		mem_free(links_home);
+		links_home = NULL;
+		foreach(struct cookie, c, lc, all_cookies)
+			if (c->expires == PSI_SLEEP_SESSION) c->expires = (time_t)-1;
+	}
 }
 
-/* at the start: a Sleep's cookie file, which PsiWebs before 0.98 wrote,
-   deleted (unread), and a Sleep's history too unless this is a waking (a
-   Sleep left by an engine that was never woken: PsiWeb was closed, or
-   the Psion restarted) */
+/* at the start: Sleep's cookies taken up if this is a waking (the session's
+   given back their "until PsiWeb closes"), and the file deleted at once
+   either way, unread unless waking (a Sleep left by an engine that was
+   never woken: PsiWeb was closed, or the Psion restarted); the history
+   too, unless waking (psi_sleep_restore reads it) */
 static void psi_sleep_start(void)
 {
 	psi_waking = pwb_waking();
+	if (psi_waking && !links_home) {
+		struct cookie *c;
+		struct list_head *lc;
+		links_home = stracpy(cast_uchar PSI_SLEEP_HOME);
+		init_cookies();
+		mem_free(links_home);
+		links_home = NULL;
+		foreach(struct cookie, c, lc, all_cookies)
+			if (c->expires == PSI_SLEEP_SESSION) c->expires = (time_t)-1;
+	}
 	remove(PSI_SLEEP_COOKIES);
+	remove(PSI_SLEEP_HOME "cookies.t0");	/* (write_to_config_file's own, if a write was cut short) */
 	if (!psi_waking) remove(PSI_SLEEP_HISTORY);
 }
 

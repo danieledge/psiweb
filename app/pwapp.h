@@ -516,6 +516,8 @@ private:
 	// Favourites and History (pwfavs.cpp)
 	TBool HavePage() const;
 	void AddFavouriteL();
+	void AddNewFavouriteL();          // (0.98) the start page's Add...: a name and address typed in
+	void RefreshStartPageL();         // (0.98) the start page made again, and shown again if it is showing
 	void OrganiseL();
 	void OpenFromListL(CPwList& aList, TInt aIndex);
 	void PickAndOpenL(CPwList& aList);

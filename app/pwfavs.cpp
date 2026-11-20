@@ -275,12 +275,24 @@ TBool CPwFavDialog::OkToExitL(TInt /*aButtonId*/)
 		TryChangeFocusToL(EPwDlgFavName);
 		return EFalse;
 		}
-	if (iUrl.Length() == 0)
+	// (0.98) a scheme alone (Add...'s "https://" left as it was) is no address
+	if (iUrl.Length() == 0 || !iUrl.CompareF(_L("https://")) || !iUrl.CompareF(_L("http://")))
 		{
 		iEikonEnv->InfoMsg(_L("No address entered"));
 		TryChangeFocusToL(EPwDlgFavUrl);
 		return EFalse;
 		}
+	// (0.98) an address typed without its scheme (bbc.co.uk) gets http://,
+	// as the address box gives it: the start page's link would otherwise be
+	// read as a part of about:start's own address
+	// (Left() only within the text: ER5 panics past its end)
+	TInt n = iUrl.Length();
+	TBool scheme = iUrl.Find(_L("://")) >= 0
+		|| (n >= 6 && !iUrl.Left(6).CompareF(_L("about:")))
+		|| (n >= 7 && !iUrl.Left(7).CompareF(_L("mailto:")))
+		|| (n >= 5 && !iUrl.Left(5).CompareF(_L("file:")));
+	if (!scheme && n + 7 <= iUrl.MaxLength())
+		iUrl.Insert(0, _L("http://"));
 	return ETrue;
 	}
 
@@ -597,6 +609,25 @@ void CPwAppUi::AddFavouriteL()
 	UpdateStartPageL();                      // (0.87) the speed dial
 	}
 
+// (0.98) The start page's Add... (its link, or its number key): a favourite
+// typed in, as there is no page of the user's showing to add
+void CPwAppUi::AddNewFavouriteL()
+	{
+	TBuf<KPwTitleMax> name;
+	TBuf<PW_URL_MAX> url(_L("https://"));
+	CPwFavDialog* dlg = new(ELeave) CPwFavDialog(name, url);
+	if (!dlg->ExecuteLD(R_PW_FAV_DIALOG))
+		return;
+	TInt r = iFavs->AddEnd(name, url);
+	if (r == KErrAlreadyExists)
+		iEikonEnv->InfoMsg(_L("Already in favourites"));
+	else if (r == KErrOverflow)
+		iEikonEnv->InfoMsg(_L("Not added - 40 favourites is the most"));
+	else
+		iEikonEnv->InfoMsg(_L("Added to favourites"));
+	RefreshStartPageL();
+	}
+
 void CPwAppUi::OrganiseL()
 	{
 	if (iFavs->Count() == 0)
@@ -607,7 +638,7 @@ void CPwAppUi::OrganiseL()
 	TInt pick = -1;
 	CPwListDialog* dlg = new(ELeave) CPwListDialog(*iFavs, ETrue, pick);
 	dlg->ExecuteLD(TallScreen() ? R_PW_ORGANISE_DIALOG_TALL : R_PW_ORGANISE_DIALOG);
-	UpdateStartPageL();                      // (0.87) the speed dial
+	RefreshStartPageL();                     // (0.87) the speed dial, (0.98) shown at once
 	}
 
 // a list to pick a page from (More favourites, Full history)

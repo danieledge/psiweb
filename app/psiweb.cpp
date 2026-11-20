@@ -3797,11 +3797,7 @@ void CPwAppUi::EngineCommandL(TInt aCmd)
 		}
 	if (aCmd == PW_APP_FAVS)              // (0.87) the start page's Add...
 		{
-		if (iFavs->Count() == 0)
-			AddFavouriteL();
-		else
-			OrganiseL();
-		UpdateStartPageL();
+		AddNewFavouriteL();                  // (0.98) what it says, not Organise
 		return;
 		}
 	TPsiLink link;

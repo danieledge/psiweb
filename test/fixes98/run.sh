@@ -9,8 +9,8 @@
 #     form written inside title attributes)
 #   a picture shown wider than it is is drawn across its whole width
 #   Reload in Lighter style shows the new page, not the old one's text
-#   Sleep writes no cookies; a Sleep's cookie file (from 0.97) is deleted
-#     unread when the engine wakes
+#   Sleep keeps every cookie (the session's too) for the waking engine, which
+#     deletes the file at once; one never woken from is deleted unread
 #   with the Psion's clock reset, an https page says to set the date
 # Build the harness engine first: core/tools/docker/psibuild "make -f links/epoc.mk -j8 emu"
 # (PW_BUILD names another build folder).
@@ -74,16 +74,29 @@ check "style: first page is version ONE" 'grep -q "\[title\] Version ONE" "$WORK
 check "style: Reload shows version TWO" 'grep -q "\[title\] Version TWO" "$WORK/style.log"'
 check "style: Reload's text is version TWO" 'python3 "$HERE/same.py" "$WORK/style1.png" "$WORK/style2.png" differ'
 
-# Sleep: no cookie file; a waking deletes an old one unread
-SL=$WORK/c-sleep/System/Apps/PsiWeb/Sleep
-run sleep "" "open @U/set" "idle 1500" "sleep"
-check "sleep: history written" '[ -s "$SL/history.txt" ]'
-check "sleep: no cookies written" '[ ! -e "$SL/cookies.txt" ]'
-printf '"127.0.0.1" "127.0.0.1" "/" "psiold" "yes" 0 "Thu, 01 Jan 2099 00:00:00 GMT" "Thu, 01 Jan 2099 00:00:00 GMT"\n' > "$SL/cookies.txt"
-CDISK=$WORK/c-sleep run wake "--waking" "idle 1500" "open @U/attr" "idle 2000"
-check "wake: the old cookie file is deleted" '[ ! -e "$SL/cookies.txt" ]'
-check "wake: its cookies are not used" '! sed -n "/^--- wake\$/,\$p" "$LOG" | grep -q psiold'
-check "wake: no session cookie came back" '! sed -n "/^--- wake\$/,\$p" "$LOG" | grep -q psisession'
+# Sleep keeps the cookies an engine awake would hold, the session's too:
+# written to Sleep\cookies.txt, read once by the waking engine and deleted at
+# once; a file never woken from is deleted unread at the next start
+for keep in off on; do
+	opt=""; [ $keep = on ] && opt="--keep-cookies"
+	SL=$WORK/c-sleep-$keep/System/Apps/PsiWeb/Sleep
+	CDISK=$WORK/c-sleep-$keep run sleep-$keep "$opt" "open @U/set" "idle 1500" "sleep"
+	check "sleep ($keep): history written" '[ -s "$SL/history.txt" ]'
+	check "sleep ($keep): the session cookie written" 'grep -q psisession "$SL/cookies.txt"'
+	check "sleep ($keep): the dated cookie written" 'grep -q psikept "$SL/cookies.txt"'
+	CDISK=$WORK/c-sleep-$keep run wake-$keep "--waking $opt" "idle 1500" "open @U/attrclean" "idle 2000"
+	check "wake ($keep): the file deleted" '[ ! -e "$SL/cookies.txt" ]'
+	check "wake ($keep): both cookies sent" 'sed -n "/^--- wake-$keep\$/,/^---/p" "$LOG" | grep "GET /attrclean" | grep -q "psisession=yes" && sed -n "/^--- wake-$keep\$/,/^---/p" "$LOG" | grep "GET /attrclean" | grep -q "psikept=yes"'
+done
+check "kept for next time: no session cookie in cookies.txt after a waking" '! grep -q psisession "$WORK/c-sleep-on/System/Apps/PsiWeb/cookies.txt"'
+check "until PsiWeb closes: no cookies.txt after a waking" '[ ! -e "$WORK/c-sleep-off/System/Apps/PsiWeb/cookies.txt" ]'
+# a Sleep never woken from: PsiWeb started afresh deletes it unread
+SL=$WORK/c-stale/System/Apps/PsiWeb/Sleep
+mkdir -p "$SL"
+printf '"127.0.0.1" "127.0.0.1" "/" "psiold" "yes" 0 "Thu, 01 Jan 2037 00:00:00 GMT" "Thu, 01 Jan 2037 00:00:00 GMT"\n' > "$SL/cookies.txt"
+CDISK=$WORK/c-stale run stale "" "idle 1500" "open @U/attrclean" "idle 2000"
+check "stale: the file deleted" '[ ! -e "$SL/cookies.txt" ]'
+check "stale: its cookies not used" '! sed -n "/^--- stale\$/,/^---/p" "$LOG" | grep -q psiold'
 
 # the clock reset (psion-core CR-20): an https page says to set the date
 # (example.com played back from test/stop/example, the clock put at 2001)
