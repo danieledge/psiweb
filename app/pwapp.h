@@ -175,6 +175,8 @@ public:
 	void SetForeground(TBool aFront);
 	void LinkToShared();                    // (0.96) PsiLink.ini into the chunk (review R60)
 	TBool Asleep() const { return iAsleep; }
+	TBool SleepNow(TDes& aWhy);   // (0.97) PsiHub's Free memory dialog, "sleepnow": asleep, else why not
+	void TrimNow();               // (0.97) "trim": the caches and the heap's free end
 	void WakeL();
 	void StartBusy(const TDesC& aText);      // busy message until the engine draws
 	void StartBusyCancel();
@@ -273,6 +275,7 @@ private:
 	TBool iLastBusy;           // busy at the last tick: a fall is a page loaded (History)
 	void MemoryTick();
 	void Sleep();
+	TBool iSaving;                // (0.97) a file being saved (a download) since the last idle moment
 	TUint iBehindAt;           // tick count when PsiWeb went behind another program (0: in front)
 	TBool iTrimmed;            // PW_CMD_TRIM sent since then
 	TBool iAsleep;             // the engine was ended to free its memory: WakeL starts it again

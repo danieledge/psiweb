@@ -32,6 +32,26 @@
 #include "pwaddr.h"              // (0.85) an address, or words to search for
 #include "psikeep.h"             // (0.95) settings kept on the card (never the cookies)
 #include "psierr.h"              // (0.96) Coda's words for an error (review R105)
+#include "psimem.h"              // (0.97) short of memory: PsiHub's Free memory dialog (core/ssh)
+// (0.97) the Free memory dialog's word and the answers (psion-netbook's
+// psisys/psimem.h, PsiHub 0.62), here if core's psimem.h has not had them yet
+#ifndef KPsiMemSleepNow
+#define KPsiMemSleepNow _L8("sleepnow")
+#define KPsiMemSlept  _L8("slept")
+#define KPsiMemCannot _L8("cannot")
+static TBool PsiMemAnswer(RWsSession& aWs, TUint aUid, const TDesC8& aWord, const TDesC& aWhy)
+	{
+	TBuf8<96> m(aWord);
+	m.AppendFormat(_L8(" %08x"), aUid);
+	if (aWhy.Length())
+		{
+		m.Append(' ');
+		for (TInt i = 0; i < aWhy.Length() && m.Length() < m.MaxLength(); i++)
+			m.Append((TUint8)aWhy[i]);
+		}
+	return PsiMemTell(aWs, m);
+	}
+#endif
 
 // The link settings, proxy included, are shared with PsiTerm and PsiMail
 // (psilink.h). The proxy fields of TPwSettings are only a copy of the shared
@@ -151,7 +171,7 @@ static TBool PwDiagOn()
 _LIT(KIniFile, "C:\\System\\Apps\\PsiWeb\\PsiWeb.ini");
 _LIT(KUpdIniFile, "C:\\System\\Apps\\PsiWeb\\Update.ini");
 _LIT(KFavsKept, "C:\\System\\Apps\\PsiWeb\\Favourites.dat");   // (pwfavs.cpp's KFavsFile)
-_LIT(KVersion, "0.96");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
+_LIT(KVersion, "0.97");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
 _LIT(KDefaultHome, "http://68k.news/");
 const TInt KZoomSteps[] = { 50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200 };
 const TInt KZoomCount = 11;
@@ -617,6 +637,8 @@ void CPwView::LoadBusyL()
 		else if (s->pics_all > 0 && s->pics_done < s->pics_all)
 			t.Format(_L("Fetching pictures %S - %d of %d..."), &route, s->pics_done, s->pics_all);
 		}
+	if (s && !s->busy)
+		iSaving = EFalse;                // (0.97) no transfer: no download either
 	if (t.Length() == 0)
 		{
 		if (iLoadBusy)
@@ -786,6 +808,78 @@ void CPwView::Sleep()
 	if (iTimer)
 		iTimer->Cancel();
 	iTickQuiet = ETrue;
+	}
+
+// (0.97) PsiHub's Free memory dialog, "Put PsiWeb to sleep" ticked
+// (psimem.h "sleepnow"): asleep now, whatever the time behind and the
+// memory free (MemoryTick's ten minutes and 3 MB are for sleeping
+// unasked), if nothing would be lost; else why not, in words, for the
+// dialog to say ("PsiWeb cannot sleep now - a page is still opening").
+// The page, Back and Forward, the place on the page and the cookies are
+// kept (Sleep); PsiWeb wakes on them when it next comes to the front.
+TBool CPwView::SleepNow(TDes& aWhy)
+	{
+	aWhy.Zero();
+	if (iAsleep)
+		return ETrue;                        // (asleep already)
+	PwShared* s = iShared;
+	if (!s || !iRunning)
+		{
+		aWhy.Copy(_L("its browser engine has stopped"));
+		return EFalse;
+		}
+	TBuf<PW_URL_MAX> url;
+	FromUtf8(url, s->url);
+	if (!url.Length() || url.Compare(_L("about:blank")) == 0)
+		aWhy.Copy(_L("no page is open"));
+	else if (s->busy && iSaving)
+		aWhy.Copy(_L("a download is in progress"));
+	else if (s->busy)
+		aWhy.Copy(_L("a page is still opening"));
+	else if (iLinkBusy || iStartBusy)
+		aWhy.Copy(_L("it is connecting"));
+	else if (iUpdDlg || iUpdState == PW_UPD_RUNNING || iUpdState == -1)
+		aWhy.Copy(_L("an update is in progress"));
+	else if (iTesting || iLogState == PW_LOG_RUNNING)
+		aWhy.Copy(_L("a test of the connection is running"));
+	else if (s->save_state == PW_ASK_ASKING || s->auth_state == PW_ASK_ASKING || iAsking
+		|| iEikonEnv->EikAppUi()->IsDisplayingMenuOrDialog())
+		aWhy.Copy(_L("a dialog is open in it"));
+	else if (s->app_cmd != PW_APP_NONE || s->cmd != PW_CMD_NONE || s->state != PW_STATE_READY)
+		aWhy.Copy(_L("it is busy - try again in a moment"));
+	else if (!s->sleep_ok)
+		aWhy.Copy(_L("a form on the page would be lost"));
+	if (aWhy.Length())
+		{
+		TBuf<100> l;
+		l.Format(_L("memory: PsiHub asked for sleep - not now, %S"), &aWhy);
+		AppLog(s, iCoeEnv->FsSession(), l);
+		return EFalse;
+		}
+	AppLog(s, iCoeEnv->FsSession(), _L("memory: PsiHub asked for sleep - the engine is stopped"));
+	Sleep();
+	if (!iAsleep)
+		{
+		aWhy.Copy(_L("its browser engine did not stop"));
+		return EFalse;
+		}
+	return ETrue;
+	}
+
+// (0.97) psimem.h "trim" (PsiHub, under 3 MB free; the dialog's "Clear
+// PsiWeb's stored pages"): the engine drops its caches and the pictures
+// away from the view and gives back its heap's free end, as after half a
+// minute behind; the app gives back its own
+void CPwView::TrimNow()
+	{
+	PwShared* s = iShared;
+	User::Heap().Compress();
+	if (!s || !iRunning || s->cmd != PW_CMD_NONE)
+		return;
+	CopyToC(s->cmd_arg, sizeof(s->cmd_arg), KNullDesC);
+	s->cmd = PW_CMD_TRIM;
+	s->net.resized = 1;                  // wakes the engine's wait (see psi_os.c)
+	RingEngine();
 	}
 
 // The engine again, on the page it slept on (iStartUrl; OpenUrlL may have
@@ -1472,6 +1566,7 @@ void CPwView::AskSaveL()
 	fs.MkDirAll(TParsePtrC(path).DriveAndPath());
 	ToUtf8(s->save_path, sizeof(s->save_path), path);
 	s->save_state = PW_ASK_OK;
+	iSaving = ETrue;                     // (0.97) the Free memory dialog says "a download is in progress"
 	}
 
 // ----- Send log to server -------------------------------------------------------
@@ -3540,6 +3635,32 @@ TBool CPwAppUi::ProcessCommandParametersL(TApaCommand /*aCommand*/, TFileName& a
 // ... or, when PsiWeb is already running, sends it the URL as a message
 void CPwAppUi::ProcessMessageL(TUid aUid, const TDesC8& aParams)
 	{
+	// (0.97) short of memory (psimem.h): PsiHub's words. Before, they went
+	// to CEikAppUi, which read them as a file to open and did nothing: the
+	// Free memory dialog's "Put PsiWeb to sleep" never put it to sleep.
+	//   "sleepnow"  the dialog, the user's choice: asleep now, answered
+	//   "sleep"     under 1.5 MB free: asleep if behind and nothing would be lost
+	//   "trim"      under 3 MB free, or "Clear PsiWeb's stored pages"
+	if (aUid.iUid == KPsiMemMsgUid)
+		{
+		if (!iView)
+			return;
+		if (aParams == KPsiMemSleepNow)
+			{
+			TBuf<64> why;
+			TBool slept = iView->SleepNow(why);
+			PsiMemAnswer(iCoeEnv->WsSession(), KUidPsiWeb.iUid, slept ? KPsiMemSlept : KPsiMemCannot, why);
+			}
+		else if (aParams == KPsiMemSleep && !iForeground)
+			{
+			TBuf<64> why;
+			if (!iView->SleepNow(why))
+				iView->TrimNow();
+			}
+		else if (aParams == KPsiMemSleep || aParams == KPsiMemTrim)
+			iView->TrimNow();
+		return;
+		}
 	if (aUid != KUidPsiWeb)
 		{
 		CEikAppUi::ProcessMessageL(aUid, aParams);

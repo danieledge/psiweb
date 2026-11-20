@@ -18,6 +18,11 @@ Up to 0.61 the engine was NetSurf. Its sources are still in the tree as a fallba
 
 [![Download PsiWeb.sis](https://img.shields.io/badge/Download-PsiWeb.sis-2ea44f?logo=github)](https://github.com/danieledge/psiterm/raw/main/dist/PsiWeb.sis)
 
+## What's new in 0.97
+
+- **Free memory can put PsiWeb to sleep.** On a Psion with a memory watcher (Coda's PsiHub on the netBook), choosing to put PsiWeb to sleep in its Free memory dialog now ends the engine at once, behind another program, and gives its memory back; the page, Back and Forward and the cookies are kept, and PsiWeb opens again on the same page when you come back to it. If it can't sleep just then, it says why ("a page is still opening", "a download is in progress", "a form on the page would be lost"), and the dialog shows it.
+- **Short of memory, PsiWeb helps.** When the watcher says memory is short, PsiWeb drops its caches at once, and when it is very short and PsiWeb is behind another program, the engine sleeps if nothing would be lost.
+
 ## What's new in 0.96
 
 - **A route changed in another program is used at once.** Coming back to PsiWeb, it reads the shared connection settings again, so the next page goes by the route PsiMail, PsiTerm or Connection settings chose, without restarting the engine.
