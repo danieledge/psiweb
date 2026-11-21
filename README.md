@@ -34,6 +34,10 @@ Less memory, so PsiWeb sits more easily beside the other programs:
   pages and the picture drawing's scratch rows: half a megabyte with a big
   page in the Lighter style. PsiWeb also trims itself when the watcher says
   memory is short.
+- **Pictures already drawn are kept where Coda can take them back** (a
+  purgeable store of their own): on a Coda image with the memory hook, a
+  program short of memory gets that room at once, and PsiWeb draws the
+  pictures again when they are next shown.
 - **The screen is no longer held a third time** on the netBook (307 KB), and
   the 16-grey table and some of Links' own tables take memory only when
   used.
