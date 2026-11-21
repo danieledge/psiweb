@@ -31,6 +31,7 @@ static struct cache_entry *k_ce;
 static tcount k_gen;		/* (0.98) k_ce's count2: a new entry, or new data from the start */
 static int k_style = -1;
 static unsigned char *k_body;	/* (Links' mem_alloc) */
+static int k_off;		/* (MEM-73) the body starts here in k_body: the notes go before it */
 static int k_len;
 static unsigned long k_text;
 static int k_scripts;
@@ -51,6 +52,25 @@ static unsigned char *g_url_rest;	/* Show the rest: this address is not cut */
 
 int pwb_style(void);
 int psi_pictures_for(unsigned char *url);	/* psi_drv.c */
+
+/* (MEM-73) Trim: the copies go (the next layout simplifies the page
+   again from its cache entry), and when a page is done that is not the
+   one kept */
+void psi_style_trim(void)
+{
+	if (k_body) mem_free(k_body);
+	k_body = NULL;
+	k_off = 0;
+	k_len = 0;
+	if (k_page) mem_free(k_page);
+	k_page = NULL;
+	k_ce = NULL;
+}
+
+void psi_style_page_done(struct cache_entry *ce)
+{
+	if ((k_body || k_page) && k_ce != ce) psi_style_trim();
+}
 
 static void put(void *ctx, const char *data, unsigned long len)
 {
@@ -164,6 +184,7 @@ unsigned char *psi_style_page(struct cache_entry *ce, unsigned char *start, size
 		unsigned char *p;
 		int pl = 0;
 		report(PW_STYLE_FULL, (int)*len, (int)*len, 0, 0, url);
+		psi_style_trim();	/* (MEM-73) a styled page's copies: not this page's */
 		if (!start || ce->incomplete) return start;
 		/* (0.87) Full: the page as it comes, with only the offer of a
 		   lighter edition, if the site has one */
@@ -173,8 +194,8 @@ unsigned char *psi_style_page(struct cache_entry *ce, unsigned char *start, size
 			return start;
 		}
 		add_bytes_to_str(&p, &pl, start, *len);
-		if (k_page) mem_free(k_page);
 		k_page = p;
+		k_ce = ce;
 		*len = (size_t)pl;
 		return k_page;
 	}
@@ -191,6 +212,7 @@ unsigned char *psi_style_page(struct cache_entry *ce, unsigned char *start, size
 	    || memcmp(k_head, start, *len < sizeof(k_head) ? *len : sizeof(k_head))) {
 		if (k_body) mem_free(k_body);
 		k_body = init_str();
+		k_off = 0;
 		k_len = 0;
 		k_fed = 0;
 		k_done = 0;
@@ -211,14 +233,14 @@ unsigned char *psi_style_page(struct cache_entry *ce, unsigned char *start, size
 		psi_simp_end(&k_text, &k_scripts);
 		k_done = 1;
 	}
-	k_imgs = count_imgs(k_body, k_len);
+	k_imgs = count_imgs(k_body + k_off, k_len);
 	k_raw = (int)*len;
 	if (k_page) mem_free(k_page), k_page = NULL;
 	max = pwb_depth() == 8 ? PSI_STYLE_MAX_NB : PSI_STYLE_MAX_5MX;
 	l = k_len;
 	if (l > max && !(g_url_rest && !strcmp(cast_const_char g_url_rest, cast_const_char url))) {
 		l = (int)max;
-		while (l > 0 && k_body[l] != '<') l--;	/* at a tag */
+		while (l > 0 && k_body[k_off + l] != '<') l--;	/* at a tag */
 		if (l == 0) l = (int)max;
 		cut = 1;
 	}
@@ -233,7 +255,7 @@ unsigned char *psi_style_page(struct cache_entry *ce, unsigned char *start, size
 		if (!cut && !pics && !drawn && !light) {
 			mem_free(p);
 			*len = (size_t)k_len;
-			return k_body;
+			return k_body + k_off;
 		}
 		if (drawn) {
 			add_to_str(&p, &pl, cast_uchar "<p><b>This page is drawn by scripts, which PsiWeb cannot run</b><br>"
@@ -250,6 +272,18 @@ unsigned char *psi_style_page(struct cache_entry *ce, unsigned char *start, size
 			snprintf(b, sizeof(b), "<p><small>%d picture%s left out - ", pics, pics == 1 ? "" : "s");
 			add_to_str(&p, &pl, cast_uchar b);
 			add_to_str(&p, &pl, cast_uchar "<a href=\"about:cmd-pictures\">Show pictures</a></small></p>");
+		}
+		if (k_done) {
+			/* (MEM-73) the page is whole: one copy, the notes and then
+			   the whole body (Links is given only as far as the cut),
+			   which stays the kept page; no second copy beside it */
+			int notes = pl;
+			add_bytes_to_str(&p, &pl, k_body + k_off, k_len);
+			mem_free(k_body);
+			k_body = p;
+			k_off = notes;
+			*len = (size_t)(notes + l);
+			return k_body;
 		}
 		add_bytes_to_str(&p, &pl, k_body, l);
 		k_page = p;

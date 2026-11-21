@@ -1,0 +1,418 @@
+Links 2.30 for PsiWeb: memory (PsiWeb 1.00, the memory review of November 2026). Applied by
+links/fetch.sh after links-2.30-psion.diff, links-2.30-scrollbar.diff and links-2.30-style.diff.
+- cache.c (PSIWEB): psi_cache_free_decompressed: Trim drops the inflated copy of every page
+- compress.c (PSIWEB): a compressed page is inflated no further than PSI_HEAP_STOP short of the
+  engine's room: what came is shown and the page says it was cut (psi_page_cut); the block starts
+  at the length the page had last time, or four times the compressed length
+- cookies.c (PSIWEB): cookies written out only when one changed (psi_cookies_changed); at most
+  300 kept, 30 for a domain, the oldest going first
+- html_r.c, html_tbl.c (PSIWEB): the colour lookup at 256 heads; the table cache at 1,024 heads
+  with no initialiser (32 KB of zeros out of the program's data)
+- img.c, links.h (PSI_LAZY_IMAGES): psi_drop_other_pages: when a page is done, the finished
+  pictures of other pages (the page before, kept for Back) go
+- jpeg.c (PSI_LAZY_IMAGES): a progressive JPEG asked only for its size is not started (libjpeg
+  allocated every coefficient of the whole picture for it); for a real decode the coefficients
+  are counted first, and a picture whose arrays would not fit is refused
+- links.h, compress.c, cache.c (PSIWEB): psi_last_dlen, a page's inflated length last time
+- session.c (PSIWEB): psi_history_cap: the Back list cut to a length when a page is done
+
+--- a/cache.c
++++ b/cache.c
+@@ -218,6 +218,9 @@
+ 	e->refcount = 1;
+ 	e->decompressed = NULL;
+ 	e->decompressed_len = 0;
++#ifdef PSIWEB
++	e->psi_last_dlen = 0;
++#endif
+ 	cache_add_to_tree(e);
+ 	add_to_list(cache, e);
+ 	*f = e;
+@@ -480,6 +483,19 @@
+ 	e->count = cache_count++;
+ }
+ 
++#ifdef PSIWEB
++/* (MEM-73) PsiWeb's Trim: the inflated copy of every compressed page goes,
++   the pages showing too (their documents do not point into it: Links
++   itself drops it for a page in use whenever more of it arrives, in
++   add_fragment). The next layout inflates the page again. */
++void psi_cache_free_decompressed(void)
++{
++	struct cache_entry *e;
++	struct list_head *le;
++	foreach(struct cache_entry, e, le, cache) if (e->decompressed_len) free_decompressed_data(e);
++}
++#endif
++
+ static int shrink_file_cache(int u)
+ {
+ 	int r = 0;
+--- a/compress.c
++++ b/compress.c
+@@ -16,10 +16,21 @@
+ 
+ #ifdef HAVE_ANY_COMPRESSION
+ 
++#ifdef PSIWEB
++long psi_heap_room(void);
++#endif
++
+ static void decoder_memory_init(unsigned char **p, size_t *size, off_t init_length)
+ {
+ 	if (init_length > 0 && init_length < MAXINT) *size = (int)init_length;
+ 	else *size = 4096;
++#ifdef PSIWEB
++	/* (not beyond the ceiling of decoder_memory_expand either) */
++	{
++		long room = psi_heap_room() - PSI_HEAP_STOP;
++		while (*size > 4096 && (long)*size > room) *size >>= 1;
++	}
++#endif
+ again:
+ 	if (*size <= 4096) {
+ 		*p = mem_alloc(*size);
+@@ -32,11 +43,31 @@
+ 	}
+ }
+ 
++#ifdef PSIWEB
++/* (MEM-72) PsiWeb: a compressed page is inflated whole into one block. A
++   big or hostile one (2 MB that inflates to 20 MB) took the Psion to its
++   last byte before it failed. The block now stops PSI_HEAP_STOP short of
++   the engine's room: what has been inflated is shown, and the page says
++   it was cut ("Page too big - only part of it is shown"). */
++void psi_page_cut(void);
++#define DECODER_CEILING (-2)
++#endif
++
+ static int decoder_memory_expand(unsigned char **p, size_t size, size_t *addsize)
+ {
+ 	unsigned char *pp;
+ 	size_t add = size / 4 + 1;
+ 	if (add > MAXINT) add = MAXINT;
++#ifdef PSIWEB
++	{
++		long room = psi_heap_room() - PSI_HEAP_STOP;
++		if (room < 4096) {
++			*addsize = 0;
++			return DECODER_CEILING;
++		}
++		if ((long)add > room) add = (size_t)room;
++	}
++#endif
+ 	while (size + add < size || !(pp = mem_realloc_mayfail(*p, size + add))) {
+ 		if (add > 1) add >>= 1;
+ 		else goto ovf;
+@@ -85,7 +116,20 @@
+ 
+ 	retry_after_memory_error:
+ 	memory_error = 0;
++#ifdef PSIWEB
++	/* (MEM-72) while a page comes it is inflated again from its first byte
++	   at each layout: start at the length it had last time (plus a
++	   quarter), or four times the compressed length, so one block is the
++	   rule rather than a chain of reallocations */
++	{
++		off_t want = ce->length > (off_t)(MAXINT / 4) ? (off_t)MAXINT : ce->length * 4;
++		off_t last = (off_t)ce->psi_last_dlen + (off_t)(ce->psi_last_dlen / 4);
++		if (last > want && last < MAXINT) want = last;
++		decoder_memory_init(&p, &size, want);
++	}
++#else
+ 	decoder_memory_init(&p, &size, ce->length);
++#endif
+ 	init_again:
+ 	err = 0;
+ 	skip_gzip_header = 0;
+@@ -227,8 +271,19 @@
+ 		}
+ 		if (!z.avail_out) {
+ 			size_t addsize;
++#ifdef PSIWEB
++			int er = decoder_memory_expand(&p, size, &addsize);
++			if (er == DECODER_CEILING) {
++				/* the page as far as it goes, not an error box */
++				psi_page_cut();
++				goto finish;
++			}
++			if (er < 0)
++				goto mem_error;
++#else
+ 			if (decoder_memory_expand(&p, size, &addsize) < 0)
+ 				goto mem_error;
++#endif
+ 			z.next_out = p + size;
+ 			z.avail_out = (unsigned)addsize;
+ 			size += addsize;
+@@ -271,6 +326,9 @@
+ 	ce->decompressed_len = (unsigned char *)z.next_out - (unsigned char *)p;
+ 	decompressed_cache_size += ce->decompressed_len;
+ 	ce->decompressed = mem_realloc(ce->decompressed, ce->decompressed_len);
++#ifdef PSIWEB
++	ce->psi_last_dlen = ce->decompressed_len;
++#endif
+ 	return 0;
+ }
+ #endif
+--- a/cookies.c
++++ b/cookies.c
+@@ -25,6 +25,40 @@
+ 
+ static void accept_cookie(struct cookie *);
+ 
++#ifdef PSIWEB
++/* (MEM-74) PsiWeb: the cookies kept are written out only when one has
++   changed (they were written at the end of every page), and there are at
++   most PSI_COOKIES_ALL of them, PSI_COOKIES_DOMAIN for a domain: the
++   oldest go first. (Links had no limit, and the list and cookies.txt, on
++   C:, which is memory, grew with every site.) */
++#define PSI_COOKIES_ALL		300
++#define PSI_COOKIES_DOMAIN	30
++int psi_cookies_changed;
++
++static void psi_cookies_cap(struct cookie *c)
++{
++	for (;;) {
++		int all = 0, dom = 0;
++		struct cookie *d, *oldest = NULL, *oldest_dom = NULL;
++		struct list_head *ld;
++		foreach(struct cookie, d, ld, all_cookies) {
++			all++;
++			if (d == c) continue;
++			if (!oldest || d->created < oldest->created) oldest = d;
++			if (!casestrcmp(d->domain, c->domain)) {
++				dom++;
++				if (!oldest_dom || d->created < oldest_dom->created) oldest_dom = d;
++			}
++		}
++		if (dom + 1 > PSI_COOKIES_DOMAIN && oldest_dom) d = oldest_dom;
++		else if (all > PSI_COOKIES_ALL && oldest) d = oldest;
++		else return;
++		del_from_list(d);
++		free_cookie(d);
++	}
++}
++#endif
++
+ /* sezere 1 cookie z retezce str, na zacatku nesmi byt zadne whitechars
+  * na konci muze byt strednik nebo 0
+  * cookie musi byt ve tvaru nazev=hodnota, kolem rovnase nesmi byt zadne mezery
+@@ -108,6 +142,9 @@
+ 	struct cookie *d;
+ 	struct list_head *ld;
+ 	size_t sl;
++#ifdef PSIWEB
++	psi_cookies_changed = 1;
++#endif
+ 	foreach(struct cookie, d, ld, all_cookies) if (!casestrcmp(d->name, c->name) && !casestrcmp(d->domain, c->domain)) {
+ 		ld = ld->prev;
+ 		del_from_list(d);
+@@ -118,6 +155,9 @@
+ 		return;
+ 	}
+ 	add_to_list(all_cookies, c);
++#ifdef PSIWEB
++	psi_cookies_cap(c);
++#endif
+ 	foreach(struct c_domain, cd, lcd, c_domains) if (!casestrcmp(cd->domain, c->domain)) return;
+ 	sl = strlen(cast_const_char c->domain);
+ 	if (sl > MAXINT - sizeof(struct c_domain)) overalloc();
+@@ -382,6 +422,9 @@
+ 	mem_free(cookies_file);
+ 	if (s)
+ 		mem_free(s);
++#ifdef PSIWEB
++	psi_cookies_changed = 0;	/* (what was read is what the file holds) */
++#endif
+ 
+ 	if (err) fprintf(stderr, "\007"), portable_sleep(1000);
+ 
+--- a/html_r.c
++++ b/html_r.c
+@@ -216,7 +216,11 @@
+ 	struct rgb rgb;
+ };
+ 
++#ifdef PSIWEB
++#define RGB_HASH_SIZE 256	/* (MEM-77) PsiWeb: a 16-colour lookup, 3 KB not 48 */
++#else
+ #define RGB_HASH_SIZE 4096
++#endif
+ 
+ #define HASH_RGB(r, l) ((((r)->r << 3) + ((r)->g << 2) + (r)->b + (l)) & (RGB_HASH_SIZE - 1))
+ 
+--- a/html_tbl.c
++++ b/html_tbl.c
+@@ -2050,9 +2050,17 @@
+ 
+ static struct list_head table_cache = { &table_cache, &table_cache };
+ 
++#ifdef PSIWEB
++/* (MEM-77) PsiWeb: 1,024 heads, and no initialiser (which put 32 KB of
++   zeros in the program's data) */
++#define TC_HASH_SIZE	1024
++
++static struct table_cache_entry *table_cache_hash[TC_HASH_SIZE];
++#else
+ #define TC_HASH_SIZE	8192
+ 
+ static struct table_cache_entry *table_cache_hash[TC_HASH_SIZE] = { NULL };
++#endif
+ 
+ static inline int make_hash(unsigned char *start, int xs)
+ {
+--- a/img.c
++++ b/img.c
+@@ -1459,6 +1459,7 @@
+ #ifdef PSI_LAZY_IMAGES
+ 		cimg->psi_py = -1;
+ 		cimg->psi_yw = 0;
++		cimg->psi_mark = 0;
+ #endif
+ 		if (cimg->wanted_xw >= 0 && cimg->wanted_yw >=0) cimg->state |= 2;
+ 		add_image_to_cache(cimg);
+@@ -1667,6 +1668,50 @@
+ 	return e.freed;
+ }
+ 
++/* (MEM-71) A page done: the finished pictures of other pages go. Links
++ * keeps the page before in its format cache, and with it its pictures'
++ * bitmaps, which the view test above cannot tell from this page's (their
++ * psi_py is a place on that page). The pictures of the page showing, in
++ * all its frames, are marked; every finished picture not marked is
++ * dropped (as above: it is decoded again from the cache if Back shows it)
++ * and forgets its place. Returns how many went. */
++static int psi_mark_now;
++
++static void psi_mark_fd(struct f_data_c *fd)
++{
++	struct g_object_image *goi;
++	struct list_head *l;
++	struct f_data_c *sub;
++	struct list_head *ls;
++	if (!fd) return;
++	if (fd->f_data) foreach(struct g_object_image, goi, l, fd->f_data->images)
++		if (goi->cimg) goi->cimg->psi_mark = psi_mark_now;
++	foreach(struct f_data_c, sub, ls, fd->subframes) psi_mark_fd(sub);
++}
++
++static void psi_drop_unmarked(struct cached_image *cimg, void *e_)
++{
++	int *freed = (int *)e_;
++	if (cimg->psi_mark == psi_mark_now) return;
++	cimg->psi_py = -1;
++	if (cimg->state < 12 || !(cimg->state & 1) || cimg == global_cimg) return;
++	psi_drop(cimg);
++	(*freed)++;
++}
++
++int psi_drop_other_pages(struct session *ses)
++{
++	int freed = 0;
++	if (!ses || !ses->screen) return 0;
++	if (++psi_mark_now == 0) psi_mark_now = 1;	/* (0 is "never marked") */
++	psi_mark_fd(ses->screen);
++	psi_imgcache_walk(psi_drop_unmarked, &freed);
++#ifdef PSI_DEBUG_MEM
++	fprintf(stderr, "[evict] page done: %d pictures of other pages dropped, bitmaps now %lu KB\n", freed, psi_pic_bytes >> 10);
++#endif
++	return freed;
++}
++
+ /* Links' "free some memory" call */
+ static int psi_evict_upcall(int type)
+ {
+--- a/jpeg.c
++++ b/jpeg.c
+@@ -297,9 +297,38 @@
+ 		global_cinfo->dct_method = JDCT_IFAST;
+ 		global_cinfo->do_fancy_upsampling = FALSE;
+ #endif
++#ifdef PSI_LAZY_IMAGES
++		{
++		/* (MEM-70) PsiWeb: a progressive JPEG makes jpeg_start_decompress
++		 * allocate every DCT coefficient of the unscaled picture (2 bytes
++		 * a sample: 2.9 MB for 1200x800, 5.8 MB for 1600x1200) through
++		 * plain malloc, which no picture guard saw; and insert_image,
++		 * which wants only the size, had it made and thrown away at
++		 * every layout pass. For the size, libjpeg works it out without
++		 * starting; for a real decode the arrays are counted first, and
++		 * a picture whose arrays would not fit is shown as a box. */
++		extern int psi_size_only;
++		if (psi_size_only) {
++			jpeg_calc_output_dimensions(global_cinfo);
++			goto psi_size_known;
++		}
++		if (global_cinfo->buffered_image) {
++			int ci;
++			double est = 0;
++			jpeg_component_info *comp = global_cinfo->comp_info;
++			for (ci = 0; ci < global_cinfo->num_components; ci++, comp++)
++				est += (double)comp->width_in_blocks * (double)comp->height_in_blocks * (DCTSIZE2 * sizeof(JCOEF));
++			if (est > PSI_PIC_MAX_BYTES || psi_heap_tight((size_t)est))
++				longjmp(global_jerr->setjmp_buffer,2);
++		}
++		}
++#endif
+ 		/* jpeg_start_decompress */
+ 		if (jpeg_start_decompress(global_cinfo)==FALSE)
+ 			break;
++#ifdef PSI_LAZY_IMAGES
++psi_size_known:
++#endif
+ 
+ 		cimg->width=global_cinfo->output_width;
+ 		cimg->height=global_cinfo->output_height;
+--- a/links.h
++++ b/links.h
+@@ -1268,6 +1268,9 @@
+ 	int refcount;
+ 	unsigned char *decompressed;
+ 	size_t decompressed_len;
++#ifdef PSIWEB
++	size_t psi_last_dlen;	/* PsiWeb: its length when last inflated (compress.c) */
++#endif
+ 	unsigned char *ip_address;
+ #ifdef HAVE_SSL
+ 	unsigned char *ssl_info;
+@@ -3293,6 +3296,7 @@
+ 				      * tremendously */
+ #ifdef PSI_LAZY_IMAGES
+ 	int psi_py, psi_yw; /* PsiWeb: where on the page it was last drawn (psi_py -1: never) */
++	int psi_mark; /* PsiWeb: the page-end count when it was last found on the page showing */
+ #endif
+ 	list_entry_last
+ };
+@@ -3356,6 +3360,7 @@
+    they take more than the budget, keeping a screen either side; 1 = memory
+    is short: everything off the screen (safe inside an allocation) */
+ int psi_evict_pictures(int how);
++int psi_drop_other_pages(struct session *ses);
+ void psi_init_pictures(void);
+ void psi_imgcache_walk(void (*fn)(struct cached_image *, void *), void *data);
+ int psi_heap_tight(size_t size);
+--- a/session.c
++++ b/session.c
+@@ -2250,6 +2250,21 @@
+ 	mem_free(loc);
+ }
+ 
++#ifdef PSIWEB
++/* (MEM-74) PsiWeb: the Back list has no end in Links; each page kept costs
++   its address, where it was on the page and what its forms held (0.2 to
++   3 KB). Called when a page is done: the oldest go past aMax. */
++void psi_history_cap(struct session *ses, int aMax)
++{
++	int n = 0;
++	struct location *loc;
++	struct list_head *l;
++	foreach(struct location, loc, l, ses->history) n++;
++	while (n-- > aMax && ses->history.prev != ses->history.next)
++		destroy_location(list_struct(ses->history.prev, struct location));
++}
++#endif
++
+ static void clear_forward_history(struct session *ses)
+ {
+ 	while (!list_empty(ses->forward_history))

@@ -31,6 +31,7 @@
  *     between the calibrated levels; with the calibration off it is
  *     exactly the old output. */
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "pwback.h"
 #include "../core/ssh/psigrey.h"
@@ -46,8 +47,10 @@ static unsigned short rt[32], gt[64], bt[32];	/* r8 * 77, g8 * 151, b8 * 28 */
 static unsigned char dt[16][256];		/* [y & 3][x & 3]: (15v + bayer) / 255 */
 /* v for every 565 pixel (64 KB, made once at the first use): one load in
    place of three table loads, the adds and the shift. Phase 5: the grey
-   conversion was a third of a Page Down on 68k.news. */
-static unsigned char vt[65536];
+   conversion was a third of a Page Down on 68k.news. (MEM-77) Taken from
+   the heap at that first use, which only 16 greys makes: on the colour
+   netBook it was 64 KB of the program's data for nothing. */
+static unsigned char *vt;
 static int ready;
 
 static unsigned char lv[16];		/* how light each level looks (psigrey.h) */
@@ -97,7 +100,9 @@ static void make_level_tables(void)
 static void make_tables(void)
 {
 	int i, r, g, b;
-	unsigned char *o = vt;
+	unsigned char *o;
+	if (!vt && !(vt = (unsigned char *)malloc(65536))) return;	/* (no memory: tried again at the next use) */
+	o = vt;
 	for (i = 0; i < 32; i++) {
 		int c5 = (i << 3) | (i >> 2);
 		rt[i] = (unsigned short)(c5 * 77);
@@ -146,15 +151,18 @@ const unsigned char *pw_v565_table(void)
 /* a pair that is neither white nor black; d is the left pixel's threshold
    table (the right one's is the next); little-endian: the left pixel is
    the low half */
-#define grey_pair(w, d) ((d)[vt[(w) & 0xffff]] | ((unsigned int)(d)[256 + vt[(w) >> 16]] << 4))
+#define grey_pair(w, d) ((d)[vtl[(w) & 0xffff]] | ((unsigned int)(d)[256 + vtl[(w) >> 16]] << 4))
 #define PAIR(w, d) ((w) == 0xffffffffu ? 0xffu : !(w) ? 0u : grey_pair(w, d))
 
 void pw_grey_convert(const unsigned short *fb, int fbw, unsigned char *out, int stride,
                      int x0, int y0, int x1, int y1)
 {
 	int y;
+	const unsigned char *vtl;
 
 	if (!ready) make_tables();
+	if (!ready) return;			/* (no memory for the table: the frame as it was) */
+	vtl = vt;
 	x0 &= ~1;
 	if (x1 & 1) x1++;
 	if (x1 > fbw) x1 = fbw;

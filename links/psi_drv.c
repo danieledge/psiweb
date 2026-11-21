@@ -55,6 +55,11 @@ static int in_poll;
 extern int psi_quiet_ok(void);		/* psi_os.c: the app rings the doorbell */
 #endif
 static uttime last_status;
+#ifdef PSI_EPOC
+static uttime level_look, level_trim;	/* (1.00) the memory watcher's level: looked at, acted on */
+static int level_was = -1;
+int pg_mem_level(void);			/* psiglue.cpp (core psiwork.h) */
+#endif
 static int mods;			/* KBD_SHIFT | KBD_CTRL | KBD_ALT */
 static int mouse_x, mouse_y, mouse_down;
 static int home_done;
@@ -82,6 +87,7 @@ static void load_start(void);
 static void report_page(void);
 static void psi_load_figures(struct session *ses, int busy);
 static void psi_cookies(int save);
+static void psi_page_done(struct session *ses);
 #ifdef PSI_EPOC
 /* (0.92) memory: trim and sleep, below */
 static int psi_waking;
@@ -205,6 +211,7 @@ static void make_g2p(void)
 		return;
 	}
 	vtab = pw_v565_table();
+	if (!vtab) return;			/* (MEM-77: no memory for psi_grey.c's table yet: next time) */
 	/* grey 565 values first (r = g = b), then any 565 value for the v
 	   still missing: every v from 0 to 255 has one */
 	for (v = 0; v < 256; v++) g2p[v] = 0x10000;
@@ -653,6 +660,7 @@ static void report_state(int force)
 				fwd = !list_empty(ses->forward_history);
 			}
 #endif
+			psi_page_done(ses);
 			psi_mem_report(cast_const_char u);
 			psi_cookies(1);		/* (0.87) a page done: its cookies kept, if asked (a crash keeps them too) */
 		}
@@ -1035,6 +1043,12 @@ static void psi_too_big(int stop)
 			: "Page too big - not all the pictures are shown");
 }
 
+/* (MEM-72) compress.c: a compressed page stopped at the ceiling */
+void psi_page_cut(void)
+{
+	psi_too_big(1);
+}
+
 int psi_heap_tight(size_t size)
 {
 	/* (0.92) when the Psion itself is short of memory, dropping the caches
@@ -1241,13 +1255,24 @@ int psi_show_pictures(struct session *ses)
    only while the cookies are read or written, so it keeps no other file. */
 #ifdef PSI_EPOC
 #define PSI_COOKIE_HOME "C:\\System\\Apps\\PsiWeb\\"
+extern int psi_cookies_changed;		/* cookies.c (MEM-74) */
 static void psi_cookies(int save)
 {
+	if (!save) {
+		/* (MEM-74) write_to_config_file's own, left by an engine
+		   ended in the middle of a write */
+		remove(PSI_COOKIE_HOME "cookies.t0");
+		remove(PSI_COOKIE_HOME "cookies.t1");
+		remove(PSI_COOKIE_HOME "cookies.t2");
+		remove(PSI_COOKIE_HOME "cookies.t3");
+	}
 	if (!pwb_keep_cookies() || links_home) return;
+	if (save && !psi_cookies_changed) return;	/* (MEM-74) the file is as it was */
 	links_home = stracpy(cast_uchar PSI_COOKIE_HOME);
 	if (save) do_save_cookies(); else init_cookies();
 	mem_free(links_home);
 	links_home = NULL;
+	if (save) psi_cookies_changed = 0;
 }
 #else
 static void psi_cookies(int save) { (void)save; }
@@ -1414,7 +1439,7 @@ int pw_grey_check(void);
 
 static void load_start(void)
 {
-	pw_grey_check();		/* PsiGrey.ini changed (Display calibration)? */
+	if (!psi_colour) pw_grey_check();	/* PsiGrey.ini changed (Display calibration)? (MEM-77: 16 greys only) */
 	psi_mem_page_start();
 	too_big_said = 0;
 	last_busy = 1;
@@ -1453,11 +1478,45 @@ int pwb_waking(void);
 int pwb_sleeping(void);
 static int psi_waking;			/* this engine was started to wake: the history is still to be taken up */
 
+void psi_style_trim(void);		/* psi_style.c */
+void psi_cache_free_decompressed(void);	/* cache.c (links-2.30-psion.diff) */
+static int psi_trim_due;		/* (MEM-73) asked while busy: at the page's end */
+
+/* the scratch rows of picture drawing, made again when next wanted */
+static void psi_free_scratch(void)
+{
+	fs_forget();
+	if (strip_buf) mem_free(strip_buf);
+	strip_buf = NULL;
+	strip_size = 0;
+	if (fs_err) mem_free(fs_err);
+	fs_err = NULL;
+	fs_w = -1;
+	if (fs_cerr) mem_free(fs_cerr);
+	fs_cerr = NULL;
+	fs_cw = -1;
+	if (fs_row565) mem_free(fs_row565);
+	fs_row565 = NULL;
+	fs_roww = -1;
+}
+
 static void psi_trim(void)
 {
-	if (!list_empty(queue) || !list_empty(downloads)) return;	/* (busy: at the page's end instead) */
+	struct session *ses = psi_ses();
+	if (!list_empty(queue) || !list_empty(downloads)) {
+		psi_trim_due = 1;	/* (busy: at the page's end instead, psi_page_done) */
+		return;
+	}
+	psi_trim_due = 0;
 	shrink_memory(SH_FREE_ALL, 0);
+	if (ses) psi_drop_other_pages(ses);
 	psi_evict_pictures(1);
+	/* (MEM-73) and what Trim kept before: the simplified page (made again
+	   from the cache at the next layout), the inflated copy of every page
+	   (inflated again when wanted), the picture drawing's scratch rows */
+	psi_style_trim();
+	psi_cache_free_decompressed();
+	psi_free_scratch();
 	psi_heap_compress();
 	psi_mem_report("trim");
 }
@@ -1616,6 +1675,25 @@ static void psi_sleep_restore(struct session *ses)
 	remove(PSI_SLEEP_HISTORY);
 }
 #endif
+
+/* (MEM-71, MEM-73, MEM-74) a page done: the pictures of the pages before
+   go (Links keeps the page before, and its bitmaps with it), the Back list
+   is cut to PSI_HISTORY_MAX, a page style's copies of another page go, and
+   a Trim asked for while the page came is done now */
+#define PSI_HISTORY_MAX 50
+void psi_history_cap(struct session *ses, int aMax);	/* session.c (links-2.30-psion.diff) */
+void psi_style_page_done(struct cache_entry *ce);	/* psi_style.c */
+
+static void psi_page_done(struct session *ses)
+{
+	if (!ses) return;
+	psi_drop_other_pages(ses);
+	psi_history_cap(ses, PSI_HISTORY_MAX);
+	psi_style_page_done(ses->screen && ses->screen->f_data && ses->screen->f_data->rq ? ses->screen->f_data->rq->ce : NULL);
+#ifdef PSI_EPOC
+	if (psi_trim_due) psi_trim();
+#endif
+}
 
 static void run_command(int cmd, char *arg)
 {
@@ -1856,6 +1934,23 @@ static void poll_fn(void *p)
 		last_status = now;
 		report_state(0);
 	}
+#ifdef PSI_EPOC
+	/* (1.00) the memory watcher's level (core psimemlvl.h, written by
+	   PsiHub): 1 or more (under 3 MB free) and the engine trims itself at
+	   once, and again every minute while it lasts (psi_trim waits for a
+	   page still coming). At 2 PsiHub sends PsiWeb.app "sleep" when it is
+	   behind, and the app ends the engine as it always has (Sleep): the
+	   engine does not end itself, which in front would lose the page */
+	if (now - level_look >= 5000) {
+		int level = pg_mem_level();
+		level_look = now;
+		if (level >= 1 && (level > level_was || now - level_trim >= 60000)) {
+			level_trim = now;
+			psi_trim();
+		}
+		level_was = level;
+	}
+#endif
 	in_poll = 0;
 	if (quiet && poll_ms() == POLL_MS && poll_timer) {
 		/* input after a quiet spell: the quick pace from now */

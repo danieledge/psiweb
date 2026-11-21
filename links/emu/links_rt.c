@@ -178,6 +178,8 @@ void emu_mem_report(void) { emu_hc(HC_MEM, (int)rh_live, (int)rh_peak, (int)top,
 void psi_mem_page_start(void) { rh_page_peak = rh_live; }
 /* bytes the heap may still grow by (psi_drv.c: the soft ceiling) */
 long psi_heap_room(void) { return (long)emu_heap_limit - (long)rh_live; }
+/* (1.00) the memory watcher's level (core psiwork.h): none in the harness */
+int pg_mem_level(void) { return -1; }
 int psi_heap_system_short(void) { return 0; }
 void psi_mem_report(const char *what) { emu_hc(HC_PAGEMEM, (int)what, (int)rh_live, (int)rh_page_peak, (int)rh_fails); }
 

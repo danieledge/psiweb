@@ -52,7 +52,8 @@ static char *psi_args[] = {
 	"-memory-cache-size", "262144",
 	"-image-cache-size", "262144",
 	"-font-cache-size", "262144",
-	"-format-cache-size", "1",
+	"-format-cache-size", "1",	/* (MEM-71) 0 on 16 greys: see main */
+	"-max-cookie-age", "400",	/* (MEM-74) days: a cookie kept no longer than this */
 	"-html-g-background-color", "0xffffff",
 	"-menu-background-color", "0xffffff",
 	"-menu-foreground-color", "0x000000",
@@ -75,6 +76,16 @@ int main(int argc, char **argv)
 	int n = 0, r;
 	(void)argc; (void)argv;
 	while (psi_args[n]) args[n] = psi_args[n], n++;
+	/* (MEM-71) the page before is kept, laid out, for Back: with its
+	   pictures and its text that is most of a second page in memory.
+	   The netBook has the room (and its pictures of other pages go when
+	   a page is done, img.c psi_drop_other_pages); the 5mx lays the page
+	   out again for Back instead */
+	if (pwb_depth() != 8) {
+		int i;
+		for (i = 0; i + 1 < n; i++)
+			if (!strcmp(args[i], "-format-cache-size")) args[i + 1] = "0";
+	}
 	/* Preferences > Use a proxy (WebOne): every request goes to it as plain
 	   HTTP, https:// addresses too (the proxy does the TLS: see
 	   get_proxy_string in sched.c) */

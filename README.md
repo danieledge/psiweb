@@ -14,9 +14,33 @@ A web browser for the **Psion Series 5mx**, the **netBook** and the **Series 7**
 
 Up to 0.61 the engine was NetSurf. Its sources are still in the tree as a fallback (see *The NetSurf engine* below), until Links has been proved on the device. The whole port is described in [`links/PORTING.md`](links/PORTING.md).
 
-**Status: beta (0.99).** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
+**Status: beta (1.00).** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
 
 [![Download PsiWeb.sis](https://img.shields.io/badge/Download-PsiWeb.sis-2ea44f?logo=github)](https://github.com/danieledge/psiterm/raw/main/dist/PsiWeb.sis)
+
+## What's new in 1.00
+
+Less memory, so PsiWeb sits more easily beside the other programs:
+
+- **The page before lets go of its pictures** once a new page is done (Back
+  draws them again), and the Back list keeps the last 50 pages.
+- **A large progressive JPEG** no longer takes several megabytes just to be
+  measured: it is measured without being decoded, and one too big for the
+  memory is shown as a box.
+- **A compressed page** is unpacked no further than the memory allows: what
+  fits is shown, and PsiWeb says the page was cut.
+- **Trim** (after half a minute behind, or when Coda's memory watcher asks)
+  also lets go of the simplified page of a page style, the unpacked copies of
+  pages and the picture drawing's scratch rows: half a megabyte with a big
+  page in the Lighter style. PsiWeb also trims itself when the watcher says
+  memory is short.
+- **The screen is no longer held a third time** on the netBook (307 KB), and
+  the 16-grey table and some of Links' own tables take memory only when
+  used.
+- **Cookies** are written only when one has changed, and at most 300 are
+  kept (30 for a site), none for more than 400 days.
+- **An update file left by Tools > Update** (2.6 MB, on C: with no card) is
+  deleted when PsiWeb next starts.
 
 ## What's new in 0.99
 

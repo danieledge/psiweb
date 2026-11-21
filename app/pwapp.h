@@ -144,6 +144,7 @@ const TInt KPwKeepLog = 4;             // (0.77) Tools > Keep a log: PsiWeb.log 
                                        // this bit (in the same byte; older files have it 0: off)
 
 class CPwView;
+const TInt KPwStripRows = 32;   // (1.00, MEM-76) the lines of the page drawn at a time (CPwView::BlitRows)
 
 class CPwWatcher : public CActive
 	{
@@ -177,6 +178,7 @@ public:
 	TBool Asleep() const { return iAsleep; }
 	TBool SleepNow(TDes& aWhy);   // (0.97) PsiHub's Free memory dialog, "sleepnow": asleep, else why not
 	void TrimNow();               // (0.97) "trim": the caches and the heap's free end
+	TBool MemBusy() const;        // (1.00) a page opening, a download, a dialog: busy for the memory watcher
 	void WakeL();
 	void StartBusy(const TDesC& aText);      // busy message until the engine draws
 	void StartBusyCancel();
@@ -233,7 +235,8 @@ private:
 	TBool iColour;                // the screen has colours: the page is EColor256
 	TInt iMaxH;                   // the screen's height (240 on the 5mx, 480 on the netBook)
 	TInt iChunkSize;              // PW_SHARED_SIZE for this screen
-	CFbsBitmap* iBitmap;
+	CFbsBitmap* iBitmap;          // (1.00, MEM-76) KPwStripRows lines of the page (BlitRows)
+	void BlitRows(CWindowGc& aGc, const TRect& aRect) const;
 	RChunk iChunk;
 	TBool iChunkOpen;
 	PwShared* iShared;
@@ -547,6 +550,7 @@ public:
 	void ConstructL();
 	~CPwAppUi();
 	void ShowPicturesState(TBool aOn);  // the Pictures button pressed in or not
+	void SetMemBusy(TBool aViewBusy);   // (1.00) PsiMemBusy: a page opening, or a command running
 	// the toolband (0.78): its address and progress follow the engine
 	void ChromeTick();
 	TBool AddressKeyL(const TKeyEvent& aKeyEvent, TEventCode aType);   // ETrue: the address had it
@@ -585,6 +589,12 @@ private:
 	TPsiReading iReading;
 	TBool iForeground;
 	void HandleCommandL(TInt aCommand);
+	void DoCommandL(TInt aCommand);             // (1.00) HandleCommandL's work, PsiWeb busy meanwhile
+	static void CommandDone(TAny* aSelf);
+	RChunk iMemChunk;                           // (1.00) registered with the memory watcher (psimemlvl.h)
+	TInt iCommands;                             // ... commands running (a dialog up)
+	TBool iViewBusy;                            // ... CPwView::MemBusy, from the tick
+	TBool iMemBusyNow;                          // ... what the watcher was last told
 	void HandleSwitchOnEventL(CCoeControl* aDestination);
 	TBool ProcessCommandParametersL(TApaCommand aCommand, TFileName& aDocumentName, const TDesC8& aTail);
 	void ProcessMessageL(TUid aUid, const TDesC8& aParams);

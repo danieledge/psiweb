@@ -154,7 +154,7 @@ static TBool PwDiagOn()
 _LIT(KIniFile, "C:\\System\\Apps\\PsiWeb\\PsiWeb.ini");
 _LIT(KUpdIniFile, "C:\\System\\Apps\\PsiWeb\\Update.ini");
 _LIT(KFavsKept, "C:\\System\\Apps\\PsiWeb\\Favourites.dat");   // (pwfavs.cpp's KFavsFile)
-_LIT(KVersion, "0.99");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
+_LIT(KVersion, "1.00");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
 _LIT(KDefaultHome, "http://68k.news/");
 const TInt KZoomSteps[] = { 50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200 };
 const TInt KZoomCount = 11;
@@ -359,8 +359,12 @@ void CPwView::ConstructL(const TRect& aRect, const TPwSettings& aSettings)
 	if (size.iWidth > PW_MAX_W) size.iWidth = PW_MAX_W;
 	size.iWidth &= ~1;	/* the engine packs two pixels a word: width must be even */
 	if (size.iHeight > iMaxH) size.iHeight = iMaxH;
+	// (1.00, MEM-76) a strip of the page, not the whole screen: the frame
+	// is in the shared chunk already, and the backed-up window keeps what
+	// is drawn, so a whole-screen copy (307 KB on the netBook, in the
+	// bitmap server) held the page a third time for nothing (BlitRows)
 	iBitmap = new(ELeave) CFbsBitmap;
-	User::LeaveIfError(iBitmap->Create(TSize(PW_MAX_W, iMaxH), fbMode));
+	User::LeaveIfError(iBitmap->Create(TSize(PW_MAX_W, KPwStripRows), fbMode));
 
 	// (only as big as this screen needs: fb is last in the chunk)
 	iChunkSize = PW_SHARED_SIZE(iMaxH, stride);
@@ -739,6 +743,7 @@ void CPwView::MemoryTick()
 		if (s->cmd != PW_CMD_NONE)
 			return;                          // (a command still waits: next tick)
 		iTrimmed = ETrue;
+		User::Heap().Compress();             // (1.00, MEM-73) the app's own heap too
 		CopyToC(s->cmd_arg, sizeof(s->cmd_arg), KNullDesC);
 		s->cmd = PW_CMD_TRIM;
 		s->net.resized = 1;                  // wakes the engine's wait (see psi_os.c)
@@ -762,6 +767,18 @@ void CPwView::MemoryTick()
 		|| iEikonEnv->EikAppUi()->IsDisplayingMenuOrDialog())
 		return;
 	Sleep();
+	}
+
+// (1.00) a page opening, a download, an update, a test or a question: not
+// to be put to sleep or closed by the memory watcher (PsiMemBusy)
+TBool CPwView::MemBusy() const
+	{
+	PwShared* s = iShared;
+	if (!s || !iRunning)
+		return EFalse;
+	return s->busy || iLinkBusy || iStartBusy || iUpdDlg || iUpdState == PW_UPD_RUNNING || iUpdState == -1
+		|| iTesting || iLogState == PW_LOG_RUNNING || iAsking
+		|| s->save_state == PW_ASK_ASKING || s->auth_state == PW_ASK_ASKING;
 	}
 
 void CPwView::Sleep()
@@ -1235,6 +1252,7 @@ void CPwView::Tick()
 	if (s)
 		s->app_beat++;                   // "still here": see pwepoc.cpp
 	MemoryTick();                        // (0.92) behind another program: trim, then sleep
+	((CPwAppUi*)iEikonEnv->EikAppUi())->SetMemBusy(MemBusy());   // (1.00) for the memory watcher
 	// (0.81) the pace: quick while anything is going on, else slow with the
 	// doorbell armed (the heartbeat above still goes every 2 s)
 	if (TickWanted())
@@ -1376,17 +1394,10 @@ void CPwView::Tick()
 		y0 = 0;
 		y1 = s->height;
 		}
-	// the shared buffer has exactly an EGray16 (or EColor256) scan line's layout
-	for (TInt y = y0; y < y1; y++)
-		{
-		TPtr8 row(s->fb + y * s->stride, s->stride, s->stride);
-		iBitmap->SetScanLine(row, y);
-		}
 	iShowMsg = EFalse;
 	// a backed-up window: draw straight in, no redraw cycle
-	TRect r(0, y0, s->width, y1);
 	ActivateGc();
-	SystemGc().BitBlt(r.iTl, iBitmap, r);
+	BlitRows(SystemGc(), TRect(0, y0, s->width, y1));
 	DeactivateGc();
 	TRAPD(se, UpdateScrollBarL());
 	(void)se;
@@ -1866,7 +1877,28 @@ void CPwView::Draw(const TRect& aRect) const
 	page.iBr.iX = page.iTl.iX + engW;
 	r.Intersection(page);                // (the scroll bar draws itself)
 	if (!r.IsEmpty())
-		gc.BitBlt(r.iTl, iBitmap, r);
+		BlitRows(gc, r);
+	}
+
+// (1.00, MEM-76) the engine's frame (the shared chunk: exactly an EGray16 or
+// EColor256 scan line's layout) drawn at aRect, a strip of KPwStripRows
+// lines at a time through iBitmap; the frame's row y is the window's y
+void CPwView::BlitRows(CWindowGc& aGc, const TRect& aRect) const
+	{
+	PwShared* s = iShared;
+	if (!s || !iBitmap)
+		return;
+	TInt y1 = aRect.iBr.iY < s->height ? aRect.iBr.iY : s->height;
+	for (TInt y = aRect.iTl.iY < 0 ? 0 : aRect.iTl.iY; y < y1; y += KPwStripRows)
+		{
+		TInt n = y1 - y < KPwStripRows ? y1 - y : KPwStripRows;
+		for (TInt k = 0; k < n; k++)
+			{
+			TPtr8 row(s->fb + (y + k) * s->stride, s->stride, s->stride);
+			iBitmap->SetScanLine(row, k);
+			}
+		aGc.BitBlt(TPoint(aRect.iTl.iX, y), iBitmap, TRect(aRect.iTl.iX, 0, aRect.iBr.iX, n));
+		}
 	}
 
 void CPwView::PushEvent(TInt aType, TInt aCode, TInt aX, TInt aY)
@@ -2267,6 +2299,11 @@ void CPwAppUi::ConstructL()
 		keptBack = ETrue;
 	PsiKeepRestore(kfs, KUpdIniFile);
 	PsiKeepRestore(kfs, KPsiLinkFile);
+	// (1.00, MEM-75) an update saved by Tools > Update (2.6 MB, on C: with
+	// no card, which is memory) was never deleted: it goes at the next
+	// start, when nothing is downloading or installing it
+	kfs.Delete(_L("C:\\PsiWeb-update.sis"));
+	kfs.Delete(_L("D:\\PsiWeb-update.sis"));
 	TPwSettings settings;
 	LoadSettings(settings);
 	iShownProgress = -1;
@@ -2323,6 +2360,9 @@ void CPwAppUi::ConstructL()
 	if (iToolBand && iToolBand->IsVisible())
 		iToolBand->DrawNow();
 	AddToStackL(iView);
+	// (1.00) on the memory watcher's list (psimemlvl.h): PsiWeb takes "trim"
+	// and "sleep" (ProcessMessageL), and says when it is busy
+	PsiMemRegister(iMemChunk, KUidPsiWeb.iUid);
 	iCoeEnv->RootWin().EnableOnEvents(EEventControlAlways);   // (0.54) switch-on events even when in the background
 	// the user's contrast and backlight back if a program stopped in
 	// Reading mode without doing it (docs/display.md)
@@ -2957,6 +2997,7 @@ void CPwAppUi::HandleControlEventL(CCoeControl* aControl, TCoeEvent aEventType)
 
 CPwAppUi::~CPwAppUi()
 	{
+	PsiMemUnregister(iMemChunk, KUidPsiWeb.iUid);
 	iReading.Leave(iCoeEnv->FsSession(), KUidPsiWeb);   // the user's contrast and backlight back
 	if (iView)
 		{
@@ -3396,7 +3437,36 @@ static TBool RouteChanged(const TPwSettings& aWas, const TPwSettings& aNow)
 		|| aWas.iProxyPort != aNow.iProxyPort;
 	}
 
+// (1.00) while a command runs (a dialog up) PsiWeb is busy for the memory
+// watcher: not put to sleep or closed then
 void CPwAppUi::HandleCommandL(TInt aCommand)
+	{
+	iCommands++;
+	SetMemBusy(iViewBusy);
+	CleanupStack::PushL(TCleanupItem(CommandDone, this));
+	DoCommandL(aCommand);
+	CleanupStack::PopAndDestroy();
+	}
+
+void CPwAppUi::CommandDone(TAny* aSelf)
+	{
+	CPwAppUi* ui = (CPwAppUi*)aSelf;
+	ui->iCommands--;
+	ui->SetMemBusy(ui->iViewBusy);
+	}
+
+void CPwAppUi::SetMemBusy(TBool aViewBusy)
+	{
+	iViewBusy = aViewBusy;
+	TBool busy = iViewBusy || iCommands > 0;
+	if (busy != iMemBusyNow)
+		{
+		iMemBusyNow = busy;
+		PsiMemBusy(iMemChunk, KUidPsiWeb.iUid, busy);
+		}
+	}
+
+void CPwAppUi::DoCommandL(TInt aCommand)
 	{
 	TPwSettings& st = iView->Settings();
 	PwShared* sh = iView->Shared();
