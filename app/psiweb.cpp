@@ -2131,15 +2131,21 @@ TBool CPwConnDialog::OkToExitL(TInt aButtonId)
 	}
 
 // (0.99) the family's About (Coda's style sheet 2.7): "PsiWeb 0.99" in
-// bold, what it is, the copyright with the machine it is on, Buy me a coffee
+// bold, what it is, the copyright (with Coda's line on Coda's netBook only),
+// Buy me a coffee
 void CPwAboutDialog::PreLayoutDynInitL()
 	{
 	TBuf<32> title(_L("PsiWeb "));
 	title.Append(KVersion);
 	((CEikLabel*)Control(EPwDlgAbout1))->SetFont(iEikonEnv->TitleFont());   // (the dialogs' bold)
 	SetLabelL(EPwDlgAbout1, title);
-	SetLabelL(EPwDlgAbout4, iTall ? _L("\xA9 Dan Edge 2026 - part of Coda for the Psion netBook")
-		: _L("\xA9 Dan Edge 2026 - part of Coda for the Psion Series 5mx"));
+	// "part of Coda" only on Coda's netBook (its ROM has PsiBattHook.bin,
+	// as the toolbar's test), as PsiTerm's and PsiMail's About: never on
+	// Psion's own image, the Series 7 or the 5mx
+	TEntry e;
+	TBool coda = iCoeEnv->FsSession().Entry(_L("Z:\\System\\Libs\\PsiBattHook.bin"), e) == KErrNone;
+	SetLabelL(EPwDlgAbout4, coda ? _L("\xA9 Dan Edge 2026 - part of Coda for the Psion netBook")
+		: _L("\xA9 Dan Edge 2026"));
 	}
 
 TBool CPwAboutDialog::OkToExitL(TInt aButtonId)

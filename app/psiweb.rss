@@ -121,8 +121,8 @@ RESOURCE TOOLBAR r_pw_toolbar_coda
 		TBAR_BUTTON { id=EPwCmdBack; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Back"; flags=EEikToolBarCtrlHasSetMinLength; length=50; },
 		TBAR_BUTTON { id=EPwCmdStart; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Start"; flags=EEikToolBarCtrlHasSetMinLength; length=50; },
 		TBAR_BUTTON { id=EPwCmdImages; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Pictures"; flags=EEikToolBarCtrlHasSetMinLength; length=50; },
-		TBAR_CTRL { type=0x7044; control=PW_BATTERY { }; },
-		TBAR_CTRL { type=0x7042; control=SPACER; },
+		// (the stretch first: Coda's battery and extras sit just above its
+		// clock, as in the built-in programs and core's psitbar.rh)
 		TBAR_CTRL
 			{
 			type=EEikCtSpacer;
@@ -130,6 +130,8 @@ RESOURCE TOOLBAR r_pw_toolbar_coda
 			length=0;
 			control=SPACER;
 			},
+		TBAR_CTRL { type=0x7044; control=PW_BATTERY { }; },
+		TBAR_CTRL { type=0x7042; control=SPACER; },
 		TBAR_CTRL
 			{
 			type=0x7043;
@@ -620,8 +622,8 @@ RESOURCE ARRAY r_pw_conn_link_lines
 	{
 	items=
 		{
-		DLG_LINE { type=EEikCtChoiceList; prompt="Connect via"; id=EPwDlgLink; control=CHOICELIST { array_id=r_pw_link_array; }; },
-		DLG_LINE { type=EEikCtChoiceList; prompt="Baud rate"; id=EPwDlgBaud; control=CHOICELIST { array_id=r_pw_baud_array; }; },
+		DLG_LINE { type=EEikCtChoiceList; prompt="Connects via"; id=EPwDlgLink; control=CHOICELIST { array_id=r_pw_link_array; }; },
+		DLG_LINE { type=EEikCtChoiceList; prompt="Speed"; id=EPwDlgBaud; control=CHOICELIST { array_id=r_pw_baud_array; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="Flow control"; id=EPwDlgFlow; control=CHOICELIST { array_id=r_pw_flow_array; }; },
 		DLG_LINE { type=EEikCtEdwin; prompt=PSILINK_TXT_FIRST_SEND; id=EPwDlgPppStart; control=EDWIN { width=14; maxlength=40; }; }
 		};
@@ -880,8 +882,8 @@ RESOURCE ARRAY r_pw_empty_array
 
 // About (0.99: the family's About, Coda style sheet 2.7): the name and
 // version in bold, what it is and the machines it runs on, the copyright
-// and the machine (set at run time: the © sign, and the netBook or the
-// Series 5mx), Buy me a coffee in the small font. The other people's code
+// (set at run time: the © sign, and "part of Coda for the Psion netBook"
+// on Coda's netBook only), Buy me a coffee in the small font. The other people's code
 // is under Credits... (the IJG's sentence, as its licence asks; the SDK's
 // notice for the C library, STDLIB.SIS, inside). How PsiWeb connects is in
 // Page information, not here.
