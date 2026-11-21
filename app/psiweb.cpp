@@ -2299,11 +2299,11 @@ void CPwAppUi::ConstructL()
 		keptBack = ETrue;
 	PsiKeepRestore(kfs, KUpdIniFile);
 	PsiKeepRestore(kfs, KPsiLinkFile);
-	// (1.00, MEM-75) an update saved by Tools > Update (2.6 MB, on C: with
-	// no card, which is memory) was never deleted: it goes at the next
-	// start, when nothing is downloading or installing it
+	// (1.00, MEM-75) an update saved by Tools > Update on C: (2.6 MB of
+	// the Psion's memory, with no card) was never deleted: it goes at the
+	// next start, when nothing is downloading or installing it. One saved
+	// on the card (D:) stays, to be installed later
 	kfs.Delete(_L("C:\\PsiWeb-update.sis"));
-	kfs.Delete(_L("D:\\PsiWeb-update.sis"));
 	TPwSettings settings;
 	LoadSettings(settings);
 	iShownProgress = -1;

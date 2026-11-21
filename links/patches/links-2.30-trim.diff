@@ -13,6 +13,7 @@ links/fetch.sh after links-2.30-psion.diff, links-2.30-scrollbar.diff and links-
 - jpeg.c (PSI_LAZY_IMAGES): a progressive JPEG asked only for its size is not started (libjpeg
   allocated every coefficient of the whole picture for it); for a real decode the coefficients
   are counted first, and a picture whose arrays would not fit is refused
+  (PSI_PIC_MAX_BYTES on the 5mx, twice it on the netBook)
 - links.h, compress.c, cache.c (PSIWEB): psi_last_dlen, a page's inflated length last time
 - session.c (PSIWEB): psi_history_cap: the Back list cut to a length when a page is done
 
@@ -325,7 +326,7 @@ links/fetch.sh after links-2.30-psion.diff, links-2.30-scrollbar.diff and links-
  {
 --- a/jpeg.c
 +++ b/jpeg.c
-@@ -297,9 +297,38 @@
+@@ -297,9 +297,42 @@
  		global_cinfo->dct_method = JDCT_IFAST;
  		global_cinfo->do_fancy_upsampling = FALSE;
  #endif
@@ -345,12 +346,16 @@ links/fetch.sh after links-2.30-psion.diff, links-2.30-scrollbar.diff and links-
 +			goto psi_size_known;
 +		}
 +		if (global_cinfo->buffered_image) {
++			/* (1.00) at most PSI_PIC_MAX_BYTES on the 5mx; twice that
++			   (8 MB) on the netBook, whose engine heap is 20 MB */
++			extern int pwb_depth(void);
++			double most = pwb_depth() == 8 ? 2.0 * PSI_PIC_MAX_BYTES : (double)PSI_PIC_MAX_BYTES;
 +			int ci;
 +			double est = 0;
 +			jpeg_component_info *comp = global_cinfo->comp_info;
 +			for (ci = 0; ci < global_cinfo->num_components; ci++, comp++)
 +				est += (double)comp->width_in_blocks * (double)comp->height_in_blocks * (DCTSIZE2 * sizeof(JCOEF));
-+			if (est > PSI_PIC_MAX_BYTES || psi_heap_tight((size_t)est))
++			if (est > most || psi_heap_tight((size_t)est))
 +				longjmp(global_jerr->setjmp_buffer,2);
 +		}
 +		}

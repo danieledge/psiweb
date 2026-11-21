@@ -5,8 +5,9 @@
 # own "[mem]" figure (its heap in use) after a page or a Trim:
 #   pics-then-text  the picture page, then a text page: the pictures of the
 #                   page before go when the text page is done
-#   prog            one 1600x1200 progressive JPEG: its page peak (it is
-#                   measured without decoding, and refused as too big)
+#   prog            one 1600x1200 progressive JPEG: its page peak (measured
+#                   without decoding; shown on the netBook, up to 8 MB to
+#                   decode; refused as too big on the 5mx, over 4 MB)
 #   bomb            48 KB of gzip that inflates to 12 MB: the engine ends the
 #                   page as "too big" and lives
 #   trim-lighter    a 380 KB news page in the Lighter style, then Trim (cmd 21)

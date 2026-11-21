@@ -25,8 +25,8 @@ Less memory, so PsiWeb sits more easily beside the other programs:
 - **The page before lets go of its pictures** once a new page is done (Back
   draws them again), and the Back list keeps the last 50 pages.
 - **A large progressive JPEG** no longer takes several megabytes just to be
-  measured: it is measured without being decoded, and one too big for the
-  memory is shown as a box.
+  measured: it is measured without being decoded, and one that would need
+  more than 4 MB to decode (8 MB on the netBook) is shown as a box.
 - **A compressed page** is unpacked no further than the memory allows: what
   fits is shown, and PsiWeb says the page was cut.
 - **Trim** (after half a minute behind, or when Coda's memory watcher asks)
@@ -39,8 +39,8 @@ Less memory, so PsiWeb sits more easily beside the other programs:
   used.
 - **Cookies** are written only when one has changed, and at most 300 are
   kept (30 for a site), none for more than 400 days.
-- **An update file left by Tools > Update** (2.6 MB, on C: with no card) is
-  deleted when PsiWeb next starts.
+- **An update file left on C: by Tools > Update** (2.6 MB of memory, with no
+  card) is deleted when PsiWeb next starts; one saved on the card stays.
 
 ## What's new in 0.99
 
