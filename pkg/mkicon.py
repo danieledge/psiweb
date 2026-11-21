@@ -1,46 +1,53 @@
 #!/usr/bin/env python3
-"""PsiWeb icon: a globe (meridians and parallels) in 4 greys, at the three
-sizes the Psion 5mx uses, written to PsiWeb.aif with PsiTerm's AIF writer."""
-import os, sys
-from PIL import Image, ImageDraw
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../core/tools/icon"))
-from aif import write_aif
-from colouricon import colour_icons   # the colour icons (colour/), when there
-K, D, L, W = 0, 85, 170, 255
+"""PsiWeb's icon: a flat globe in Coda's icon style (0.99; the UI review's
+style sheet 2.3 and its design audit DA-19), drawn with Coda's icon kit
+(codaicon.py, a copy of psion-netbook's psiicons/art/codaicon.py, with
+epoc256.py, EPOC's palette) at 24, 32 and 48 pixels, and written to
+PsiWeb.aif as 8-bit colour bitmaps with their masks, compressed as Psion's
+own .aif files are. One .aif serves both machines: the netBook shows the
+colours, the Series 5mx each colour by its brightness in its greys.
 
-def icon(n):
-    im = Image.new("L", (n, n), W)
-    mk = Image.new("1", (n, n), 1)
-    d, m = ImageDraw.Draw(im), ImageDraw.Draw(mk)
-    s = n / 48.0
-    R = lambda v: int(round(v * s))
-    b = [R(3), R(3), n - 1 - R(3), n - 1 - R(3)]
-    t = max(1, R(2.5))
-    d.ellipse(b, fill=L, outline=K)
-    m.ellipse(b, fill=0)
-    for k in range(1, t):
-        d.ellipse([b[0] + k, b[1] + k, b[2] - k, b[3] - k], outline=K)
-    cx, cy = n // 2, n // 2
-    rw = (b[2] - b[0]) // 2
-    for f in (0.45,):                               # meridian ellipse
-        w = int(rw * f)
-        d.ellipse([cx - w, b[1], cx + w, b[3]], outline=D)
-    d.line([(cx, b[1]), (cx, b[3])], fill=K, width=max(1, t - 1))
-    d.line([(b[0], cy), (b[2], cy)], fill=K, width=max(1, t - 1))
-    for dy in (-0.5, 0.5):                          # parallels
-        y = cy + int(rw * dy)
-        half = int(rw * 0.866)
-        d.line([(cx - half, y), (cx + half, y)], fill=D, width=max(1, t - 1))
-    return im, mk
+The globe: pale blue (99ccff) seas, Coda's blue (0066cc) land and navy
+(003366) meridians, on a 1-pixel 333333 outline with the kit's edges and
+shadow; three hues at most, cube colours only (the kit checks). At 24 the
+globe, one piece of land, the equator and the middle meridian; the curved
+meridians and the second piece of land from 32; the parallels at 48.
 
-if __name__ == "__main__":
-    icons = colour_icons("psiweb") or [icon(n) for n in (24, 32, 48)]
-    out = sys.argv[1] if len(sys.argv) > 1 else "psiweb.aif"
-    print(out, write_aif(out, 0x01000A7A, [(1, "PsiWeb"), (10, "PsiWeb")], icons), "bytes")
-    if len(sys.argv) > 1:
-        sys.exit(0)
-    prev = Image.new("L", (24 + 32 + 48 + 20, 48), W)
-    x = 0
-    for im, _ in icons:
-        prev.paste(im, (x, 0)); x += im.size[0] + 10
-    prev.resize((prev.size[0] * 3, 144), Image.NEAREST).save("icon-preview.png")
+    python3 pkg/mkicon.py [OUT.aif]     (build.sh: the package's PsiWeb.aif)
+    python3 pkg/mkicon.py               also icon-preview.png, the three sizes x3
+"""
+import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import codaicon  # noqa: E402
+from codaicon import BLUE, NAVY  # noqa: E402
+
+SEA = '99ccff'
+
+
+def globe(c):
+    # the object within y 2..44 and x 1..45 of the 48 grid (the kit's margins)
+    c.ellipse(3, 2, 45, 44, SEA)
+    # the land, flat (a map's print: no outline of its own)
+    c.poly([(10, 12), (19, 8), (25, 13), (22, 21), (25, 28), (17, 33), (12, 26), (8, 19)], BLUE, edge=False, bevel=False)
+    c.poly([(29, 27), (37, 25), (40, 32), (33, 39), (28, 35)], BLUE, only=(32, 48), edge=False, bevel=False)
+    # the lines, flat, inside the outline
+    c.line([(6, 23), (42, 23)], 2, NAVY)                             # the equator
+    c.line([(24, 5), (24, 41)], 2, NAVY)                             # the middle meridian
+    c.arc(13, 3, 35, 43, 0, 360, 1.5, NAVY, only=(32, 48))           # the curved meridians
+    c.line([(9, 13), (39, 13)], 1.5, NAVY, only=(48,))               # the parallels
+    c.line([(9, 33), (39, 33)], 1.5, NAVY, only=(48,))
+
+
+def icons():
+    return codaicon.icons(globe, 'PsiWeb')
+
+
+if __name__ == '__main__':
+    ic = icons()
+    out = sys.argv[1] if len(sys.argv) > 1 else 'psiweb.aif'
+    print(out, codaicon.write_aif(out, 0x01000A7A, [(1, 'PsiWeb'), (10, 'PsiWeb')], ic), 'bytes')
+    if len(sys.argv) == 1:
+        codaicon.preview('icon-preview.png', [('PsiWeb', ic)])
