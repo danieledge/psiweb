@@ -346,18 +346,22 @@ private:
 	void SizeChangedL();
 	void PositionChanged();
 	void Layout();
+	void LayoutL();                    // (1.01) whole lines; the bar only for a text longer than the box
 	TInt CountComponentControls() const;
 	CCoeControl* ComponentControl(TInt aIndex) const;
 	void Draw(const TRect& aRect) const;
 	void HandlePointerEventL(const TPointerEvent& aEvent);
-	void Model(TInt& aTotal, TInt& aShown, TInt& aAbove) const;
+	TInt LineHeight() const;           // the text's own
+	void FormatL();                    // all of it, so its lines can be counted
+	TInt Count() const;                // the text's lines
+	TInt Shown() const;                // the lines the box shows
 	void DrawBar(CWindowGc& aGc) const;
 	void UpdateBar();
-	TBool AtEnd() const;
-	TInt ScrollL(TInt aMovement);
+	void ScrollToL(TInt aTop);         // (1.01) a whole line at the top, from 0
 	CEikRichTextEditor* iEditor;
-	TRect iBar;
-	TInt iAbove;                       // pixels scrolled off the top
+	TRect iBar;                        // empty when the text fits
+	TInt iLineH;
+	TInt iTopLine;                     // the line at the top
 	TInt iPress;                       // the part held: 1 up, 2 down, 3 the thumb
 	TInt iGrab;
 	};

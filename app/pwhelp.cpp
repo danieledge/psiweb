@@ -231,7 +231,7 @@ static const TPwHelpTopic KHelpTopics[] =
 
 static const TInt KHelpCount = sizeof(KHelpTopics) / sizeof(KHelpTopics[0]);
 
-// ----- the text, with its scroll bar (0.99) ------------------------------------
+// ----- the text, with its scroll bar (0.99; 1.01: whole lines) ----------------
 //
 // As PsiMail's Help (pmhelp.cpp CPmHelpText): a read-only rich text editor
 // with a scroll bar drawn beside it, the text scrolled with its view: Up and
@@ -239,9 +239,15 @@ static const TInt KHelpCount = sizeof(KHelpTopics) / sizeof(KHelpTopics[0]);
 // Up at the top goes back to the Topic line. The line's resource is the
 // editor's (RTXTED); the box is whole lines high: 7 on the 5mx's 240 lines,
 // 12 on 480 (the style sheet's Help), whatever the resource says.
+// (1.01) The text moves a whole line at a time (the view's line at the top,
+// SetViewLineAtTopL), so the top line is never cut: ScrollDisplayL had moved
+// it by pixels and left the last line at the bottom, a part line at the top.
+// The bar is drawn only when the topic is longer than the box; a topic that
+// fits has none, and its text takes the bar's room. The line height is the
+// text's own (the netBook's fonts can change), 17 if it cannot be read.
 
 const TInt KHelpBarW = 23;                 // EIKON's scroll bar width
-const TInt KHelpLineH = 17;                // a line of the help's text (the normal font's)
+const TInt KHelpLineH = 17;                // a line of the help's text (the normal font's), if not read
 const TInt KHelpButH = 20;                 // the bar's arrow buttons
 
 CPwHelpText::~CPwHelpText()
@@ -264,11 +270,25 @@ void CPwHelpText::SetContainerWindowL(const CCoeControl& aContainer)
 		iEditor->SetContainerWindowL(*this);
 	}
 
+// the text's own line height (its first formatted line)
+TInt CPwHelpText::LineHeight() const
+	{
+	CTextLayout* lay = iEditor ? iEditor->TextLayout() : NULL;
+	TInt h = 0;
+	if (lay && lay->NumFormattedLines() > 0)
+		{
+		TRect line;
+		lay->GetLineRect(1, line);
+		h = line.Height();
+		}
+	return h >= 8 && h <= 40 ? h : KHelpLineH;
+	}
+
 TSize CPwHelpText::MinimumSize()
 	{
 	TBool tall = iEikonEnv->ScreenDevice()->SizeInPixels().iHeight >= 400;
 	TInt lines = tall ? 12 : 7;
-	return TSize(iEditor->MinimumSize().iWidth + KHelpBarW + 2, lines * KHelpLineH + 2);
+	return TSize(iEditor->MinimumSize().iWidth + KHelpBarW + 2, lines * LineHeight() + 2);
 	}
 
 void CPwHelpText::SizeChangedL()
@@ -281,15 +301,59 @@ void CPwHelpText::PositionChanged()
 	Layout();
 	}
 
+// the whole text formatted (an edwin formats only the band in view once its
+// text is long), so its lines can be counted and any one put at the top
+void CPwHelpText::FormatL()
+	{
+	CTextView* view = iEditor->TextView();
+	if (!view || !iEditor->TextLayout())
+		return;
+	iEditor->TextLayout()->SetAmountToFormat(CTextLayout::EFFormatAllText);
+	view->FormatTextL();
+	}
+
+TInt CPwHelpText::Count() const
+	{
+	CTextLayout* lay = iEditor->TextLayout();
+	return lay ? lay->NumFormattedLines() : 0;
+	}
+
+TInt CPwHelpText::Shown() const
+	{
+	return iLineH > 0 ? iEditor->Rect().Height() / iLineH : 0;
+	}
+
+// the text's box: whole lines high (any pixels over stay blank below it), as
+// wide as the line less the bar when the text is longer than the box
 void CPwHelpText::Layout()
+	{
+	TRAPD(err, LayoutL());
+	(void)err;
+	}
+
+void CPwHelpText::LayoutL()
 	{
 	if (!iEditor)
 		return;
 	TRect r = Rect();
 	r.Shrink(1, 1);
-	iBar = TRect(r.iBr.iX - KHelpBarW, r.iTl.iY, r.iBr.iX, r.iBr.iY);
-	TRAPD(err, iEditor->SetRectL(TRect(r.iTl, TPoint(iBar.iTl.iX, r.iBr.iY))));
-	(void)err;
+	if (r.Width() <= KHelpBarW + 8 || r.Height() <= 8)
+		return;
+	iLineH = LineHeight();
+	TInt h = (r.Height() / iLineH) * iLineH;
+	if (h <= 0)
+		h = r.Height();
+	iEditor->SetRectL(TRect(r.iTl, TSize(r.Width() - KHelpBarW, h)));
+	FormatL();
+	if (Count() > Shown())
+		iBar = TRect(r.iBr.iX - KHelpBarW, r.iTl.iY, r.iBr.iX, r.iBr.iY);
+	else
+		{
+		iBar = TRect();
+		iEditor->SetRectL(TRect(r.iTl, TSize(r.Width(), h)));
+		FormatL();
+		}
+	iTopLine = 0;
 	}
 
 TInt CPwHelpText::CountComponentControls() const
@@ -302,31 +366,21 @@ CCoeControl* CPwHelpText::ComponentControl(TInt /*aIndex*/) const
 	return iEditor;
 	}
 
-void CPwHelpText::Model(TInt& aTotal, TInt& aShown, TInt& aAbove) const
-	{
-	CTextLayout* lay = iEditor->TextLayout();
-	aShown = iEditor->Rect().Height();
-	aTotal = lay ? lay->FormattedHeightInPixels() : aShown;
-	if (aTotal < aShown) aTotal = aShown;
-	aAbove = iAbove;
-	if (aAbove > aTotal - aShown) aAbove = aTotal - aShown;
-	if (aAbove < 0) aAbove = 0;
-	}
-
 // the parts of the bar: the shaft, the thumb in it, the two arrow buttons
-// at the foot (as EIKON's own bars)
+// at the foot (as EIKON's own bars); the model in lines
 static void HelpBarParts(const TRect& r, TInt aTotal, TInt aShown, TInt aAbove,
 	TRect& aShaft, TRect& aThumb, TRect& aUp, TRect& aDown)
 	{
 	aDown = TRect(r.iTl.iX, r.iBr.iY - KHelpButH, r.iBr.iX, r.iBr.iY);
 	aUp = TRect(r.iTl.iX, r.iBr.iY - 2 * KHelpButH, r.iBr.iX, r.iBr.iY - KHelpButH);
 	aShaft = TRect(r.iTl.iX, r.iTl.iY, r.iBr.iX, aUp.iTl.iY);
+	if (aTotal < aShown) aTotal = aShown;
 	TInt sh = aShaft.Height();
 	TInt th = aTotal > 0 ? sh * aShown / aTotal : sh;
 	if (th < 16) th = 16;
 	if (th > sh) th = sh;
 	TInt room = aTotal - aShown;
-	TInt ty = aShaft.iTl.iY + (room > 0 ? (sh - th) * aAbove / room : 0);
+	TInt ty = aShaft.iTl.iY + (room > 0 ? (sh - th) * Min(aAbove, room) / room : 0);
 	aThumb = TRect(aShaft.iTl.iX, ty, aShaft.iBr.iX, ty + th);
 	}
 
@@ -369,24 +423,35 @@ void CPwHelpText::Draw(const TRect& /*aRect*/) const
 	gc.SetPenColor(KRgbBlack);
 	gc.SetBrushStyle(CGraphicsContext::ENullBrush);
 	gc.DrawRect(Rect());
+	// (1.01) white under the last whole line (the editor draws its own)
+	if (iEditor)
+		{
+		TRect r = Rect();
+		r.Shrink(1, 1);
+		TRect below(r.iTl.iX, iEditor->Rect().iBr.iY, iBar.Width() > 0 ? iBar.iTl.iX : r.iBr.iX, r.iBr.iY);
+		if (below.Height() > 0)
+			{
+			gc.SetPenStyle(CGraphicsContext::ENullPen);
+			gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
+			gc.SetBrushColor(KRgbWhite);
+			gc.DrawRect(below);
+			}
+		}
 	DrawBar(gc);
 	}
 
 void CPwHelpText::DrawBar(CWindowGc& aGc) const
 	{
 	if (iBar.Width() <= 0)
-		return;
-	TInt total, shown, above;
-	Model(total, shown, above);
+		return;                              // (1.01) a topic that fits: no bar
 	TRect shaft, thumb, up, down;
-	HelpBarParts(iBar, total, shown, above, shaft, thumb, up, down);
+	HelpBarParts(iBar, Count(), Shown(), iTopLine, shaft, thumb, up, down);
 	aGc.SetPenStyle(CGraphicsContext::ESolidPen);
 	aGc.SetPenColor(KRgbBlack);
 	aGc.SetBrushStyle(CGraphicsContext::ESolidBrush);
 	aGc.SetBrushColor(iEikonEnv->ControlColor((TEikLogicalColor)EEikColorScrollBarShaft, *this));
 	aGc.DrawRect(shaft);
-	if (total > shown)
-		HelpFace(aGc, *this, thumb, iPress == 3);
+	HelpFace(aGc, *this, thumb, iPress == 3);
 	HelpFace(aGc, *this, up, iPress == 1);
 	HelpArrow(aGc, up, ETrue);
 	HelpFace(aGc, *this, down, iPress == 2);
@@ -395,7 +460,7 @@ void CPwHelpText::DrawBar(CWindowGc& aGc) const
 
 void CPwHelpText::UpdateBar()
 	{
-	if (!IsReadyToDraw())
+	if (!IsReadyToDraw() || iBar.Width() <= 0)
 		return;
 	ActivateGc();
 	DrawBar(SystemGc());
@@ -404,108 +469,90 @@ void CPwHelpText::UpdateBar()
 
 void CPwHelpText::TextChangedL()
 	{
-	iAbove = 0;
-	iEditor->TextView()->SetCursorVisibilityL(TCursor::EFCursorInvisible, TCursor::EFCursorInvisible);
-	UpdateBar();
+	iTopLine = 0;
+	iPress = 0;
+	if (iEditor->TextView())
+		iEditor->TextView()->SetCursorVisibilityL(TCursor::EFCursorInvisible, TCursor::EFCursorInvisible);
+	LayoutL();
 	}
 
-// the end of the text is in view (no scrolling on into blank lines)
-TBool CPwHelpText::AtEnd() const
+// (1.01) a whole line at the top (aTop: from 0), kept within the text
+void CPwHelpText::ScrollToL(TInt aTop)
 	{
-	TInt total, shown, above;
-	Model(total, shown, above);
-	return iAbove >= total - shown;
-	}
-
-// scrolls the text: the pixels it moved (0 at the top or the end)
-TInt CPwHelpText::ScrollL(TInt aMovement)
-	{
-	TCursorPosition::TMovementType m = (TCursorPosition::TMovementType)aMovement;
-	TInt px = iEditor->TextView()->ScrollDisplayL(m);
-	if (px < 0) px = -px;
-	TBool down = m == TCursorPosition::EFLineDown || m == TCursorPosition::EFPageDown;
-	iAbove += down ? px : -px;
-	if (iAbove < 0) iAbove = 0;
-	iEditor->TextView()->SetCursorVisibilityL(TCursor::EFCursorInvisible, TCursor::EFCursorInvisible);
+	TInt most = Count() - Shown();
+	if (aTop > most)
+		aTop = most;
+	if (aTop < 0)
+		aTop = 0;
+	if (aTop == iTopLine || !iEditor->TextView())
+		return;
+	TPoint moved = iEditor->TextView()->SetViewLineAtTopL(aTop + 1);
+	iTopLine = aTop;
+	if (moved.iY == CTextLayout::EFScrollRedrawWholeScreen)
+		iEditor->DrawNow();
 	UpdateBar();
-	return px;
 	}
 
 TKeyResponse CPwHelpText::OfferKeyEventL(const TKeyEvent& aKeyEvent, TEventCode aType)
 	{
 	if (aType != EEventKey)
 		return EKeyWasNotConsumed;
+	TInt page = Shown() > 1 ? Shown() - 1 : 1;
 	switch (aKeyEvent.iCode)
 		{
 	case EKeyUpArrow:
-		if (iAbove <= 0 || ScrollL(TCursorPosition::EFLineUp) == 0)
-			{
-			iAbove = 0;
-			UpdateBar();
-			if (iDialog)
-				iDialog->TopicLineL();       // at the top: back to the Topic line
-			}
-		return EKeyWasConsumed;
+		if (iTopLine > 0)
+			ScrollToL(iTopLine - 1);
+		else if (iDialog)
+			iDialog->TopicLineL();           // at the top: back to the Topic line
+		break;
 	case EKeyDownArrow:
-		if (!AtEnd())
-			ScrollL(TCursorPosition::EFLineDown);
-		return EKeyWasConsumed;
+		ScrollToL(iTopLine + 1);
+		break;
 	case EKeyPageUp:
-		ScrollL(TCursorPosition::EFPageUp);
-		return EKeyWasConsumed;
+		ScrollToL(iTopLine - page);
+		break;
 	case EKeyPageDown:
-		if (!AtEnd())
-			ScrollL(TCursorPosition::EFPageDown);
-		return EKeyWasConsumed;
+		ScrollToL(iTopLine + page);
+		break;
 	case EKeyHome:
-		while (iAbove > 0 && ScrollL(TCursorPosition::EFPageUp) > 0) {}
-		iAbove = 0;
-		UpdateBar();
-		return EKeyWasConsumed;
+		ScrollToL(0);
+		break;
 	case EKeyEnd:
-		for (TInt guard = 0; guard < 100 && !AtEnd() && ScrollL(TCursorPosition::EFPageDown) > 0; guard++) {}
-		return EKeyWasConsumed;
+		ScrollToL(Count());
+		break;
 	default:
 		return EKeyWasNotConsumed;
 		}
+	return EKeyWasConsumed;
 	}
 
 // the pen on the bar: the arrows a line, the shaft a page, the thumb dragged
 void CPwHelpText::HandlePointerEventL(const TPointerEvent& aEvent)
 	{
+	if (iBar.Width() <= 0)
+		return;                              // (the text: nothing to select)
 	TPoint p = aEvent.iPosition;
-	TInt total, shown, above;
-	Model(total, shown, above);
 	TRect shaft, thumb, up, down;
-	HelpBarParts(iBar, total, shown, above, shaft, thumb, up, down);
+	HelpBarParts(iBar, Count(), Shown(), iTopLine, shaft, thumb, up, down);
+	TInt page = Shown() > 1 ? Shown() - 1 : 1;
 	if (aEvent.iType == TPointerEvent::EButton1Down)
 		{
 		iPress = 0;
 		if (!iBar.Contains(p))
-			return;                          // (the text: nothing to select)
-		if (up.Contains(p)) { iPress = 1; ScrollL(TCursorPosition::EFLineUp); }
-		else if (down.Contains(p)) { iPress = 2; if (!AtEnd()) ScrollL(TCursorPosition::EFLineDown); }
+			return;
+		if (up.Contains(p)) { iPress = 1; ScrollToL(iTopLine - 1); }
+		else if (down.Contains(p)) { iPress = 2; ScrollToL(iTopLine + 1); }
 		else if (thumb.Contains(p)) { iPress = 3; iGrab = p.iY - thumb.iTl.iY; }
-		else if (p.iY < thumb.iTl.iY) ScrollL(TCursorPosition::EFPageUp);
-		else if (!AtEnd()) ScrollL(TCursorPosition::EFPageDown);
+		else ScrollToL(p.iY < thumb.iTl.iY ? iTopLine - page : iTopLine + page);
 		UpdateBar();
 		return;
 		}
 	if (aEvent.iType == TPointerEvent::EDrag && iPress == 3)
 		{
-		TInt room = shaft.Height() - thumb.Height();
-		if (room > 0 && total > shown)
-			{
-			TInt want = (p.iY - iGrab - shaft.iTl.iY) * (total - shown) / room;
-			for (TInt guard = 0; guard < 200; guard++)
-				{
-				TInt at = iAbove;
-				if (at + 12 < want && !AtEnd()) ScrollL(TCursorPosition::EFLineDown);
-				else if (at - 12 > want && at > 0) ScrollL(TCursorPosition::EFLineUp);
-				else break;
-				if (iAbove == at) break;
-				}
-			}
+		TInt room = shaft.Height() - thumb.Height(), most = Count() - Shown();
+		if (room > 0 && most > 0)
+			ScrollToL(((p.iY - iGrab - shaft.iTl.iY) * most + room / 2) / room);
 		return;
 		}
 	if (aEvent.iType == TPointerEvent::EButton1Up && iPress)
@@ -572,6 +619,12 @@ void CPwHelpDialog::ShowTopicL(TInt aTopic)
 		ap.Append(TPtrC8((const TUint8*)own));
 		}
 	TPtrC8 text(*all);
+	// (1.01) trailing new lines dropped: blank lines after the text made a
+	// topic that fits look longer than the box
+	TInt n = text.Length();
+	while (n > 0 && text[n - 1] == '\n')
+		n--;
+	text.Set(text.Left(n));
 	HBufC* b = HBufC::NewLC(title.Length() + text.Length() + 4);
 	TPtr p = b->Des();
 	p.Copy(title);
@@ -595,6 +648,8 @@ void CPwHelpDialog::ShowTopicL(TInt aTopic)
 	ed->HandleTextChangedL();
 	ed->SetCursorPosL(0, EFalse);
 	box->TextChangedL();                    // (at its top, the bar up to date)
+	if (IsActivated())
+		box->DrawDeferred();                // (1.01: the bar shown or not, the text's width with it)
 	CleanupStack::PopAndDestroy(2);         // b, all
 	}
 

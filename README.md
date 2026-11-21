@@ -14,9 +14,14 @@ A web browser for the **Psion Series 5mx**, the **netBook** and the **Series 7**
 
 Up to 0.61 the engine was NetSurf. Its sources are still in the tree as a fallback (see *The NetSurf engine* below), until Links has been proved on the device. The whole port is described in [`links/PORTING.md`](links/PORTING.md).
 
-**Status: beta (1.00).** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
+**Status: beta (1.01).** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
 
 [![Download PsiWeb.sis](https://img.shields.io/badge/Download-PsiWeb.sis-2ea44f?logo=github)](https://github.com/danieledge/psiterm/raw/main/dist/PsiWeb.sis)
+
+## What's new in 1.01
+
+- **Help**: a topic that fits shows no scroll bar, and the text scrolls a
+  whole line at a time, so the top line is never cut.
 
 ## What's new in 1.00
 
