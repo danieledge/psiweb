@@ -33,6 +33,10 @@ A round of polish, so PsiWeb looks and reads like PsiMail and PsiTerm, and like 
 
 No setting, file or connection setting changed.
 
+![PsiWeb 0.99 on the netBook: the toolbar shown, the start page](docs/img/2026-11-21-polish/netbook-start.png)
+
+The netBook before (`before-netbook-start.png`, `before-netbook-about.png`) and after (`netbook-start.png`, `netbook-tools.png`, `netbook-help.png`, `netbook-credits.png`), the Series 5mx (`5mx-start.png`, `5mx-about.png`) and the icon at its three sizes (`icon.png`) are in [docs/img/2026-11-21-polish](docs/img/2026-11-21-polish/).
+
 ## What's new in 0.98
 
 - **The start page's Add... and What works do what they say.** Add... (or its number key) asks for a name and an address and adds them as a favourite, the next tile, and What works opens Help at "What works and what does not".
