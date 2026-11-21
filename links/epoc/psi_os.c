@@ -549,6 +549,10 @@ static int live_wanted(int n, fd_set *r)
 	return r && live_fd >= 0 && live_fd < n && FD_ISSET(live_fd, r);
 }
 
+void psi_store_idle(void);
+int psi_store_busy(void);
+void psi_store_purged(void);
+
 int psi_select(int n, void *rv, void *wv, void *ev, void *tvv)
 {
 	fd_set *r = rv, *w = wv, ro, wo;
@@ -559,6 +563,7 @@ int psi_select(int n, void *rv, void *wv, void *ev, void *tvv)
 
 	(void)ev;
 	ring_if_news();
+	psi_store_idle();	/* (1.00) waiting: the picture store may be emptied meanwhile (psi_store.c) */
 	for (;;) {
 		int left, step;
 		FD_ZERO(&ro);
@@ -620,6 +625,7 @@ int psi_select(int n, void *rv, void *wv, void *ev, void *tvv)
 	if (r) memcpy(r, &ro, sizeof(fd_set));
 	if (w) memcpy(w, &wo, sizeof(fd_set));
 	if (ev) FD_ZERO((fd_set *)ev);
+	if (psi_store_busy()) psi_store_purged();	/* (1.00) pinned again; emptied meanwhile: its pictures forgotten */
 	return k;
 }
 

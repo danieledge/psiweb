@@ -37,7 +37,7 @@ Z_SRCS   := adler32 crc32 inflate inftrees inffast zutil deflate trees
 LINKS_OBJS := $(addprefix $(O)/links/,$(LINKS_SRCS:=.o))
 # (psi_grey.c, as in the ARM build: psi_drv.c uses its table of greys)
 PSI_OBJS   := $(O)/psi/psi_drv.o $(O)/psi/psi_mem.o $(O)/psi/pwhost.o $(O)/psi/psi_grey.o $(O)/psi/psi_colour.o $(O)/psi/psi_digest.o \
-	$(O)/psi/psi_style.o $(O)/psi/psi_simp.o $(O)/psi/htmlsimp.o $(O)/psi/pwproblem.o
+	$(O)/psi/psi_style.o $(O)/psi/psi_simp.o $(O)/psi/htmlsimp.o $(O)/psi/pwproblem.o $(O)/psi/psi_store.o
 JPG_LIB    := $(O)/libjpeg.a
 PNG_LIB    := $(O)/libpng.a
 Z_LIB      := $(O)/libz.a
@@ -68,6 +68,9 @@ $(O)/links/%.o: $(SRC)/%.c $(HDRS) $(WEB)/links/host/config2.h $(SRC)/links.h $(
 $(O)/psi/psi_drv.o: psi_drv.c $(HDRS) $(WEB)/fb/pwback.h $(SRC)/links.h
 	@mkdir -p $(dir $@)
 	$(CC) -c $(LCFLAGS) -I$(WEB)/fb -I$(WEB) $< -o $@
+$(O)/psi/psi_store.o: psi_store.c
+	@mkdir -p $(dir $@)
+	$(CC) -c $(LCFLAGS) $< -o $@
 # (0.85, 0.86) the Page not opened page, View > Page style and the simplifier
 $(O)/psi/psi_style.o: psi_style.c simp/psi_simp.h $(HDRS) $(WEB)/fb/pwback.h $(SRC)/links.h
 	@mkdir -p $(dir $@)

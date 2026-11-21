@@ -1882,7 +1882,8 @@ void CPwView::Draw(const TRect& aRect) const
 
 // (1.00, MEM-76) the engine's frame (the shared chunk: exactly an EGray16 or
 // EColor256 scan line's layout) drawn at aRect, a strip of KPwStripRows
-// lines at a time through iBitmap; the frame's row y is the window's y
+// lines at a time through iBitmap, each blitted before the next is filled;
+// the frame's row y is the window's y
 void CPwView::BlitRows(CWindowGc& aGc, const TRect& aRect) const
 	{
 	PwShared* s = iShared;
@@ -1898,6 +1899,10 @@ void CPwView::BlitRows(CWindowGc& aGc, const TRect& aRect) const
 			iBitmap->SetScanLine(row, k);
 			}
 		aGc.BitBlt(TPoint(aRect.iTl.iX, y), iBitmap, TRect(aRect.iTl.iX, 0, aRect.iBr.iX, n));
+		// the window server reads the strip when it carries the BitBlt
+		// out, not when it is asked: it must have done so before the strip
+		// is filled again (else every strip shows the last one's lines)
+		iCoeEnv->WsSession().Flush();         // (carried out before the request returns)
 		}
 	}
 

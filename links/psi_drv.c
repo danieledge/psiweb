@@ -177,6 +177,14 @@ static void copy16(unsigned short *d, const unsigned short *s, int n)
  * the rest back), and into the scratch rows prepare_strip hands out, which
  * commit_strip packs. */
 #define PSI_BMP_GREY	((void *)1)	/* bitmap->flags: packed grey */
+#define PSI_BMP_STORE	((void *)3)	/* (1.00) packed, and moved into the purgeable store (psi_store.c) */
+void psi_store_move(void);
+void psi_store_purged(void);
+void *psi_store_alloc(size_t n, void **owner);
+void psi_store_free(void *p);
+void psi_store_compact(void);
+long psi_store_used(void);
+long psi_store_committed(void);
 
 int psi_pic_bitmap;			/* img.c: the next bitmap is a picture's */
 unsigned long psi_pic_bytes;		/* bytes in picture bitmaps now */
@@ -450,15 +458,67 @@ static void psi_register_bitmap(struct bitmap *bmp)
 	bmp->data = mem_realloc(bmp->data, n);	/* (shrinking: in place) */
 	bmp->flags = (void *)2;			/* packed */
 }
-#define PACKED(b) ((b)->flags == (void *)2)
+#define PACKED(b) ((b)->flags == (void *)2 || (b)->flags == PSI_BMP_STORE)
 
 static void psi_unregister_bitmap(struct bitmap *bmp)
 {
 	if (bmp == fs_bmp) fs_forget();
 	if (bmp->flags && bmp->data)
 		psi_pic_bytes -= (size_t)bmp->x * (size_t)bmp->y * (PACKED(bmp) ? 1 : 2);
-	if (bmp->data) mem_free(bmp->data);
+	if (bmp->data) {
+		if (bmp->flags == PSI_BMP_STORE) psi_store_free(bmp->data);
+		else mem_free(bmp->data);
+	}
 	bmp->data = NULL;
+}
+
+/* (1.00) the purgeable store (psi_store.c): a finished picture's bitmap
+   is moved out of the heap into it, at a quiet moment (psi_store_move) */
+static void store_move_one(struct cached_image *cimg, void *u)
+{
+	struct bitmap *b = &cimg->bmp;
+	size_t n;
+	void *p;
+	if ((cimg->state != 13 && cimg->state != 15) || b->flags != (void *)2 || !b->data || b == fs_bmp) return;
+	n = (size_t)b->x * (size_t)b->y;
+	if (!n || !(p = psi_store_alloc(n, &b->data))) return;
+	memcpy(p, b->data, n);
+	mem_free(b->data);
+	b->data = p;
+	b->flags = PSI_BMP_STORE;
+	(*(int *)u)++;
+}
+
+void psi_store_move(void)
+{
+	int moved = 0;
+	psi_imgcache_walk(store_move_one, &moved);
+}
+
+/* the store was emptied while the engine waited: every picture that was
+   in it is forgotten, to be decoded again when next drawn (img.c) */
+void psi_drop_picture(struct cached_image *cimg);
+static void store_purged_one(struct cached_image *cimg, void *u)
+{
+	struct bitmap *b = &cimg->bmp;
+	if (b->flags != PSI_BMP_STORE) return;
+	if (b->data) psi_pic_bytes -= (size_t)b->x * (size_t)b->y;
+	b->data = NULL;				/* (gone: never read or freed) */
+	b->flags = (void *)2;
+	psi_drop_picture(cimg);
+	(*(int *)u)++;
+}
+
+void psi_store_purged(void)
+{
+	int gone = 0;
+	psi_imgcache_walk(store_purged_one, &gone);
+	{
+		extern void pw_log(const char *);
+		char line[100];
+		snprintf(line, sizeof(line), "memory: the picture store was emptied by the system (%d pictures to decode again)", gone);
+		pw_log(line);
+	}
 }
 
 static void *psi_prepare_strip(struct bitmap *bmp, int top, int lines)
@@ -1517,6 +1577,8 @@ static void psi_trim(void)
 	psi_style_trim();
 	psi_cache_free_decompressed();
 	psi_free_scratch();
+	psi_store_move();		/* (1.00) and the store given back down to what it holds */
+	psi_store_compact();
 	psi_heap_compress();
 	psi_mem_report("trim");
 }
@@ -1688,6 +1750,8 @@ static void psi_page_done(struct session *ses)
 {
 	if (!ses) return;
 	psi_drop_other_pages(ses);
+	psi_store_move();		/* (1.00) the page's finished pictures into the purgeable store */
+	if (psi_store_committed() - psi_store_used() >= 128L * 1024) psi_store_compact();
 	psi_history_cap(ses, PSI_HISTORY_MAX);
 	psi_style_page_done(ses->screen && ses->screen->f_data && ses->screen->f_data->rq ? ses->screen->f_data->rq->ce : NULL);
 #ifdef PSI_EPOC
@@ -1933,6 +1997,9 @@ static void poll_fn(void *p)
 	if (now - last_status >= STATUS_MS) {
 		last_status = now;
 		report_state(0);
+		/* (1.00) pictures finished since (a page still coming, a scroll
+		   decoding them): into the store; one still being decoded stays */
+		psi_store_move();
 	}
 #ifdef PSI_EPOC
 	/* (1.00) the memory watcher's level (core psimemlvl.h, written by

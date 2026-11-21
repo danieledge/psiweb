@@ -9,7 +9,8 @@ links/fetch.sh after links-2.30-psion.diff, links-2.30-scrollbar.diff and links-
 - html_r.c, html_tbl.c (PSIWEB): the colour lookup at 256 heads; the table cache at 1,024 heads
   with no initialiser (32 KB of zeros out of the program's data)
 - img.c, links.h (PSI_LAZY_IMAGES): psi_drop_other_pages: when a page is done, the finished
-  pictures of other pages (the page before, kept for Back) go
+  pictures of other pages (the page before, kept for Back) go; psi_drop_picture, for a
+  picture whose bitmap the system took back (psi_store.c, the purgeable store)
 - jpeg.c (PSI_LAZY_IMAGES): a progressive JPEG asked only for its size is not started (libjpeg
   allocated every coefficient of the whole picture for it); for a real decode the coefficients
   are counted first, and a picture whose arrays would not fit is refused
@@ -273,7 +274,21 @@ links/fetch.sh after links-2.30-psion.diff, links-2.30-scrollbar.diff and links-
  #endif
  		if (cimg->wanted_xw >= 0 && cimg->wanted_yw >=0) cimg->state |= 2;
  		add_image_to_cache(cimg);
-@@ -1667,6 +1668,50 @@
+@@ -1631,6 +1632,13 @@
+ 	cimg->state &= 2;
+ }
+ 
++/* (PsiWeb 1.00) psi_drv.c: a picture whose bitmap the system took back
++   (the purgeable store) is forgotten, to be decoded again when drawn */
++void psi_drop_picture(struct cached_image *cimg)
++{
++	psi_drop(cimg);
++}
++
+ static void psi_evict_one(struct cached_image *cimg, void *e_)
+ {
+ 	struct psi_evict *e = (struct psi_evict *)e_;
+@@ -1667,6 +1675,50 @@
  	return e.freed;
  }
  

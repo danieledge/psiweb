@@ -13,6 +13,10 @@
 #   trim-lighter    a 380 KB news page in the Lighter style, then Trim (cmd 21)
 #   cookies-links   3 pages that set 40 cookies each, then 60 linked pages:
 #                   cookies.txt keeps 30 for the site
+#   purge           the picture page; the picture store (psi_store.c)
+#                   emptied as Coda's memory hook would, on a page and during
+#                   a load; Page Down and Up, Back: the pictures decoded again
+#                   and the screen the same to the pixel (shots purge-*.png)
 # PW_BUILD names another build folder (an older engine, to compare).
 # Build the harness engine first: core/tools/docker/psibuild "make -f links/epoc.mk -j8 emu"
 set -e
@@ -38,6 +42,13 @@ run pics-then-text --images "open $U/images.html" "idle 3000" "open $U/text.html
 run prog --images "open $U/prog.html" "idle 3000"
 run bomb "" "open $U/bomb.html" "idle 3000"
 run trim-lighter "--style 1" "open $U/big.html" "idle 3000" "cmd 21" "wait 500" "idle 2000"
+run purge --images "open $U/images.html" "idle 3000" "shot $WORK/purge-1.png" "purge" "wait 300" "key 281" "wait 400" "idle 2000" "key 280" "wait 400" "idle 2000" "shot $WORK/purge-2.png" "open $U/text.html" "idle 2000" "purge" "wait 300" "cmd 2" "purge" "wait 150" "purge" "wait 150" "idle 3000" "shot $WORK/purge-3.png"
+grep -a -E "\[purge\]|emptied by" "$WORK/purge.log" | sed 's/^/    /'
+python3 -c "
+import sys
+from PIL import Image, ImageChops
+a, b, c = (Image.open('$WORK/purge-%d.png' % i).convert('RGB') for i in (1, 2, 3))
+print('    the same after the purges:', ImageChops.difference(a, b).getbbox() is None and ImageChops.difference(a, c).getbbox() is None)"
 L=""
 for i in 1 2 3; do L="$L open $U/cookies/$i|idle 1500|"; done
 for i in $(seq 0 59); do L="$L open $U/link/$i|idle 500|"; done

@@ -180,6 +180,35 @@ void psi_mem_page_start(void) { rh_page_peak = rh_live; }
 long psi_heap_room(void) { return (long)emu_heap_limit - (long)rh_live; }
 /* (1.00) the memory watcher's level (core psiwork.h): none in the harness */
 int pg_mem_level(void) { return -1; }
+
+/* (1.00) psi_store.c's region in the harness: a static block standing for
+   the global chunk. The script line "purge" (run_links.py, hypercall 41)
+   empties it the next time the engine pins it, as Coda's memory hook would
+   while the engine waits: what was committed is filled with 0xDD first, so
+   a picture used after the purge would show as garbage or crash here. */
+#define EMU_REGION (4 * 1024 * 1024)
+static unsigned char emu_region[EMU_REGION];
+static long emu_committed;
+unsigned char *psi_region_open(long max) { (void)max; return emu_region; }
+int psi_region_pin(void)
+{
+	if (emu_hc(41, (int)emu_committed, 0, 0, 0)) {
+		memset(emu_region, 0xDD, (size_t)emu_committed);
+		emu_committed = 0;
+		return 1;
+	}
+	return 0;
+}
+int psi_region_commit(long bytes)
+{
+	if (bytes > EMU_REGION) return -1;
+	if (bytes < emu_committed) memset(emu_region + bytes, 0xDD, (size_t)(emu_committed - bytes));
+	emu_committed = bytes;
+	emu_hc(42, (int)bytes, 0, 0, 0);
+	return 0;
+}
+void psi_region_unpin(void) { }
+void psi_region_wait(void) { }
 int psi_heap_system_short(void) { return 0; }
 void psi_mem_report(const char *what) { emu_hc(HC_PAGEMEM, (int)what, (int)rh_live, (int)rh_page_peak, (int)rh_fails); }
 

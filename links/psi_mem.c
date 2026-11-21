@@ -154,6 +154,13 @@ void psi_mem_report(const char *what)
    PSI_HEAP_LIMIT, as if the limit were the Psion's 10 MB */
 int psi_heap_system_short(void) { return 0; }	/* (the PC: only the limit) */
 
+/* (1.00) psi_store.c's region: none on the PC (the pictures stay in the heap) */
+unsigned char *psi_region_open(long max) { (void)max; return 0; }
+int psi_region_pin(void) { return 0; }
+int psi_region_commit(long bytes) { (void)bytes; return -1; }
+void psi_region_unpin(void) { }
+void psi_region_wait(void) { }
+
 long psi_heap_room(void)
 {
 	over(0);

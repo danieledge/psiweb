@@ -107,7 +107,7 @@ endif
 PSI_OBJS   := $(O)/psi/psi_drv.o $(O)/psi/psi_os.o $(O)/psi/pwgrey.o $(O)/psi/pwcolour.o $(O)/psi/psi_str.o $(O)/psi/psi_digest.o $(O)/psi/pwnet.o \
 	$(O)/psi/nsprintf.o $(O)/psi/tls13.o $(O)/psi/x25519.o $(O)/psi/pwrandom.o \
 	$(O)/psi/certcheck.o $(O)/psi/pmrsa.o $(O)/psi/pwcert.o $(O)/psi/pwproblem.o $(O)/psi/aesgcm.o \
-	$(O)/psi/psi_style.o $(O)/psi/psi_simp.o $(O)/psi/htmlsimp.o \
+	$(O)/psi/psi_style.o $(O)/psi/psi_simp.o $(O)/psi/htmlsimp.o $(O)/psi/psi_store.o \
 	$(addprefix $(O)/ltc/,$(subst /,__,$(LTC_SRCS:=.o)))
 LTM_LIB    := $(O)/libltm.a
 JPG_LIB    := $(O)/libjpeg.a
@@ -187,6 +187,9 @@ $(O)/psi/pwgrey.o: $(LW)/psi_grey.c $(WEB)/fb/pwback.h $(CORE)/ssh/psigrey.h
 $(O)/psi/pwcolour.o: $(LW)/psi_colour.c $(LW)/psi_pal.h $(WEB)/fb/pwback.h
 	@mkdir -p $(dir $@)
 	$(CC) -c $(CFLAGS_C) -std=gnu99 -I$(WEB)/fb $< -o $@
+$(O)/psi/psi_store.o: $(LW)/psi_store.c
+	@mkdir -p $(dir $@)
+	$(CC) -c $(CFLAGS_C) $< -o $@
 $(O)/psi/psi_str.o: $(LW)/psi_str.c
 	@mkdir -p $(dir $@)
 	$(CC) -c $(CFLAGS_C) $< -o $@
@@ -283,7 +286,7 @@ $(O)/psiweb-emu.pe: $(LINKS_OBJS) $(PSI_OBJS) $(EMU_OBJS) $(JPG_LIB) $(PNG_LIB) 
 
 # ---------- the device EXE (as Makefile links NetSurf's) ----------
 CXXFLAGS := $(ARCH) $(DEFS) -Wno-ctor-dtor-privacy -fcheck-new -fvtable-thunks -w -I$(WEB) -I$(CORE)/ssh $(LIBC)
-DEV_OBJS := $(O)/dev/pwepoc.o $(O)/dev/psiglue.o $(O)/dev/pwupdate.o $(O)/dev/psi_heap.o $(O)/dev/psi_stubs.o
+DEV_OBJS := $(O)/dev/pwepoc.o $(O)/dev/psiglue.o $(O)/dev/pwupdate.o $(O)/dev/psi_heap.o $(O)/dev/psi_stubs.o $(O)/dev/psi_purge.o
 SYSLIBS := $(REL)/estlib.lib $(REL)/euser.lib $(REL)/c32.lib $(REL)/efsrv.lib $(REL)/esock.lib $(REL)/insock.lib $(REL)/nifman.lib $(LIBGCC)
 EXE_OBJS = $(REL)/eexe.o $(LINKS_OBJS) $(PSI_OBJS) $(DEV_OBJS) $(PNG_LIB) $(JPG_LIB) $(Z_LIB) $(LTM_LIB) $(REL)/ecrt0.o $(SYSLIBS)
 
@@ -296,6 +299,12 @@ $(O)/dev/psiglue.o: $(CORE)/ssh/psiglue.cpp $(CORE)/ssh/psishared.h $(CORE)/ssh/
 $(O)/dev/psi_heap.o: $(LW)/epoc/psi_heap.cpp $(WEB)/psiweb.h $(CORE)/ssh/psishared.h
 	@mkdir -p $(dir $@)
 	$(CC) -c $(CXXFLAGS) $< -o $@
+# (1.00) the purgeable picture store's chunk (psion-core ssh/psipurge.h):
+# PSI_PURGE=1 for PsiWeb only; PSI_PURGE=0 builds it with no store
+PSI_PURGE ?= 1
+$(O)/dev/psi_purge.o: $(LW)/epoc/psi_purge.cpp $(CORE)/ssh/psipurge.h
+	@mkdir -p $(dir $@)
+	$(CC) -c $(CXXFLAGS) -DPSI_PURGE=$(PSI_PURGE) $< -o $@
 $(O)/dev/psi_stubs.o: $(LW)/epoc/psi_stubs.c
 	@mkdir -p $(dir $@)
 	$(CC) -c $(CFLAGS_C) $< -o $@

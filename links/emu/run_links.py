@@ -53,7 +53,9 @@ else is the exact ARM code that goes into psiweb.exe.
 
 Script lines: as fb/pwhost.c (open URL, idle [ms], wait ms, key N,
 type TEXT, pen X Y, cmd N [arg], shot FILE.png, quit), and (0.93) until
-TEXT: wait until the status line has TEXT in it.
+TEXT: wait until the status line has TEXT in it; (1.00) purge: the picture
+store (psi_store.c) is emptied before the engine next runs, as Coda's
+memory hook would.
 --count counts ARM instructions to estimate the time on a 36 MHz Psion.
 """
 import os, re, sys, time, socket, select, struct, math
@@ -385,6 +387,8 @@ def script_step():
             state["last_draw"] = t
         elif cmd == "idle":
             state["idle"] = (int(rest) if rest else 1500) / 1000.0
+        elif cmd == "purge":                         # (1.00) the memory hook empties the picture store
+            state["purge"] = True
         elif cmd == "mark":                          # measure from here (e.g. before a key)
             page_start(rest or "mark")
         elif cmd == "wait":
@@ -598,6 +602,15 @@ def hc(op, a, b, c, d):
         if cur and "done" not in cur:
             cur["heap_end"] = b
         log("[mem] %s: live %d KB, page peak %d KB, failed allocations %d" % (cstr(a, 200), b // 1024, c // 1024, d))
+        return 0
+    if op == 41:                                     # (1.00) psi_region_pin: "purge" asked for?
+        if state.get("purge"):
+            state["purge"] = False
+            log("[purge] the picture store emptied (%d KB committed)" % (a // 1024))
+            return 1
+        return 0
+    if op == 42:                                     # (1.00) psi_region_commit: the store's size
+        log("[store] %d KB committed" % (a // 1024))
         return 0
     if op == 212: return 1 if IMAGES else 0          # pwb_load_images
     if op == 213: return 8 if NETBOOK else 4         # pwb_depth
