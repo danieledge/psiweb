@@ -33,7 +33,7 @@
 #include "psigreyui.h"
 #include "pwaddr.h"              // (0.85) an address, or words to search for
 #include "psikeep.h"             // (0.95) settings kept on the card (never the cookies)
-#include "psierr.h"              // (0.96) Coda's words for an error (review R105)
+#include "psierr.h"              // (0.96) Coda's words for an error (review R105; 1.02: psion-core's ssh/psierr.h)
 #include "psimem.h"              // (0.97) short of memory: PsiHub's Free memory dialog, its words and answers (core/ssh)
 
 // The link settings, proxy included, are shared with PsiTerm and PsiMail
@@ -154,7 +154,7 @@ static TBool PwDiagOn()
 _LIT(KIniFile, "C:\\System\\Apps\\PsiWeb\\PsiWeb.ini");
 _LIT(KUpdIniFile, "C:\\System\\Apps\\PsiWeb\\Update.ini");
 _LIT(KFavsKept, "C:\\System\\Apps\\PsiWeb\\Favourites.dat");   // (pwfavs.cpp's KFavsFile)
-_LIT(KVersion, "1.01");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
+_LIT(KVersion, "1.02");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
 _LIT(KDefaultHome, "http://68k.news/");
 const TInt KZoomSteps[] = { 50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200 };
 const TInt KZoomCount = 11;
