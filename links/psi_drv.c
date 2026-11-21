@@ -1210,8 +1210,8 @@ static void save_progress(void)
 		const char *p = name;
 		for (; *p; p++) if (*p == '/' || *p == '\\' || *p == ':') name = p + 1;
 	}
-	if (of >= 0) snprintf(line, sizeof(line), "Saving %.40s: %ld of %ld KB...", name, kb, of);
-	else snprintf(line, sizeof(line), "Saving %.40s: %ld KB...", name, kb);
+	if (of >= 0) snprintf(line, sizeof(line), "Saving %.40s: %ld of %ld KB\x85", name, kb, of);
+	else snprintf(line, sizeof(line), "Saving %.40s: %ld KB\x85", name, kb);
 	psi_infoprint(line);
 	(void)ld;
 }

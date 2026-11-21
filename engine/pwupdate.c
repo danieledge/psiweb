@@ -354,8 +354,8 @@ int pw_update_run(void)
 
 	setup_route();
 	why[0] = 0;
-	say(PW_UPD_RUNNING, "Checking for a new PsiWeb (%s%s)...",
-		R.local ? "local server " : (R.tls ? "GitHub" : "GitHub through the web helper"),
+	say(PW_UPD_RUNNING, "Checking for a new PsiWeb (%s%s)\x85",
+		R.local ? "the computer at " : (R.tls ? "GitHub" : "GitHub through the web helper"),
 		R.local ? R.host : "");
 
 	r = fetch_small("PsiWeb-version.txt", remote, sizeof(remote), why, sizeof(why));
@@ -387,7 +387,7 @@ int pw_update_run(void)
 		snprintf(why, sizeof(why), buf ? "cannot write %.60s" : "out of memory", net->save_as);
 		r = -1; goto fail;
 	}
-	say(PW_UPD_RUNNING, "Downloading PsiWeb %s...", remote);
+	say(PW_UPD_RUNNING, "Downloading PsiWeb %s\x85", remote);
 	for (;;) {
 		long want, k;
 		if (total >= 0 && got >= total) break;
@@ -449,7 +449,7 @@ int pw_update_run(void)
 	free(buf);
 	buf = NULL;
 	pwn_close(1);
-	say(PW_UPD_RUNNING, "Checking the release signature...");
+	say(PW_UPD_RUNNING, "Checking the release signature\x85");
 	if (verify_file(net->save_as, remote, sig) != 0) {
 		remove(net->save_as);
 		snprintf(why, sizeof(why), "The release signature does not match - the download was deleted");
@@ -464,9 +464,9 @@ fail:
 	pwn_close(1);
 	if (r == -2) {
 		net->quit = 0;
-		say(PW_UPD_FAILED, "Update cancelled");
+		say(PW_UPD_FAILED, "Update stopped");
 	} else
-		say(PW_UPD_FAILED, "Update failed: %s", why);
+		say(PW_UPD_FAILED, "Cannot update - %s", why);
 	return PW_UPD_FAILED;
 }
 

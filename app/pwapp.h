@@ -322,12 +322,51 @@ private:
 	TInt iCount;
 	};
 
+// (0.99) Help's text: a read-only rich text editor with a scroll bar drawn
+// beside it (PsiMail's CPmHelpText, pmhelp.cpp), whole lines only: 7 on a
+// 240-line screen, 12 on 480 (pwhelp.cpp)
+class CPwHelpDialog;
+class CRichText;
+class CEikRichTextEditor;
+class CPwHelpText : public CCoeControl
+	{
+public:
+	~CPwHelpText();
+	void ConstructFromResourceL(TResourceReader& aReader);
+	void SetContainerWindowL(const CCoeControl& aContainer);
+	TSize MinimumSize();
+	TKeyResponse OfferKeyEventL(const TKeyEvent& aKeyEvent, TEventCode aType);
+	CEikRichTextEditor* Editor() const { return iEditor; }
+	void TextChangedL();               // a new topic: at its top, no cursor
+	CPwHelpDialog* iDialog;            // Up at the top goes back to the Topic line
+private:
+	void SizeChangedL();
+	void PositionChanged();
+	void Layout();
+	TInt CountComponentControls() const;
+	CCoeControl* ComponentControl(TInt aIndex) const;
+	void Draw(const TRect& aRect) const;
+	void HandlePointerEventL(const TPointerEvent& aEvent);
+	void Model(TInt& aTotal, TInt& aShown, TInt& aAbove) const;
+	void DrawBar(CWindowGc& aGc) const;
+	void UpdateBar();
+	TBool AtEnd() const;
+	TInt ScrollL(TInt aMovement);
+	CEikRichTextEditor* iEditor;
+	TRect iBar;
+	TInt iAbove;                       // pixels scrolled off the top
+	TInt iPress;                       // the part held: 1 up, 2 down, 3 the thumb
+	TInt iGrab;
+	};
+
 // Help on PsiWeb: a topic list over a read-only text (pwhelp.cpp)
 class CPwHelpDialog : public CEikDialog
 	{
 public:
 	CPwHelpDialog(TInt aTopic) : iTopic(aTopic) {}
+	void TopicLineL() { TryChangeFocusToL(EPwDlgHelpTopic); }
 private:
+	SEikControlInfo CreateCustomControlL(TInt aControlType);
 	void PreLayoutDynInitL();
 	void PostLayoutDynInitL();
 	void HandleControlStateChangeL(TInt aControlId);
@@ -336,13 +375,22 @@ private:
 	TInt iTopic;
 	};
 
+// (0.99) About, as the family's (style sheet 2.7); Credits... opens the
+// credits over it
 class CPwAboutDialog : public CEikDialog
 	{
 public:
-	CPwAboutDialog(const TDesC& aStatus) : iStatus(aStatus) {}
+	CPwAboutDialog(TBool aTall) : iTall(aTall) {}
 private:
 	void PreLayoutDynInitL();
-	const TDesC& iStatus;
+	TBool OkToExitL(TInt aButtonId);
+	TBool iTall;
+	};
+
+class CPwCreditsDialog : public CEikDialog
+	{
+private:
+	void PreLayoutDynInitL();
 	};
 
 // Update PsiWeb: where from (as PsiMail's)
@@ -354,6 +402,8 @@ public:
 private:
 	void PreLayoutDynInitL();
 	TBool OkToExitL(TInt aButtonId);
+	void HandleControlStateChangeL(TInt aControlId);
+	void DimComputerLines();             // (0.99) its lines only for "A computer on my network"
 	TInt& iSource;
 	TDes& iHost;
 	TInt& iPort;
@@ -402,8 +452,8 @@ private:
 	};
 
 // A list of favourites or of history (pwfavs.cpp). Mode 0: pick one to open
-// (Cancel, Open); mode 1: Organise favourites (Edit, Delete, Close - the
-// changes are made at once). aPick is the entry chosen.
+// (Cancel, Open); mode 1: Organise favourites (New, Edit, Delete, Close -
+// the changes are made at once). aPick is the entry chosen.
 class CPwListDialog : public CEikDialog, public MEikListBoxObserver
 	{
 public:
@@ -548,6 +598,7 @@ private:
 	void HelpL();                      // Tools > Help on PsiWeb (pwhelp.cpp)
 	void ButtonPictureL(CEikToolBar* aBar, TInt aId, TInt aIcon);
 	void ToolbarPicturesL();
+	void TallToolbarL();                // (0.99) the netBook's toolbar in place of the 5mx's
 	void ShowToolBarL(TBool aShow);
 	void ShowToolBandL(TBool aShow);
 	void RestartEngineL();
@@ -557,7 +608,8 @@ private:
 	void GoL(const TDesC& aTyped);      // (0.85) an address, or words to search for
 	void FullBrowserL();                // (0.88) File > Open in full browser (PsiTerm)
 	TRect PageRect();                   // the bars laid out as they are shown: the page's room
-	TBool TallScreen() const;           // 480 lines (the netBook): the toolband at first, not the toolbar
+	TBool TallScreen() const;           // 480 lines (the netBook): the toolband too, and the tall toolbar
+	TBool ColourScreen() const;         // (0.99) the netBook, the Series 7: no greys
 	void StartAddressL();               // a tap on the address, or Ctrl+L
 	void ClipboardL(TInt aCommand);     // (0.94) Edit > Cut, Copy, Paste: the address, or a page's field
 	void CopyAddressL();                // (0.94) Edit > Copy page address

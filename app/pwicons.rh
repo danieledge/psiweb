@@ -23,3 +23,11 @@
 #define EMbmBandLockMask 21
 #define EMbmBandNoLock 22
 #define EMbmBandNoLockMask 23
+#define EMbmToolOpenC 24
+#define EMbmToolOpenCMask 25
+#define EMbmToolBackC 26
+#define EMbmToolBackCMask 27
+#define EMbmToolHomeC 28
+#define EMbmToolHomeCMask 29
+#define EMbmToolPicturesC 30
+#define EMbmToolPicturesCMask 31

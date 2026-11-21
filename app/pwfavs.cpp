@@ -361,6 +361,29 @@ TBool CPwListDialog::OkToExitL(TInt aButtonId)
 	{
 	CEikColumnListBox* list = (CEikColumnListBox*)Control(EPwDlgOrgList);
 	TInt cur = list->Model()->NumberOfItems() ? list->CurrentItemIndex() : -1;
+	if (aButtonId == EPwBidNew)
+		{
+		// (0.99) New...: a favourite typed in, as the start page's Add...
+		TBuf<KPwTitleMax> name;
+		TBuf<PW_URL_MAX> url(_L("https://"));
+		CPwFavDialog* dlg = new(ELeave) CPwFavDialog(name, url);
+		if (dlg->ExecuteLD(R_PW_FAV_DIALOG))
+			{
+			TInt r = iList.AddEnd(name, url);
+			if (r == KErrAlreadyExists)
+				iEikonEnv->InfoMsg(_L("Already in favourites"));
+			else if (r == KErrOverflow)
+				iEikonEnv->InfoMsg(_L("Not added - 40 favourites is the most"));
+			else
+				{
+				FillL();
+				CEikColumnListBox* l = (CEikColumnListBox*)Control(EPwDlgOrgList);
+				if (l->Model()->NumberOfItems())
+					l->SetCurrentItemIndexAndDraw(l->Model()->NumberOfItems() - 1);
+				}
+			}
+		return EFalse;                       // (the list stays up)
+		}
 	if (aButtonId == EPwBidEdit)
 		{
 		if (cur < 0 || cur >= iList.Count())
@@ -436,10 +459,11 @@ void CPwOpenDialog::PreLayoutDynInitL()
 	CEikEdwin* ed = (CEikEdwin*)Control(EPwDlgUrl);
 	ed->SetTextL(&iUrl);
 	ed->SelectAllL();
-	// Recent: "-" (nothing chosen), then the latest pages' addresses
+	// Recent: "-" (nothing chosen), then the latest pages' addresses;
+	// (0.99) "(none yet)", dimmed, before there are any
 	CDesCArrayFlat* items = new(ELeave) CDesCArrayFlat(KPwRecent + 1);
 	CleanupStack::PushL(items);
-	items->AppendL(_L("-"));
+	items->AppendL(iHistory.Count() ? _L("-") : _L("(none yet)"));
 	const CFont* font = iEikonEnv->NormalFont();
 	for (TInt i = 0; i < iHistory.Count() && i < KPwRecent; i++)
 		{
@@ -708,7 +732,7 @@ void CPwAppUi::FavsMenuL(CEikMenuPane* aPane)
 		more.iCommandId = EPwCmdFavMore;
 		more.iCascadeId = 0;
 		more.iFlags = 0;
-		more.iText = _L("More favourites...");
+		more.iText = _L("More favourites\x85");
 		more.iExtraText.Zero();
 		aPane->AddMenuItemL(more);
 		}
@@ -728,8 +752,8 @@ void CPwAppUi::HistoryMenuL(CEikMenuPane* aPane)
 		CEikMenuPane::TItem::SData none;
 		none.iCommandId = EPwCmdHistNone;
 		none.iCascadeId = 0;
-		none.iFlags = EEikMenuItemSeparatorAfter;
-		none.iText = _L("(No history)");
+		none.iFlags = 0;                     // (0.99: no lines in a cascade)
+		none.iText = _L("(none yet)");
 		none.iExtraText.Zero();
 		aPane->AddMenuItemL(none);
 		aPane->SetItemDimmed(EPwCmdHistNone, ETrue);     // (only when it is in the pane: EIKON 8 otherwise)
@@ -738,14 +762,13 @@ void CPwAppUi::HistoryMenuL(CEikMenuPane* aPane)
 		{
 		TInt shown = n > KPwMenuHist ? KPwMenuHist : n;
 		for (TInt i = 0; i < shown; i++)
-			AddMenuEntryL(aPane, EPwCmdHist0 + i, iHist->At(i), *font,
-				i == shown - 1 ? EEikMenuItemSeparatorAfter : 0);
+			AddMenuEntryL(aPane, EPwCmdHist0 + i, iHist->At(i), *font, 0);   // (0.99: no lines in a cascade)
 		}
 	CEikMenuPane::TItem::SData full;
 	full.iCommandId = EPwCmdHistoryFull;
 	full.iCascadeId = 0;
 	full.iFlags = 0;
-	full.iText = _L("Full history...");
+	full.iText = _L("Full history\x85");
 	full.iExtraText.Zero();
 	aPane->AddMenuItemL(full);
 	CEikMenuPane::TItem::SData clear;

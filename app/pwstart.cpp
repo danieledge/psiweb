@@ -104,16 +104,14 @@ void CPwAppUi::UpdateStartPageL()
 	TPtr8 p = page->Des();
 	Add(p, _L8("<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=windows-1252\">"
 		"<title>PsiWeb</title></head><body>"));
-	// the search box: the search page chosen in Preferences
-	if (iView->Settings().iSearch == PW_SEARCH_FROGFIND)
-		Add(p, _L8("<form action=\"http://frogfind.com/\" method=\"get\">"));
-	else
-		Add(p, _L8("<form action=\"https://html.duckduckgo.com/html/\" method=\"get\">"));
-	AddNumber(p, _L8("<b>PsiWeb</b> &nbsp; <input type=\"text\" name=\"q\" size=\"%d\"> <input type=\"submit\" value=\"Search\"></form>"),
-		tall ? 44 : 30);
+	// (0.99) the heading, and where to type: the address takes an address or
+	// words to search for (Ctrl+L; the Open address dialog when the toolband
+	// is hidden). Until 0.98 a form here, which Links draws as a line of
+	// underscores and "[ Search ]": a terminal's look on the netBook
+	Add(p, _L8("<p><b>PsiWeb</b> &nbsp; <small>Ctrl+L, then an address or words to search for</small></p>"));
 	if (tall)
-		Add(p, _L8("<p><small>Speed dial - press 1 to 8, or tap</small></p>"));
-	// the speed dial: 4 x 2
+		Add(p, _L8("<p><small>Favourites - press 1 to 8, or tap</small></p>"));
+	// the favourites: 4 x 2 (called the speed dial until 0.98)
 	Add(p, _L8("<table width=\"100%\" cellspacing=\"4\" cellpadding=\"0\">"));
 	TInt n = iFavs->Count() < KTiles ? iFavs->Count() : KTiles;
 	for (TInt t = 0; t < KTiles; t++)
@@ -134,7 +132,7 @@ void CPwAppUi::UpdateStartPageL()
 				Add(p, _L8("</a>"));
 			}
 		else if (t == n)
-			Add(p, _L8("<a href=\"about:cmd-favs\">Add...</a>"));
+			Add(p, _L8("<a href=\"about:cmd-favs\">Add\x85</a>"));
 		else
 			Add(p, _L8("&nbsp;"));
 		Add(p, _L8("</td></tr></table></td>"));
@@ -169,15 +167,16 @@ void CPwAppUi::UpdateStartPageL()
 		Esc(p, route, 100);
 		Add(p, _L8("<br><small>"));
 		Add(p, helper ? _L8("Secure sites are checked by the helper, which sees the pages.")
-		                : _L8("Secure sites are checked on this Psion."));
+		                : _L8("Secure sites are checked on the netBook."));
+		// (0.99) no line breaks inside a link's words (&nbsp;)
 		Add(p, _L8(" Pages drawn by scripts may not work.</small> &nbsp; "
-			"<a href=\"about:cmd-setup\">Change...</a> &nbsp; <a href=\"about:cmd-help\">What works</a></td></tr></table>"));
+			"<a href=\"about:cmd-setup\">Change\x85</a> &nbsp; <a href=\"about:cmd-help\">What&nbsp;works</a></td></tr></table>"));
 		}
 	else
 		{
 		Add(p, _L8("<p><small>Connection: "));
 		Esc(p, route, 100);
-		Add(p, _L8(" &nbsp; <a href=\"about:cmd-setup\">Change...</a> &nbsp; <a href=\"about:cmd-help\">What works</a>"));
+		Add(p, _L8(" &nbsp; <a href=\"about:cmd-setup\">Change\x85</a> &nbsp; <a href=\"about:cmd-help\">What&nbsp;works</a>"));
 		if (iHist->Count() > 0)
 			{
 			Add(p, _L8("<br>Recent: "));

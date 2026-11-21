@@ -20,7 +20,7 @@ enum TPwCommands
 	EPwCmdRestart,
 	EPwCmdAbout,
 	EPwCmdUpdate,
-	EPwCmdSendLog,           // Tools > Send log to server (0.71)
+	EPwCmdSendLog,           // Tools > Troubleshooting > Send log to helper (0.71)
 	EPwCmdHangup,
 	EPwCmdConnect,           // File > Connect (as PsiTerm's)
 	EPwCmdToggleToolbar,
@@ -40,7 +40,7 @@ enum TPwCommands
 	EPwCmdSetup,             // (0.85) Tools > Set up PsiWeb...
 	EPwCmdStart,             // (0.85) Go > Start page
 	EPwCmdShowMenu,          // (0.85) View > Show (the cascade's own id)
-	EPwCmdLogMenu,           // (0.85) Tools > Log (the cascade's own id)
+	EPwCmdLogMenu,           // (0.85) Tools > Troubleshooting (the cascade's own id; Log until 0.98)
 	EPwCmdRetry,             // (0.85) a "Page not opened" page: Try again
 	EPwCmdTestConn,          // (0.85) ...Test the connection
 	EPwCmdStyleMenu,         // (0.86) View > Page style (the cascade's own id)
@@ -116,14 +116,27 @@ enum TPwDialogControls
 	EPwDlgCookies,           // (0.87) Preferences: Cookies
 	EPwDlgFullServer,        // (0.88) Open in full browser: the server
 	EPwDlgFullCommand,       // ...the program
-	EPwDlgFullNote
+	EPwDlgFullNote,
+	EPwDlgAboutCoffee,       // (0.99) About: Buy me a coffee (the small font)
+	EPwDlgCredit1,           // (0.99) About > Credits: the other people's code
+	EPwDlgCredit2, EPwDlgCredit3, EPwDlgCredit4, EPwDlgCredit5, EPwDlgCredit6, EPwDlgCredit7, EPwDlgCredit8
+	};
+
+// (0.99) the toolbar's name box (Coda's, a CEikFileNameLabel) and Help's
+// text with its scroll bar (a control of PsiWeb's own, CPwHelpText)
+enum TPwOwnControls
+	{
+	EPwCtlFileName = 0x1210,
+	EPwCtHelpText = 0x1300   // the custom control type (CPwHelpDialog::CreateCustomControlL)
 	};
 
 // Organise favourites: its buttons
 enum TPwOrganiseButtons
 	{
 	EPwBidEdit = 0x7500,
-	EPwBidDelete
+	EPwBidDelete,
+	EPwBidNew,               // (0.99) New...: a favourite typed in
+	EPwBidCredits            // (0.99) About: Credits...
 	};
 
 // Connection settings > Test (0.74): the button, and the result dialog's lines

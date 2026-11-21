@@ -20,6 +20,8 @@
 #include <apgtask.h>
 #include <apacmdln.h>
 #include <eikdll.h>
+#include <eikproc.h>              // (0.99) the "file" name the toolbar shows
+#include <eikfnlab.h>
 #include <eikcfdlg.h>
 #include <eikseced.h>
 #include <eikon.rsg>
@@ -152,7 +154,7 @@ static TBool PwDiagOn()
 _LIT(KIniFile, "C:\\System\\Apps\\PsiWeb\\PsiWeb.ini");
 _LIT(KUpdIniFile, "C:\\System\\Apps\\PsiWeb\\Update.ini");
 _LIT(KFavsKept, "C:\\System\\Apps\\PsiWeb\\Favourites.dat");   // (pwfavs.cpp's KFavsFile)
-_LIT(KVersion, "0.98");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
+_LIT(KVersion, "0.99");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
 _LIT(KDefaultHome, "http://68k.news/");
 const TInt KZoomSteps[] = { 50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200 };
 const TInt KZoomCount = 11;
@@ -511,7 +513,7 @@ void CPwView::StartEngineL()
 	// rather than when Create() returns. Tick takes it down when the first
 	// page starts loading.
 	if (!iStartBusy)
-		StartBusy(_L("Starting the browser engine..."));
+		StartBusy(_L("Starting the browser engine\x85"));
 	iCoeEnv->WsSession().Flush();
 
 	TInt r = iProcess.Create(exe, KNullDesC);
@@ -522,15 +524,15 @@ void CPwView::StartEngineL()
 		// when the file is missing or damaged
 		TBuf<120> e;
 		if (r == KErrNoMemory)
-			e = _L("Not enough memory - close other programs, then Tools > Log > Restart browser engine");
+			e = _L("Not enough memory - close other programs, then Tools > Troubleshooting > Restart browser engine");
 		else if (r == KErrNotReady || r == KErrDisMounted)
 			{
 			// (0.96, review R103) Coda's one wording for the card
 			PsiOnCardMsg(e, _L("PsiWeb"));
-			e.Append(_L(", then Tools > Log > Restart browser engine"));
+			e.Append(_L(", then Tools > Troubleshooting > Restart browser engine"));
 			}
 		else if (r == KErrInUse || r == KErrLocked)
-			e = _L("psiweb.exe is in use - try Tools > Log > Restart browser engine in a moment");
+			e = _L("The last browser engine is still closing - Tools > Troubleshooting > Restart browser engine in a moment");
 		else if (exe.Length() && exe[0] != 'C' && exe[0] != 'c' && exe[0] != 'Z' && exe[0] != 'z'
 			&& !DiskThere(iCoeEnv->FsSession(), exe[0]))
 			{
@@ -539,11 +541,11 @@ void CPwView::StartEngineL()
 			PsiOnCardMsg(e, _L("PsiWeb"));
 			}
 		else if (r == KErrNotFound || r == KErrPathNotFound)
-			e = _L("psiweb.exe is not next to PsiWeb - reinstall PsiWeb from its .sis file");
+			e = _L("Part of PsiWeb is missing - install PsiWeb again");   // (0.99: no file names, style sheet 2.13)
 		else if (r == KErrCorrupt || r == KErrNotSupported)
-			e = _L("psiweb.exe is damaged - reinstall PsiWeb from its .sis file");
+			e = _L("Part of PsiWeb is damaged - install PsiWeb again");
 		else
-			PsiErrMsg(e, _L("Could not start psiweb.exe"), r);   // (0.96: in words, review R105)
+			PsiErrMsg(e, _L("Cannot start the browser engine"), r);   // (0.96: in words, review R105)
 		{
 		TBuf<60> l;
 		l.Format(_L("psiweb.exe did not start (error %d)"), r);
@@ -577,19 +579,15 @@ void CPwView::StartBusyCancel()
 	iStartBusy = EFalse;
 	}
 
-// (0.89) The route in a busy message: "direct", "through the Atom",
-// "through PsiProxy"
+// (0.89) The route in a busy message: nothing for a page fetched direct,
+// "through the web helper" (0.99: one word for the helper, not the products'
+// names), with the space before it
 static void RouteBusyWords(const TPwSettings& aS, TDes& aOut)
 	{
-	TBuf8<64> h;
-	h.Copy(Clip(aS.iProxyHost, 60));
-	h.ZeroTerminate();
 	if (!aS.iUseProxy || aS.iProxyHost.Length() == 0)
-		aOut.Copy(_L("direct"));
-	else if (pg_su_is_atom_host((const char*)h.Ptr()))
-		aOut.Copy(_L("through the Atom"));
+		aOut.Zero();
 	else
-		aOut.Copy(_L("through PsiProxy"));
+		aOut.Copy(_L(" through the web helper"));
 	}
 
 // (0.89) While a page loads, the busy message (bottom left) says which page,
@@ -610,13 +608,13 @@ void CPwView::LoadBusyL()
 			TBuf<64> host;
 			FromUtf8(host, s->load_host);
 			TPtrC h = Clip(host, 36);
-			t.Format(_L("Opening %S %S"), &h, &route);
+			t.Format(_L("Opening %S%S"), &h, &route);
 			if (s->load_kb > 0)
 				t.AppendFormat(_L(" - %d KB"), s->load_kb);
-			t.Append(_L("..."));
+			t.Append(TChar(0x85));
 			}
 		else if (s->pics_all > 0 && s->pics_done < s->pics_all)
-			t.Format(_L("Fetching pictures %S - %d of %d..."), &route, s->pics_done, s->pics_all);
+			t.Format(_L("Fetching pictures%S - %d of %d\x85"), &route, s->pics_done, s->pics_all);
 		}
 	if (s && !s->busy)
 		iSaving = EFalse;                // (0.97) no transfer: no download either
@@ -870,7 +868,7 @@ void CPwView::WakeL()
 	if (!iAsleep || iRunning)
 		return;
 	iWaking = ETrue;
-	StartBusy(_L("Opening the page again..."));
+	StartBusy(_L("Opening the page again\x85"));
 	StartEngineL();
 	}
 
@@ -885,7 +883,7 @@ void CPwView::RestartL(TBool aSamePage)
 		if (url.Compare(_L("about:blank")) == 0)
 			url.Zero();
 		}
-	StartBusy(_L("Restarting the browser engine..."));
+	StartBusy(_L("Restarting the browser engine\x85"));
 	StopEngine();
 	if (url.Length())
 		iStartUrl = url;
@@ -1093,7 +1091,7 @@ void CPwView::EngineEnded()
 		// the engine went while sending the log
 		iLogState = PW_LOG_IDLE;
 		iEikonEnv->BusyMsgCancel();
-		iEikonEnv->InfoMsg(_L("Could not send log - the browser engine stopped"));
+		iEikonEnv->InfoMsg(_L("Cannot send the log - the browser engine stopped"));
 		}
 	if (iUpdState == PW_UPD_RUNNING || iUpdState == -1)
 		{
@@ -1122,13 +1120,13 @@ void CPwView::EngineEnded()
 	AppLog(iShared, iCoeEnv->FsSession(), l);
 	}
 	if (type == EExitPanic)
-		why = _L("It stopped unexpectedly - Tools > Log > Restart browser engine starts it again");
+		why = _L("It stopped unexpectedly - Tools > Troubleshooting > Restart browser engine starts it again");
 	else if (iShared->exit_msg[0])
 		{
 		FromUtf8(why, iShared->exit_msg);
 		}
 	else
-		why = _L("It closed - Tools > Log > Restart browser engine starts it again");
+		why = _L("It closed - Tools > Troubleshooting > Restart browser engine starts it again");
 	ShowMessage(_L("The browser engine has stopped"), why);
 	}
 
@@ -1261,6 +1259,10 @@ void CPwView::Tick()
 		// (Right(3) of a shorter text panics USER 22: a one- or two-letter
 		// note, e.g. after NO CARRIER, closed PsiWeb up to 0.56)
 		TBool dots = m.Length() >= 3 && m.Right(3).Compare(_L("...")) == 0;
+		if (dots)
+			m.Replace(m.Length() - 3, 3, _L("\x85"));   // (0.99) the ellipsis is one character
+		else if (m.Length() && m[m.Length() - 1] == 0x85)
+			dots = ETrue;
 		if (m.Length() && m[m.Length() - 1] == '.' && !dots)
 			m.SetLength(m.Length() - 1);     // no full stop at the end of a message
 		// (0.89) the link's routine notes for each connection ("Connecting
@@ -1551,8 +1553,8 @@ void CPwView::AskSaveL()
 	iSaving = ETrue;                     // (0.97) the Free memory dialog says "a download is in progress"
 	}
 
-// ----- Send log to server -------------------------------------------------------
-// Tools > Send log to server: the engine POSTs PsiWeb.old and PsiWeb.log to
+// ----- Send log to helper -------------------------------------------------------
+// Tools > Troubleshooting > Send log to helper: the engine POSTs PsiWeb.old and PsiWeb.log to
 // the proxy (pwupdate.c pw_putlog_run). The busy message is bottom left, the
 // outcome an infoprint.
 
@@ -1565,7 +1567,7 @@ void CPwView::SendLog()
 		}
 	if (!(iSettings.iDisplay & KPwKeepLog))
 		{
-		iEikonEnv->InfoMsg(_L("Logging is off - turn on Tools > Keep a log"));
+		iEikonEnv->InfoMsg(_L("No log kept - tick Tools > Troubleshooting > Keep a log"));
 		return;
 		}
 	if (!iRunning)
@@ -1585,7 +1587,7 @@ void CPwView::SendLog()
 	iShared->log_state = PW_LOG_RUNNING;
 	iShared->log_msg[0] = 0;
 	iLogState = PW_LOG_RUNNING;
-	TRAPD(err, iEikonEnv->BusyMsgL(_L("Sending log..."), EHLeftVBottom, TTimeIntervalMicroSeconds32(0)));
+	TRAPD(err, iEikonEnv->BusyMsgL(_L("Sending the log\x85"), EHLeftVBottom, TTimeIntervalMicroSeconds32(0)));
 	(void)err;
 	Command(PW_CMD_PUTLOG, KNullDesC);
 	}
@@ -1618,7 +1620,7 @@ void CPwView::LogTick()
 			msg = why;                       // "Not available ...", "No log to send", "Needs PsiProxy on a computer"
 		else
 			{
-			msg = _L("Could not send log - ");
+			msg = _L("Cannot send the log - ");
 			msg.Append(why);
 			}
 		iEikonEnv->InfoMsg(msg);
@@ -1642,7 +1644,7 @@ void CPwView::StartUpdateL()
 	iShared->update_state = PW_UPD_RUNNING;
 	iUpdState = -1;                      // (the first tick shows the engine's first words)
 	iUpdLog.Zero();
-	UpdateLine(_L("Starting the update..."));
+	UpdateLine(_L("Starting the update\x85"));
 	Command(PW_CMD_UPDATE, KNullDesC);
 	UpdateDialogL();
 	}
@@ -1802,7 +1804,7 @@ void CPwView::StartInstallerL()
 		return;
 		}
 	TBuf<160> m;
-	PsiErrMsg(m, _L("Could not start the installer"), err);   // (0.96: in words, review R105)
+	PsiErrMsg(m, _L("Cannot start the installer"), err);   // (0.96: in words, review R105)
 	m.Append(_L(" - open "));
 	m.Append(iUpdateFile.Left(Min(iUpdateFile.Length(), m.MaxLength() - m.Length() - 23)));
 	m.Append(_L(" from the System screen"));
@@ -2128,15 +2130,35 @@ TBool CPwConnDialog::OkToExitL(TInt aButtonId)
 	return ETrue;
 	}
 
+// (0.99) the family's About (Coda's style sheet 2.7): "PsiWeb 0.99" in
+// bold, what it is, the copyright with the machine it is on, Buy me a coffee
 void CPwAboutDialog::PreLayoutDynInitL()
 	{
 	TBuf<32> title(_L("PsiWeb "));
 	title.Append(KVersion);
-	// the name and version are the heading: the dialog title font (the
-	// legend font is smaller than the bold line under it)
-	((CEikLabel*)Control(EPwDlgAbout1))->SetFont(iEikonEnv->TitleFont());
+	((CEikLabel*)Control(EPwDlgAbout1))->SetFont(iEikonEnv->TitleFont());   // (the dialogs' bold)
 	SetLabelL(EPwDlgAbout1, title);
-	SetLabelL(EPwDlgAboutStatus, iStatus);
+	SetLabelL(EPwDlgAbout4, iTall ? _L("\xA9 Dan Edge 2026 - part of Coda for the Psion netBook")
+		: _L("\xA9 Dan Edge 2026 - part of Coda for the Psion Series 5mx"));
+	}
+
+TBool CPwAboutDialog::OkToExitL(TInt aButtonId)
+	{
+	if (aButtonId == EPwBidCredits)
+		{
+		CPwCreditsDialog* dlg = new(ELeave) CPwCreditsDialog;
+		dlg->ExecuteLD(R_PW_CREDITS_DIALOG);
+		return EFalse;                       // (About stays)
+		}
+	return ETrue;
+	}
+
+// About > Credits: the lines with a copyright sign are set here (the
+// resource compiler takes plain text)
+void CPwCreditsDialog::PreLayoutDynInitL()
+	{
+	SetLabelL(EPwDlgCredit1, _L("Links 2 browser engine \xA9 Mikulas Patocka & others - GPL v2"));
+	SetLabelL(EPwDlgCredit6, _L("\xA9 Symbian Ltd 1998-9"));
 	}
 
 void CPwUpdateDialog::PreLayoutDynInitL()
@@ -2144,6 +2166,23 @@ void CPwUpdateDialog::PreLayoutDynInitL()
 	((CEikChoiceList*)Control(EPwDlgUpdSource))->SetCurrentItem(iSource >= 0 && iSource <= 2 ? iSource : 0);
 	SetEdwinTextL(EPwDlgUpdHost, &iHost);
 	SetNumberEditorValue(EPwDlgUpdPort, iPort > 0 ? iPort : 8686);
+	DimComputerLines();
+	}
+
+// (0.99) the computer's address and port matter only for "A computer on my
+// network": dimmed for the other two, as the style guide dims what does
+// not apply
+void CPwUpdateDialog::DimComputerLines()
+	{
+	TBool off = ((CEikChoiceList*)Control(EPwDlgUpdSource))->CurrentItem() != 2;
+	SetLineDimmedNow(EPwDlgUpdHost, off);
+	SetLineDimmedNow(EPwDlgUpdPort, off);
+	}
+
+void CPwUpdateDialog::HandleControlStateChangeL(TInt aControlId)
+	{
+	if (aControlId == EPwDlgUpdSource)
+		DimComputerLines();
 	}
 
 TBool CPwUpdateDialog::OkToExitL(TInt /*aButtonId*/)
@@ -2154,7 +2193,7 @@ TBool CPwUpdateDialog::OkToExitL(TInt /*aButtonId*/)
 	iPort = NumberEditorValue(EPwDlgUpdPort);
 	if (iSource == 2 && iHost.Length() == 0)
 		{
-		iEikonEnv->InfoMsg(_L("No local server entered"));
+		iEikonEnv->InfoMsg(_L("No computer's address entered"));
 		TryChangeFocusToL(EPwDlgUpdHost);
 		return EFalse;
 		}
@@ -2226,6 +2265,16 @@ void CPwAppUi::ConstructL()
 	LoadSettings(settings);
 	iShownProgress = -1;
 	iLockShown = -1;
+	TallToolbarL();                          // (0.99) the netBook's own toolbar
+	// (0.99) the toolbar's name is a CEikFileNameLabel, as in Psion's own
+	// programs: it shows the "file" name, which is the program's here
+	iEikonEnv->Process()->SetMainDocFileName(_L("PsiWeb"));
+	CEikFileNameLabel* name = iToolBar ? (CEikFileNameLabel*)iToolBar->ControlById(EPwCtlFileName) : NULL;
+	if (name)
+		{
+		TRAPD(ne, name->UpdateL());
+		(void)ne;
+		}
 	TRAPD(pics, ToolbarPicturesL());
 	(void)pics;                              // (no PsiWeb.mbm: words only)
 	// the Pictures buttons stay pressed in while the page's pictures show
@@ -2409,17 +2458,50 @@ void CPwAppUi::ShowPicturesState(TBool aOn)
 
 void CPwAppUi::ToolbarPicturesL()
 	{
-	ButtonPictureL(iToolBar, EPwCmdOpen, EMbmToolOpen);
-	ButtonPictureL(iToolBar, EPwCmdBack, EMbmToolBack);
-	ButtonPictureL(iToolBar, EPwCmdStart, EMbmToolHome);   // (0.87) Start, the start page
-	ButtonPictureL(iToolBar, EPwCmdImages, EMbmToolPictures);
+	// (0.99) on a colour screen the colour set (Coda's style sheet 2.3:
+	// tools/mkicons.py), on the 5mx the four greys
+	TBool c = ColourScreen();
+	ButtonPictureL(iToolBar, EPwCmdOpen, c ? EMbmToolOpenC : EMbmToolOpen);
+	ButtonPictureL(iToolBar, EPwCmdBack, c ? EMbmToolBackC : EMbmToolBack);
+	ButtonPictureL(iToolBar, EPwCmdStart, c ? EMbmToolHomeC : EMbmToolHome);   // (0.87) Start, the start page
+	ButtonPictureL(iToolBar, EPwCmdImages, c ? EMbmToolPicturesC : EMbmToolPictures);
 	// (the toolband's pictures are named in its resource: pwicons.rh)
+	}
+
+// (0.99) A tall screen gets the netBook's toolbar in place of the 5mx's one
+// that EIK_APP_INFO made (as PsiTerm makes its file view's toolbar): Coda's
+// name box and 50-pixel buttons, and, when the ROM is Coda's (its hook in
+// Eikon's control factory is there), the battery, Coda's toolbar extras
+// and clock. The toolbar is not on the control stack, so it can simply be
+// replaced; the toolband is laid out against it later (PageRect).
+void CPwAppUi::TallToolbarL()
+	{
+	if (!iToolBar || !TallScreen())
+		return;
+	TEntry e;
+	TBool coda = iCoeEnv->FsSession().Entry(_L("Z:\\System\\Libs\\PsiBattHook.bin"), e) == KErrNone;
+	CEikToolBar* bar = new(ELeave) CEikToolBar;
+	CleanupStack::PushL(bar);
+	bar->ConstructL(this, coda ? R_PW_TOOLBAR_CODA : R_PW_TOOLBAR_TALL,
+		TRect(TPoint(0, 0), iEikonEnv->ScreenDevice()->SizeInPixels()));
+	CleanupStack::Pop();
+	delete iToolBar;
+	iToolBar = bar;
+	if (iToolBand)
+		iToolBar->DrawableWindow()->SetOrdinalPosition(0);   // (in front, as BaseConstructL puts it)
 	}
 
 // 480 lines (the netBook): room for the toolband as well as the page
 TBool CPwAppUi::TallScreen() const
 	{
 	return iEikonEnv->ScreenDevice()->SizeInPixels().iHeight >= 400;
+	}
+
+// (0.99) a colour screen (the netBook, the Series 7)
+TBool CPwAppUi::ColourScreen() const
+	{
+	TDisplayMode m = iEikonEnv->ScreenDevice()->DisplayMode();
+	return m == EColor256 || m == EColor4K || m == EColor64K || m == EColor16M;
 	}
 
 // The bars laid out as they are shown, and the page's room: the rest.
@@ -2895,8 +2977,8 @@ void CPwAppUi::LoadSettings(TPwSettings& aSettings)
 	aSettings.iImages = 0;            // pictures only when asked (View > Show pictures)
 	aSettings.iZoom = 100;
 	// (0.78) a tall screen (the netBook) starts with the toolband along the
-	// top and the page the whole width; the 5mx with the toolbar, as before
-	aSettings.iToolbar = TallScreen() ? 0 : 1;
+	// top; (0.99) and the toolbar, as every program of the family opens
+	aSettings.iToolbar = 1;
 	aSettings.iToolband = TallScreen() ? 1 : 0;
 	aSettings.iDisplay = 0;           // sharp text, Reading mode off (docs/display.md)
 	aSettings.iSearch = PW_SEARCH_DDG;
@@ -3107,7 +3189,7 @@ void CPwAppUi::DynInitMenuPaneL(TInt aMenuId, CEikMenuPane* aMenuPane)
 		aMenuPane->SetItemButtonState(EPwCmdImages, iView->PicturesShown() ? EEikMenuItemSymbolOn : 0);
 	}
 
-// a dimmed command chosen: say why (Tools > Send log to server)
+// a dimmed command chosen: say why (Tools > Troubleshooting > Send log to helper)
 void CPwAppUi::HandleAttemptDimmedSelectionL(TInt aCommandId)
 	{
 	if (aCommandId != EPwCmdSendLog)
@@ -3116,7 +3198,7 @@ void CPwAppUi::HandleAttemptDimmedSelectionL(TInt aCommandId)
 		return;
 		}
 	if (!(iView->Settings().iDisplay & KPwKeepLog))
-		iEikonEnv->InfoMsg(_L("Logging is off - turn on Tools > Keep a log"));
+		iEikonEnv->InfoMsg(_L("No log kept - tick Tools > Troubleshooting > Keep a log"));
 	else
 		iEikonEnv->InfoMsg(_L("Not available - set a web helper in Connection settings"));
 	}
@@ -3139,22 +3221,30 @@ static void Ellipsis(TDes& aText, const CFont& aFont, TInt aWidth)
 	aText.Append(KEllipsis);
 	}
 
-// (0.85) The route in the user's words (core/docs/setup-assistant.md):
-// "Direct, on the network card or dial-up", "Through the Atom modem
-// helper", "Through PsiProxy at 192.168.1.20" - About, Page information
+// (0.85) The route in the user's words (core/docs/setup-assistant.md);
+// (0.99) the family's words (style sheet 2.13): "By modem, 115200 baud" or
+// "By network card or dial-up", then the web helper if there is one: "By
+// modem, 115200 baud, through the web helper" (the modem's own helper), "By
+// network card or dial-up, through the web helper at 192.168.1.20" - the
+// start page, Page information
 void RouteWords(const TPwSettings& aS, TDes& aOut)
 	{
+	static const TInt KBaud[] = { 9600, 19200, 38400, 57600, 115200 };
 	TBuf8<64> h;
 	h.Copy(Clip(aS.iProxyHost, 60));
 	h.ZeroTerminate();
 	TBool helper = aS.iUseProxy && aS.iProxyHost.Length() > 0;
+	if (aS.iNetMode)
+		aOut.Copy(_L("By network card or dial-up"));
+	else
+		aOut.Format(_L("By modem, %d baud"), KBaud[aS.iBaudIndex >= 0 && aS.iBaudIndex < 5 ? aS.iBaudIndex : 4]);
 	if (!helper)
-		aOut.Copy(aS.iNetMode ? _L("Direct, on the network card or dial-up") : _L("Direct, through the modem"));
-	else if (pg_su_is_atom_host((const char*)h.Ptr()))
-		aOut.Copy(_L("Through the Atom modem helper"));
+		return;
+	if (pg_su_is_atom_host((const char*)h.Ptr()))
+		aOut.Append(_L(", through the web helper"));
 	else
 		{
-		aOut.Copy(_L("Through PsiProxy at "));
+		aOut.Append(_L(", through the web helper at "));
 		aOut.Append(Clip(aS.iProxyHost, aOut.MaxLength() - aOut.Length() - 6));
 		if (aS.iProxyPort != PG_SU_PSIPROXY_PORT)
 			aOut.AppendFormat(_L(":%d"), aS.iProxyPort);
@@ -3182,14 +3272,16 @@ void CPwAppUi::PageInfoL()
 		lines[2] = _L("-");
 	TMemoryInfoV1Buf mem;
 	UserHal::MemoryInfo(mem);
-	lines[3].Format(_L("%d KB"), mem().iFreeRamInBytes / 1024);
+	// (0.99) MB with one decimal, as the toolbar shows the free memory
+	TInt kb = mem().iFreeRamInBytes / 1024;
+	lines[3].Format(_L("%d.%d MB"), kb / 1024, (kb % 1024) * 10 / 1024);
 	// (0.86) the route and how secure the page is
 	RouteWords(iView->Settings(), lines[4]);
 	TBool https = Clip(lines[1], 6).Compare(_L("https:")) == 0;
 	if (https && s->page_secure == PW_SECURE_CHECKED)
-		lines[4].Append(_L(" - secure, checked by this Psion"));
+		lines[4].Append(TallScreen() ? _L(" - secure, checked by the netBook") : _L(" - secure, checked by the Series 5mx"));
 	else if (https && s->page_secure == PW_SECURE_MODEM)
-		lines[4] = _L("Direct, checked by the Atom modem");   // (0.90) short, to fit: the Atom made the TLS connection
+		lines[4].Append(_L(" - secure, checked by the modem"));   // (0.90) the Atom made the TLS connection
 	else if (https && s->page_secure == PW_SECURE_HELPER)
 		lines[4].Append(_L(" - secure, checked by the web helper"));
 	else if (Clip(lines[1], 5).Compare(_L("http:")) == 0)
@@ -3223,15 +3315,10 @@ void CPwAppUi::PageInfoL()
 	dlg->ExecuteLD(R_PW_INFO_DIALOG);
 	}
 
+// (0.99) the route is in Page information (Shift+Ctrl+Q), not in About
 void CPwAppUi::AboutL()
 	{
-	const TPwSettings& s = iView->Settings();
-	static const TInt KBaud[] = { 9600, 19200, 38400, 57600, 115200 };
-	TBuf<120> status;
-	RouteWords(s, status);
-	if (!s.iNetMode)
-		status.AppendFormat(_L(" - modem at %d baud"), KBaud[s.iBaudIndex >= 0 && s.iBaudIndex < 5 ? s.iBaudIndex : 4]);
-	CPwAboutDialog* dlg = new(ELeave) CPwAboutDialog(status);
+	CPwAboutDialog* dlg = new(ELeave) CPwAboutDialog(TallScreen());
 	dlg->ExecuteLD(R_PW_ABOUT_DIALOG);
 	}
 
@@ -3387,9 +3474,10 @@ void CPwAppUi::HandleCommandL(TInt aCommand)
 		TBuf<8> z;
 		z.Num(st.iZoom);
 		iView->Command(PW_CMD_ZOOM, z);
-		TBuf<32> msg;
-		msg.Format(_L("Zoom %d%%"), st.iZoom);
-		iEikonEnv->InfoMsg(msg);
+		// (0.99) the page shows the new size, as Psion's own programs say
+		// nothing; Normal size, which may change nothing, says what it is
+		if (aCommand == EPwCmdZoomNormal)
+			iEikonEnv->InfoMsg(_L("Normal size - 100%"));
 		SaveSettings(st);
 		break;
 		}
@@ -3519,7 +3607,7 @@ void CPwAppUi::HandleCommandL(TInt aCommand)
 		{
 		TPwSettings was(st);
 		CPwPrefsDialog* dlg = new(ELeave) CPwPrefsDialog(st);
-		if (dlg->ExecuteLD(R_PW_PREFS_DIALOG))
+		if (dlg->ExecuteLD(ColourScreen() ? R_PW_PREFS_DIALOG_COLOUR : R_PW_PREFS_DIALOG))
 			{
 			SaveSettings(st);
 			UpdateStartPageL();
@@ -3557,7 +3645,7 @@ void CPwAppUi::HandleCommandL(TInt aCommand)
 		if (iView->Settings().iNetMode)
 			PgLinkDisconnectL();             // (0.73) the link itself too, even when "Stay connected" holds it
 		else if (iView->EngineRunning())
-			iEikonEnv->InfoMsg(_L("Disconnecting - the serial port will be free"));
+			iEikonEnv->InfoMsg(_L("Disconnecting\x85"));
 		break;
 	case EPwCmdUpdate:
 		UpdateL();
@@ -3575,8 +3663,7 @@ void CPwAppUi::HandleCommandL(TInt aCommand)
 		SaveSettings(st);
 		if (iView->Shared())
 			iView->Shared()->net.log_on = (st.iDisplay & KPwKeepLog) || PwDiagOn() ? 1 : 0;
-		iEikonEnv->InfoMsg((st.iDisplay & KPwKeepLog) ? _L("Keeping a log") : _L("Not keeping a log"));
-		break;
+		break;                               // (0.99: the tick says it; no infoprint)
 	case EPwCmdAbout:
 		AboutL();
 		break;
@@ -3689,8 +3776,8 @@ TInt CPwSetupDialog::StandardStyle(const PgSuChoice& /*aChoice*/)
 void CPwSetupDialog::ShowPicturesNoteL()
 	{
 	SetLabelL(EPwDlgSuPicturesNote, ChoiceListCurrentItem(EPwDlgSuPictures) == 1
-		? _L("On every page suits a network card - Ctrl+I for one page")
-		: _L("Only when asked suits a modem - Ctrl+I shows a page's pictures"));
+		? _L("On every page suits a network card - Ctrl+I turns them off for one page")
+		: _L("Only when asked suits a modem - Ctrl+I shows one page's pictures"));
 	}
 
 void CPwSetupDialog::AppControlChangedL(TInt aControlId)
@@ -3773,7 +3860,7 @@ void CPwAppUi::EngineCommandL(TInt aCmd)
 	if (aCmd == PW_APP_HELP)              // (0.87) the start page's What works
 		{
 		CPwHelpDialog* dlg = new(ELeave) CPwHelpDialog(2);
-		dlg->ExecuteLD(TallScreen() ? R_PW_HELP_DIALOG_TALL : R_PW_HELP_DIALOG);
+		dlg->ExecuteLD(R_PW_HELP_DIALOG);   // (0.99) one resource; its text sized by the screen
 		return;
 		}
 	if (aCmd == PW_APP_FAVS)              // (0.87) the start page's Add...
@@ -3871,7 +3958,7 @@ void CPwAppUi::WebTestL(PgLinkTest* aTest)
 	TBuf<32> route;
 	RouteBusyWords(iView->Settings(), route);
 	TBuf<80> busy;
-	busy.Format(_L("Opening a page from GitHub %S..."), &route);
+	busy.Format(_L("Opening the test page%S\x85"), &route);
 	CPwTestKeys* keys = new(ELeave) CPwTestKeys;
 	CleanupStack::PushL(keys);
 	CPeriodic* tick = CPeriodic::NewL(CActive::EPriorityStandard);
@@ -3920,14 +4007,14 @@ void CPwAppUi::WebTestL(PgLinkTest* aTest)
 		{
 		TInt ms = s->test_ms;
 		if (ms < 10000)
-			line.Format(_L("A page came %S from GitHub in %d.%d s - the web works"), &route, ms / 1000, (ms % 1000) / 100);
+			line.Format(_L("Test page opened%S in %d.%d s"), &route, ms / 1000, (ms % 1000) / 100);
 		else
-			line.Format(_L("A page came %S from GitHub in %d s - the web works"), &route, (ms + 500) / 1000);
+			line.Format(_L("Test page opened%S in %d s"), &route, (ms + 500) / 1000);
 		}
 	else if (state == PW_TEST_FAILED)
-		line.Format(_L("No page came %S from GitHub"), &route);
+		line.Format(_L("The test page did not open%S"), &route);
 	else
-		line = _L("Stopped before a page came from GitHub");
+		line = _L("Stopped before the test page opened");
 	TBuf8<PG_LT_LINE> l8;
 	l8.Copy(Clip(line, PG_LT_LINE - 1));
 	pg_lt_add_line(aTest, (const char*)l8.PtrZ());
@@ -3958,45 +4045,20 @@ void CPwAppUi::SetStyleL(TInt aStyle)
 	iEikonEnv->InfoMsg(TPtrC(KNames[aStyle & 3]));
 	}
 
-// (0.86) The route light: Direct, Atom or PsiProxy; the padlock shut when
-// the page came by https and was checked on the way (by this Psion or the
-// helper); the style's letter when it is not Full (L, R, T)
+// (0.86) The route light; (0.99) a picture only, as toolband buttons are:
+// the padlock shut when the page came by https and was checked on the way
+// (by the netBook or 5mx, the modem or the helper), open for any other.
+// How the page came and its style are in Page information, a tap away.
 void CPwAppUi::RouteLightL()
 	{
 	CEikCommandButton* b = iToolBand ? (CEikCommandButton*)iToolBand->ControlById(EPwCmdRouteLight) : NULL;
 	PwShared* s = iView ? iView->Shared() : NULL;
 	if (!b || !s || !iToolBand->IsVisible())
 		return;
-	const TPwSettings& st = iView->Settings();
-	TBuf<16> t;
-	if (!st.iUseProxy || st.iProxyHost.Length() == 0)
-		t = _L("Direct");
-	else
-		{
-		TBuf8<64> h;
-		h.Copy(Clip(st.iProxyHost, 60));
-		h.ZeroTerminate();
-		t = pg_su_is_atom_host((const char*)h.Ptr()) ? _L("Atom") : _L("PsiProxy");
-		}
-	TInt style = iView->EngineRunning() && s->busy == 0 ? s->page_style : StyleNow(st);
-	if (style > PW_STYLE_FULL && style <= PW_STYLE_TEXT)
-		{
-		t.Append(' ');
-		t.Append(TChar("LRT"[style - 1]));
-		}
 	TBool url = iView->EngineRunning() && Clip(iShownUrl, 6).Compare(_L("https:")) == 0;
 	TInt lock = url && s->page_secure != PW_SECURE_NO ? 1 : 0;
-	// (0.90) a direct https page whose TLS and certificate check the Atom
-	// modem did (engine/pwatom.h): the light says Atom, the padlock shut, as
-	// for the Atom modem helper - the Atom checked it, not this Psion.
-	// ("Atom TLS" did not fit the button.)
-	if (lock && s->page_secure == PW_SECURE_MODEM && t.Left(6) == _L("Direct"))
-		t.Replace(0, 6, _L("Atom"));
-	if (t == iRouteShown && lock == iLockShown)
+	if (lock == iLockShown)
 		return;
-	iRouteShown = t;
-	b->SetTextL(t);
-	if (lock != iLockShown)
 		{
 		iLockShown = lock;
 		CFbsBitmap* bmp = iEikonEnv->CreateBitmapL(Application()->BitmapStoreName(), lock ? EMbmBandLock : EMbmBandNoLock);
@@ -4126,7 +4188,7 @@ void CPwAppUi::FullBrowserL()
 	cl->SetTailEndL(line);
 	EikDll::StartAppL(*cl);
 	CleanupStack::PopAndDestroy();          // cl
-	iEikonEnv->BusyMsgL(_L("Opening in PsiTerm..."), EHLeftVBottom, TTimeIntervalMicroSeconds32(0));
+	iEikonEnv->BusyMsgL(_L("Opening in PsiTerm\x85"), EHLeftVBottom, TTimeIntervalMicroSeconds32(0));
 	iFullBusyAt = User::TickCount();
 	}
 

@@ -14,9 +14,24 @@ A web browser for the **Psion Series 5mx**, the **netBook** and the **Series 7**
 
 Up to 0.61 the engine was NetSurf. Its sources are still in the tree as a fallback (see *The NetSurf engine* below), until Links has been proved on the device. The whole port is described in [`links/PORTING.md`](links/PORTING.md).
 
-**Status: beta (0.98).** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
+**Status: beta (0.99).** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
 
 [![Download PsiWeb.sis](https://img.shields.io/badge/Download-PsiWeb.sis-2ea44f?logo=github)](https://github.com/danieledge/psiterm/raw/main/dist/PsiWeb.sis)
+
+## What's new in 0.99
+
+A round of polish, so PsiWeb looks and reads like PsiMail and PsiTerm, and like Psion's own programs:
+
+- **The toolbar is shown at first on the netBook too**, beside the toolband, as every program of the family opens. On a netBook it is the netBook's toolbar: the name in the same box as Psion's own programs, 50-pixel buttons with colour pictures, and, on Coda, the battery, free memory and brightness above the clock. The 5mx keeps its toolbar as it was, with the name in the same box as its own programs.
+- **The toolbar's first button is Open** (it was a clipped "Addres"), and **Start has a star**: the house was the home page's idea, not the start page's.
+- **The route light is a padlock only**, shut for a secure page checked on the way, open for any other. How the page came and its style are in Page information, a tap away.
+- **About** is the family's: the name and version, what PsiWeb is and the machines it runs on, the copyright, and Buy me a coffee. The other people's code is under Credits.
+- **Menus.** Tools > Troubleshooting (it was Log) holds Keep a log, Send log to helper and Restart browser engine, last before Help. Open in full browser moves from File to Tools, and Bright screen from View > Show to View itself. Every command that opens a dialog ends in the one-character ellipsis.
+- **Help** shows whole lines (12 on the netBook, 7 on the 5mx) with a scroll bar.
+- **Words.** The route reads "By modem, 115200 baud" or "By network card or dial-up", with "through the web helper" when there is one, on the start page and in Page information. The start page calls its tiles Favourites, and its heading says where to type (Ctrl+L) instead of drawing a form. Messages name no files: "Part of PsiWeb is missing - install PsiWeb again". Update PsiWeb offers "Released versions", "Test versions" or "A computer on my network". Page information gives the free memory in MB and calls the last line Page style.
+- **Small things.** Organise favourites has New...; an empty Recent line or History says "(none yet)"; on a colour screen Preferences has no Screen greys button; zooming says nothing, as Psion's own programs do (Normal size still names itself).
+
+No setting, file or connection setting changed.
 
 ## What's new in 0.98
 
@@ -356,8 +371,8 @@ Figures are ARM instructions counted in the emulator harness, at an assumed 15 M
 The same `PsiWeb.sis` installs on the netBook. PsiWeb looks at the screen when it starts:
 
 - **Colour.** Pages are drawn in EPOC's 256 colours: text, rules and backgrounds take the nearest colour (text stays crisp; its smooth edges use EPOC's 16 greys), and pictures are blended from the colours by error diffusion, once, as they come. Colour JPEGs keep their colour.
-- **The whole screen.** The page has all 480 lines and, with the toolbar hidden, the whole width.
-- **The toolband** (View > Show toolband, Shift+Ctrl+T) along the top: Back, Forward, Reload, Stop and Home, the page's address, a bar that fills as the page comes (its bytes, then its pictures), and Pictures. Tap the address, or press Ctrl+L, and type: the whole address is chosen, so typing replaces it. Enter goes there (or searches for the words), Esc leaves it as it was. On the netBook the toolband is shown and the toolbar hidden at first; Ctrl+T brings the toolbar back, and the toolband then stops at it.
+- **The whole screen.** The page has all 480 lines and, with the toolbar hidden (Ctrl+T), the whole width.
+- **The toolband** (View > Show toolband, Shift+Ctrl+T) along the top: Back, Forward, Reload, Stop and Home, the page's address, a bar that fills as the page comes (its bytes, then its pictures), and Pictures. Tap the address, or press Ctrl+L, and type: the whole address is chosen, so typing replaces it. Enter goes there (or searches for the words), Esc leaves it as it was. On the netBook the toolband and the toolbar are both shown at first (0.99; before, the toolbar was hidden); Ctrl+T hides the toolbar, and the toolband then runs the whole width.
 
 - **Through a web helper** (0.83). Each request PsiWeb sends to a helper says which screen it is for: `X-Psi-Screen: 640x480x256` on the netBook, `640x240x16` on the 5mx (the width and height of the page area, and the colours). It goes to the helper only, never to a site. [PsiProxy](https://github.com/danieledge/psiproxy) 1.01 and the [PsiConnect Atom](https://github.com/danieledge/psiconnect) 2.8 use it: the netBook gets pictures in colour up to 560 pixels wide (and from PsiProxy tables that fit and lighter pages), the 5mx the same 16-grey output as before. A helper that does not know the header ignores it.
 - **Known fault (0.83 and earlier, netBook only).** A JPEG whose whole file reaches the engine in one piece is drawn black: in the ARM harness (`--netbook`), any JPEG under about 8 KB; a 5mx, PNGs and GIFs are not affected. PsiProxy 1.01 sends small photos to the netBook as PNG for now. To be fixed in the engine's colour path (`links/psi_drv.c`, `jpeg.c`'s size-only pass).

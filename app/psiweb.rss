@@ -40,12 +40,17 @@ RESOURCE EIK_APP_INFO
 	}
 
 // The standard toolbar: the program's name, four buttons for the pen (Open
-// an address, Back, the Home page, Pictures - the page's pictures on or
-// off, pressed in while they show, as View > Show pictures), the clock.
-// Zoom is on the View menu, its keys and the Zoom icons beside the screen.
-// The pictures come from PsiWeb.mbm (web/tools/mkicons.py):
-// CPwAppUi::ConstructL puts them on. View > Show toolbar (Ctrl+T) hides it
-// and the page takes its room.
+// an address, Back, Start - the start page with the favourites - and
+// Pictures - the page's pictures on or off, pressed in while they show, as
+// View > Show pictures), the clock. Zoom is on the View menu, its keys and
+// the Zoom icons beside the screen. The pictures come from PsiWeb.mbm
+// (tools/mkicons.py): CPwAppUi::ConstructL puts them on. View > Show >
+// Toolbar (Ctrl+T) hides it and the page takes its room.
+// (0.99) The name is a CEikFileNameLabel, as Psion's own programs have it
+// (the program's name is set as the "file" name at start): on Coda that is
+// the name box in the theme's colours. This one is the Series 5mx's (240
+// lines, the SDK's 37-pixel buttons); a taller screen gets one of the two
+// below in its place (CPwAppUi::TallToolbarL).
 RESOURCE TOOLBAR r_pw_toolbar
 	{
 	breadth=KEikStdToolBarWidth;
@@ -53,15 +58,111 @@ RESOURCE TOOLBAR r_pw_toolbar
 		{
 		TBAR_CTRL
 			{
-			type=EEikCtLabel;
+			type=EEikCtFileNameLabel;
+			id=EPwCtlFileName;
 			flags=EEikToolBarCtrlHasSetMinLength;
 			length=KEikStdFileNameLabelHeight;
-			control=LABEL { txt="PsiWeb"; horiz_align=EEikLabelAlignHCenter; vert_align=EEikLabelAlignVCenter; };
 			},
-		TBAR_BUTTON { id=EPwCmdOpen; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Address"; flags=EEikToolBarCtrlHasSetMinLength; length=KEikStdToolBarButtonHeight; },
+		TBAR_BUTTON { id=EPwCmdOpen; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Open"; flags=EEikToolBarCtrlHasSetMinLength; length=KEikStdToolBarButtonHeight; },
 		TBAR_BUTTON { id=EPwCmdBack; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Back"; flags=EEikToolBarCtrlHasSetMinLength; length=KEikStdToolBarButtonHeight; },
 		TBAR_BUTTON { id=EPwCmdStart; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Start"; flags=EEikToolBarCtrlHasSetMinLength; length=KEikStdToolBarButtonHeight; },
 		TBAR_BUTTON { id=EPwCmdImages; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Pictures"; flags=EEikToolBarCtrlHasSetMinLength; length=KEikStdToolBarButtonHeight; },
+		TBAR_CTRL
+			{
+			type=EEikCtSpacer;
+			flags=EEikToolBarCtrlHasSetMinLength|EEikToolBarCtrlIsStretchable;
+			length=0;
+			control=SPACER;
+			},
+		TBAR_CTRL
+			{
+			type=EEikCtClock;
+			control=CLOCK { digitalresourceid=R_EIK_DIGITAL_CLOCK; analogresourceid=R_EIK_ANALOG_CLOCK; };
+			},
+		TBAR_CTRL
+			{
+			type=EEikCtSpacer;
+			flags=EEikToolBarCtrlHasSetMinLength;
+			length=KEikStdGapBelowClock;
+			control=SPACER;
+			}
+		};
+	}
+
+// (0.99) the netBook's toolbar (480 lines) as Coda gives Psion's own
+// programs theirs (psion-netbook tools/toolbars.mts): the name box 24
+// pixels, buttons of 50, then the battery, Coda's toolbar extras (the
+// charge, the free memory, the brightness: PsiBatt) and Coda's clock above
+// the gap. Types 0x7044, 0x7042 and 0x7043 are made by the hook Coda puts in
+// Eikon's control factory, so this one is used only when the ROM has the
+// hook (Z:\System\Libs\PsiBattHook.bin); without PsiBatt.dll the hook
+// makes Psion's battery and clock from the same fields.
+STRUCT PW_BATTERY             // the netBook's own battery's 17 bytes (type 0x47)
+	{
+	BYTE b0=0xff; BYTE b1=0xff; BYTE b2=0xff; BYTE b3=0xff;
+	BYTE b4=0x0a; BYTE b5=0x00; BYTE b6=0x00; BYTE b7=0x03;
+	BYTE b8=0x00; BYTE b9=0x00; BYTE b10=0x00; BYTE b11=0x18;
+	BYTE b12=0x00; BYTE b13=0xb5; BYTE b14=0xb1; BYTE b15=0xf3; BYTE b16=0x00;
+	}
+
+RESOURCE TOOLBAR r_pw_toolbar_coda
+	{
+	breadth=KEikStdToolBarWidth;
+	controls=
+		{
+		TBAR_CTRL
+			{
+			type=EEikCtFileNameLabel;
+			id=EPwCtlFileName;
+			flags=EEikToolBarCtrlHasSetMinLength;
+			length=24;
+			},
+		TBAR_BUTTON { id=EPwCmdOpen; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Open"; flags=EEikToolBarCtrlHasSetMinLength; length=50; },
+		TBAR_BUTTON { id=EPwCmdBack; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Back"; flags=EEikToolBarCtrlHasSetMinLength; length=50; },
+		TBAR_BUTTON { id=EPwCmdStart; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Start"; flags=EEikToolBarCtrlHasSetMinLength; length=50; },
+		TBAR_BUTTON { id=EPwCmdImages; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Pictures"; flags=EEikToolBarCtrlHasSetMinLength; length=50; },
+		TBAR_CTRL { type=0x7044; control=PW_BATTERY { }; },
+		TBAR_CTRL { type=0x7042; control=SPACER; },
+		TBAR_CTRL
+			{
+			type=EEikCtSpacer;
+			flags=EEikToolBarCtrlHasSetMinLength|EEikToolBarCtrlIsStretchable;
+			length=0;
+			control=SPACER;
+			},
+		TBAR_CTRL
+			{
+			type=0x7043;
+			control=CLOCK { digitalresourceid=R_EIK_DIGITAL_CLOCK; analogresourceid=R_EIK_ANALOG_CLOCK; };
+			},
+		TBAR_CTRL
+			{
+			type=EEikCtSpacer;
+			flags=EEikToolBarCtrlHasSetMinLength;
+			length=KEikStdGapBelowClock;
+			control=SPACER;
+			}
+		};
+	}
+
+// (0.99) a tall screen without Coda's hook (Psion's own netBook image, the
+// Series 7): the same name box and buttons, Psion's clock
+RESOURCE TOOLBAR r_pw_toolbar_tall
+	{
+	breadth=KEikStdToolBarWidth;
+	controls=
+		{
+		TBAR_CTRL
+			{
+			type=EEikCtFileNameLabel;
+			id=EPwCtlFileName;
+			flags=EEikToolBarCtrlHasSetMinLength;
+			length=24;
+			},
+		TBAR_BUTTON { id=EPwCmdOpen; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Open"; flags=EEikToolBarCtrlHasSetMinLength; length=50; },
+		TBAR_BUTTON { id=EPwCmdBack; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Back"; flags=EEikToolBarCtrlHasSetMinLength; length=50; },
+		TBAR_BUTTON { id=EPwCmdStart; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Start"; flags=EEikToolBarCtrlHasSetMinLength; length=50; },
+		TBAR_BUTTON { id=EPwCmdImages; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Pictures"; flags=EEikToolBarCtrlHasSetMinLength; length=50; },
 		TBAR_CTRL
 			{
 			type=EEikCtSpacer;
@@ -88,10 +189,10 @@ RESOURCE TOOLBAR r_pw_toolbar
 // (16x16 colour pictures from PsiWeb.mbm, put on by CPwAppUi), the address
 // (a tap or Ctrl+L, then type an address or words to search for, Enter
 // goes there, Esc leaves it), how far the page has come, and Pictures (as
-// the toolbar's). Shown at first on a tall screen (the netBook), where the
-// toolbar is hidden and the page has the whole width; on the 5mx the
-// toolbar as before, and Shift+Ctrl+T shows the toolband. Its buttons act
-// at once, as the style guide asks.
+// the toolbar's). Shown at first on a tall screen (the netBook), beside the
+// toolbar (0.99: both, as the family's programs open); on the 5mx the
+// toolbar alone, and Shift+Ctrl+T shows the toolband. Its buttons act at
+// once, as the style guide asks.
 RESOURCE TOOLBAND r_pw_toolband
 	{
 	breadth=KEikStdToolBandHeight;
@@ -112,10 +213,10 @@ RESOURCE TOOLBAND r_pw_toolband
 			control=EDWIN { flags=EEikEdwinNoLineOrParaBreaks|EEikEdwinNoAutoSelection|EEikEdwinJustAutoCurEnd; width=20; lines=1; maxlength=500; };
 			},
 		TBAR_CTRL { type=EEikCtSpacer; flags=EEikToolBarCtrlHasSetMinLength; length=6; control=SPACER; },
-		// (0.86) the route light: how the page came (Direct, Atom, PsiProxy),
-		// a padlock for a secure page checked on the way, the page style's
-		// letter when it is not Full; a tap is Page information
-		TBAR_BUTTON { id=EPwCmdRouteLight; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Direct"; flags=EEikToolBarCtrlHasSetMinLength; length=EEikStdShortTextPopoutToolBandButtonWidth; bmpfile="*"; bmpid=EMbmBandNoLock; bmpmask=EMbmBandNoLockMask; },
+		// (0.86) the route light; (0.99) a picture only: the padlock shut for
+		// a secure page checked on the way, open for any other. How the page
+		// came and its style are in Page information, which a tap opens
+		TBAR_BUTTON { id=EPwCmdRouteLight; flags=EEikToolBarCtrlHasSetMinLength; length=EEikStdTwoStateIconicToolBandButtonWidth; bmpfile="*"; bmpid=EMbmBandNoLock; bmpmask=EMbmBandNoLockMask; },
 		TBAR_CTRL { type=EEikCtSpacer; flags=EEikToolBarCtrlHasSetMinLength; length=6; control=SPACER; },
 		TBAR_BUTTON { id=EPwCmdImages; flags=EEikToolBarCtrlHasSetMinLength; length=EEikStdTwoStateIconicToolBandButtonWidth; bmpfile="*"; bmpid=EMbmBandPictures; bmpmask=EMbmBandPicturesMask; }
 		};
@@ -193,26 +294,26 @@ RESOURCE MENU_PANE r_pw_edit_menu
 
 // File: the page, the connection, Close. Stop has no letter shortcut: Esc
 // stops a page loading, as in the built-in programs. (0.85) Home page moved
-// to Go, where browsers have it
+// to Go, where browsers have it; (0.99) Open in full browser to Tools
 RESOURCE MENU_PANE r_pw_file_menu
 	{
 	items=
 		{
-		MENU_ITEM { command=EPwCmdOpen; txt="Open address..."; },
-		MENU_ITEM { command=EPwCmdFullBrowser; txt="Open in full browser..."; },
+		MENU_ITEM { command=EPwCmdOpen; txt="Open address"<0x85>; },
 		MENU_ITEM { command=EPwCmdReload; txt="Reload"; },
 		MENU_ITEM { command=EPwCmdStop; txt="Stop"; extratxt="Esc"; flags=EEikMenuItemSeparatorAfter; },
-		MENU_ITEM { command=EPwCmdConnect; txt="Connect..."; },
+		MENU_ITEM { command=EPwCmdConnect; txt="Connect"<0x85>; },
 		MENU_ITEM { command=EPwCmdHangup; txt="Disconnect"; flags=EEikMenuItemSeparatorAfter; },
 		MENU_ITEM { command=EEikCmdExit; txt="Close"; }
 		};
 	}
 
 // View: zoom (in and out cycle round the sizes; also the Zoom icons beside
-// the screen), Show (a cascade: the toolbar, the toolband, Bright screen),
-// Show pictures (a tick box: the pictures of the page showing, as the
-// Pictures button; pictures on every page is in Preferences), then Page
-// information (the Email program's Status information, on its key)
+// the screen), Page style, Show pictures (a tick box: the pictures of the
+// page showing, as the Pictures button; pictures on every page is in
+// Preferences), Bright screen (a tick box; in the Show cascade until 0.98),
+// Show (a cascade: the toolbar, the toolband), then Page information (the
+// Email program's Status information, on its key)
 RESOURCE MENU_PANE r_pw_view_menu
 	{
 	items=
@@ -222,8 +323,9 @@ RESOURCE MENU_PANE r_pw_view_menu
 		MENU_ITEM { command=EPwCmdZoomNormal; txt="Normal size"; flags=EEikMenuItemSeparatorAfter; },
 		MENU_ITEM { command=EPwCmdStyleMenu; cascade=r_pw_style_menu; txt="Page style"; },
 		MENU_ITEM { command=EPwCmdImages; txt="Show pictures"; flags=EEikMenuItemCheckBox; },
+		MENU_ITEM { command=EPwCmdReading; txt="Bright screen"; flags=EEikMenuItemCheckBox; },
 		MENU_ITEM { command=EPwCmdShowMenu; cascade=r_pw_show_menu; txt="Show"; flags=EEikMenuItemSeparatorAfter; },
-		MENU_ITEM { command=EPwCmdPageInfo; txt="Page information..."; }
+		MENU_ITEM { command=EPwCmdPageInfo; txt="Page information"<0x85>; }
 		};
 	}
 
@@ -241,16 +343,14 @@ RESOURCE MENU_PANE r_pw_style_menu
 		};
 	}
 
-// View > Show: the bars, and Bright screen (the contrast and backlight for
-// reading: called Reading mode up to 0.84, renamed so that "Reader" means
-// one thing; Shift+Ctrl+B)
+// View > Show: the bars. (Bright screen, the contrast and backlight for
+// reading, Shift+Ctrl+B, was here until 0.98: it is not a thing to show.)
 RESOURCE MENU_PANE r_pw_show_menu
 	{
 	items=
 		{
 		MENU_ITEM { command=EPwCmdToggleToolbar; txt="Toolbar"; flags=EEikMenuItemCheckBox; },
-		MENU_ITEM { command=EPwCmdToggleToolband; txt="Toolband"; flags=EEikMenuItemCheckBox; },
-		MENU_ITEM { command=EPwCmdReading; txt="Bright screen"; flags=EEikMenuItemCheckBox; }
+		MENU_ITEM { command=EPwCmdToggleToolband; txt="Toolband"; flags=EEikMenuItemCheckBox; }
 		};
 	}
 
@@ -277,7 +377,7 @@ RESOURCE MENU_PANE r_pw_history_menu
 	{
 	items=
 		{
-		MENU_ITEM { command=EPwCmdHistoryFull; txt="Full history..."; },
+		MENU_ITEM { command=EPwCmdHistoryFull; txt="Full history"<0x85>; },
 		MENU_ITEM { command=EPwCmdClearHistory; txt="Clear history"; }
 		};
 	}
@@ -289,34 +389,38 @@ RESOURCE MENU_PANE r_pw_favs_menu
 	{
 	items=
 		{
-		MENU_ITEM { command=EPwCmdAddFav; txt="Add to favourites..."; extratxt="Shift+Ctrl+D"; },
-		MENU_ITEM { command=EPwCmdOrganiseFav; txt="Organise favourites..."; }
+		MENU_ITEM { command=EPwCmdAddFav; txt="Add to favourites"<0x85>; extratxt="Shift+Ctrl+D"; },
+		MENU_ITEM { command=EPwCmdOrganiseFav; txt="Organise favourites"<0x85>; }
 		};
 	}
 
 // Tools: preferences and settings (Set up PsiWeb... is the first-time setup,
-// any time), the log and the engine in a cascade, updates, Help and About last
+// any time), Open in full browser (0.99, from File), updates, the support
+// cascade (Troubleshooting, as in PsiMail and PsiTerm: Log until 0.98), then
+// Help and About last
 RESOURCE MENU_PANE r_pw_tools_menu
 	{
 	items=
 		{
-		MENU_ITEM { command=EPwCmdPrefs; txt="Preferences..."; },
-		MENU_ITEM { command=EPwCmdConnSettings; txt="Connection settings..."; },
-		MENU_ITEM { command=EPwCmdSetup; txt="Set up PsiWeb..."; flags=EEikMenuItemSeparatorAfter; },
-		MENU_ITEM { command=EPwCmdLogMenu; cascade=r_pw_log_menu; txt="Log"; },
-		MENU_ITEM { command=EPwCmdUpdate; txt="Update PsiWeb..."; flags=EEikMenuItemSeparatorAfter; },
+		MENU_ITEM { command=EPwCmdPrefs; txt="Preferences"<0x85>; },
+		MENU_ITEM { command=EPwCmdConnSettings; txt="Connection settings"<0x85>; },
+		MENU_ITEM { command=EPwCmdSetup; txt="Set up PsiWeb"<0x85>; flags=EEikMenuItemSeparatorAfter; },
+		MENU_ITEM { command=EPwCmdFullBrowser; txt="Open in full browser"<0x85>; },
+		MENU_ITEM { command=EPwCmdUpdate; txt="Update PsiWeb"<0x85>; },
+		MENU_ITEM { command=EPwCmdLogMenu; cascade=r_pw_log_menu; txt="Troubleshooting"; flags=EEikMenuItemSeparatorAfter; },
 		MENU_ITEM { command=EPwCmdHelp; txt="Help on PsiWeb"; },
 		MENU_ITEM { command=EPwCmdAbout; txt="About PsiWeb"; }
 		};
 	}
 
-// Tools > Log: for whoever is looking into a problem (no lines in a cascade)
+// Tools > Troubleshooting: for whoever is looking into a problem (no lines
+// in a cascade). The log goes to the web helper (PsiProxy on a computer).
 RESOURCE MENU_PANE r_pw_log_menu
 	{
 	items=
 		{
 		MENU_ITEM { command=EPwCmdKeepLog; txt="Keep a log"; flags=EEikMenuItemCheckBox; },
-		MENU_ITEM { command=EPwCmdSendLog; txt="Send log to server"; },
+		MENU_ITEM { command=EPwCmdSendLog; txt="Send log to helper"; },
 		MENU_ITEM { command=EPwCmdRestart; txt="Restart browser engine"; }
 		};
 	}
@@ -331,7 +435,7 @@ RESOURCE DIALOG r_pw_open_dialog
 		DLG_LINE { type=EEikCtEdwin; prompt="Address"; id=EPwDlgUrl;
 			control=EDWIN { width=20; maxlength=500; }; },
 		DLG_LINE { type=EEikCtLabel; control=LABEL { standard_font=EEikLabelFontAnnotation;
-			txt="Or words to search for"; }; },
+			horiz_align=EEikLabelAlignHLeft; txt="Or words to search for"; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="Recent"; id=EPwDlgRecent;
 			control=CHOICELIST { maxdisplaychar=20; array_id=r_pw_empty_array; }; }
 		};
@@ -352,8 +456,8 @@ RESOURCE DIALOG r_pw_fav_dialog
 		};
 	}
 
-// Organise favourites: the list with Edit and Delete (they act at once, the
-// list stays), and Close
+// Organise favourites: the list with New, Edit and Delete (they act at
+// once, the list stays; New 0.99), and Close
 RESOURCE DIALOG r_pw_organise_dialog
 	{
 	title="Organise favourites";
@@ -384,7 +488,8 @@ RESOURCE DLG_BUTTONS r_pw_organise_buttons
 	{
 	buttons=
 		{
-		DLG_BUTTON { id=EPwBidEdit; button=CMBUT { txt="Edit..."; }; hotkey='E'; },
+		DLG_BUTTON { id=EPwBidNew; button=CMBUT { txt="New"<0x85>; }; hotkey='N'; },
+		DLG_BUTTON { id=EPwBidEdit; button=CMBUT { txt="Edit"<0x85>; }; hotkey='E'; },
 		DLG_BUTTON { id=EPwBidDelete; button=CMBUT { txt="Delete"; }; hotkey='D'; },
 		DLG_BUTTON { id=EEikBidOk; button=CMBUT { txt="Close"; }; hotkey=EEikBidOk; flags=0; }
 		};
@@ -483,12 +588,12 @@ RESOURCE ARRAY r_pw_setup_pages_lines
 			control=CHOICELIST { maxdisplaychar=16; array_id=r_pw_style_array; }; },
 		DLG_LINE { type=EEikCtLabel; id=EPwDlgSuStyleNote; control=LABEL { standard_font=EEikLabelFontAnnotation;
 			horiz_align=EEikLabelAlignHLeft; reserve_length=72;
-			txt="Reader puts an article first - Shift+Ctrl+R changes the page showing"; }; },
+			txt="Reader shows the article first - Shift+Ctrl+R changes the page's style"; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="Pictures"; id=EPwDlgSuPictures;
 			control=CHOICELIST { maxdisplaychar=16; array_id=r_pw_pictures_array; }; },
 		DLG_LINE { type=EEikCtLabel; id=EPwDlgSuPicturesNote; control=LABEL { standard_font=EEikLabelFontAnnotation;
 			horiz_align=EEikLabelAlignHLeft; reserve_length=72;
-			txt="Only when asked suits a modem - View > Show pictures for one page"; }; },
+			txt="Only when asked suits a modem - Ctrl+I shows one page's pictures"; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="Search with"; id=EPwDlgSuSearch;
 			control=CHOICELIST { maxdisplaychar=16; array_id=r_pw_search_array; }; }
 		};
@@ -540,7 +645,7 @@ RESOURCE ARRAY r_pw_conn_proxy_lines
 // PsiMail). Screen greys... opens the greys screen shared with PsiTerm and
 // PsiMail (ssh/psigreyui.cpp; docs/display.md) on top; the dialog is still
 // there when it closes.
-// (0.88) File > Open in full browser: the page showing, in a real browser
+// (0.88) Tools (File until 0.98) > Open in full browser: the page showing, in a real browser
 // (Carbonyl, or w3m) on one of PsiTerm's saved servers, shown in PsiTerm.
 // The server is a name from PsiTerm's list; the program is run there with
 // the address. Help > Ways to connect says how to install them.
@@ -551,13 +656,13 @@ RESOURCE DIALOG r_pw_full_dialog
 	buttons=R_EIK_BUTTONS_CANCEL_OK;
 	items=
 		{
-		DLG_LINE { type=EEikCtEdwin; prompt="PsiTerm server"; id=EPwDlgFullServer;
+		DLG_LINE { type=EEikCtEdwin; prompt="Server (saved in PsiTerm)"; id=EPwDlgFullServer;
 			control=EDWIN { width=16; maxlength=24; }; },
-		DLG_LINE { type=EEikCtEdwin; prompt="Program there"; id=EPwDlgFullCommand;
+		DLG_LINE { type=EEikCtEdwin; prompt="Browser program"; id=EPwDlgFullCommand;
 			control=EDWIN { width=16; maxlength=40; }; },
 		DLG_LINE { type=EEikCtLabel; id=EPwDlgFullNote; control=LABEL { standard_font=EEikLabelFontAnnotation;
 			horiz_align=EEikLabelAlignHLeft; reserve_length=72;
-			txt="A server saved in PsiTerm - carbonyl draws the page as Chrome would"; }; }
+			txt="The page opens in PsiTerm, drawn by that program on the server"; }; }
 		};
 	}
 
@@ -581,17 +686,36 @@ RESOURCE DLG_BUTTONS r_pw_prefs_buttons
 	{
 	buttons=
 		{
-		DLG_BUTTON { id=EPwBidGreys; button=CMBUT { txt="Screen greys..."; }; hotkey='G'; flags=0; },
+		DLG_BUTTON { id=EPwBidGreys; button=CMBUT { txt="Screen greys"<0x85>; }; hotkey='G'; flags=0; },
 		DLG_BUTTON { id=EEikBidCancel; button=CMBUT { txt="Cancel"; }; hotkey=EEikBidCancel; flags=0; },
 		DLG_BUTTON { id=EEikBidOk; button=CMBUT { txt="OK"; }; hotkey=EEikBidOk; flags=0; }
 		};
 	}
 
-// Preferences > Text (docs/display.md): fonts drawn ahead for the Psion's
-// greys at the sizes PsiWeb uses (sharper), or Links' own, scaled
+// (0.99) on a colour screen (the netBook, the Series 7) the greys mean
+// nothing: no Screen greys button, and Cancel and OK as wide as every other
+// dialog's. The same lines as r_pw_prefs_dialog.
+RESOURCE DIALOG r_pw_prefs_dialog_colour
+	{
+	title="Preferences";
+	flags=EEikDialogFlagWait;
+	buttons=R_EIK_BUTTONS_CANCEL_OK;
+	items=
+		{
+		DLG_LINE { type=EEikCtEdwin; prompt="Home page"; id=EPwDlgHome; control=EDWIN { width=20; maxlength=200; }; },
+		DLG_LINE { type=EEikCtChoiceList; prompt="Pictures"; id=EPwDlgPictures; control=CHOICELIST { array_id=r_pw_pictures_array; }; },
+		DLG_LINE { type=EEikCtChoiceList; prompt="Page style"; id=EPwDlgStyle; control=CHOICELIST { array_id=r_pw_style_array; }; },
+		DLG_LINE { type=EEikCtChoiceList; prompt="Search with"; id=EPwDlgSearch; control=CHOICELIST { array_id=r_pw_search_array; }; },
+		DLG_LINE { type=EEikCtChoiceList; prompt="Text"; id=EPwDlgText; control=CHOICELIST { array_id=r_pw_text_array; }; },
+		DLG_LINE { type=EEikCtChoiceList; prompt="Cookies"; id=EPwDlgCookies; control=CHOICELIST { array_id=r_pw_cookies_array; }; }
+		};
+	}
+
+// Preferences > Text (docs/display.md): fonts drawn ahead for the screen at
+// the sizes PsiWeb uses (sharper), or Links' own, scaled
 RESOURCE ARRAY r_pw_text_array
 	{
-	items={ LBUF { txt="Sharp"; }, LBUF { txt="Scaled (as before)"; } };
+	items={ LBUF { txt="Sharp"; }, LBUF { txt="Scaled"; } };
 	}
 
 // Page information (Shift+Ctrl+Q, the Email program's Status information):
@@ -609,7 +733,7 @@ RESOURCE DIALOG r_pw_info_dialog
 		DLG_LINE { type=EEikCtLabel; prompt="Status"; id=EPwDlgInfo3; control=LABEL { txt=""; }; },
 		DLG_LINE { type=EEikCtLabel; prompt="Free memory"; id=EPwDlgInfo4; control=LABEL { txt=""; }; },
 		DLG_LINE { type=EEikCtLabel; prompt="Route"; id=EPwDlgInfo5; control=LABEL { txt=""; }; },
-		DLG_LINE { type=EEikCtLabel; prompt="Page"; id=EPwDlgInfo6; control=LABEL { txt=""; }; }
+		DLG_LINE { type=EEikCtLabel; prompt="Page style"; id=EPwDlgInfo6; control=LABEL { txt=""; }; }
 		};
 	}
 
@@ -686,7 +810,8 @@ RESOURCE ARRAY r_pw_proxy_array
 	}
 
 // Update: where to fetch PsiWeb-version.txt and PsiWeb.sis from - the same
-// dialog and Update.ini words as PsiMail's ("github", "github-dev", "host:port")
+// dialog and Update.ini words as PsiMail's ("github", "github-dev", "host:port").
+// (0.99) In the user's words; the computer's lines dimmed unless it is chosen.
 RESOURCE DIALOG r_pw_update_dialog
 	{
 	title="Update PsiWeb";
@@ -695,7 +820,7 @@ RESOURCE DIALOG r_pw_update_dialog
 	items=
 		{
 		DLG_LINE { type=EEikCtChoiceList; prompt="Updates from"; id=EPwDlgUpdSource; control=CHOICELIST { array_id=r_pw_source_array; }; },
-		DLG_LINE { type=EEikCtEdwin; prompt="Local server"; id=EPwDlgUpdHost; control=EDWIN { width=22; maxlength=50; }; },
+		DLG_LINE { type=EEikCtEdwin; prompt="Computer's address"; id=EPwDlgUpdHost; control=EDWIN { width=22; maxlength=50; }; },
 		DLG_LINE { type=EEikCtNumberEditor; prompt="Port"; id=EPwDlgUpdPort; control=NUMBER_EDITOR { min=1; max=65535; }; }
 		};
 	}
@@ -725,11 +850,15 @@ RESOURCE DLG_BUTTONS r_pw_update_buttons
 
 RESOURCE ARRAY r_pw_source_array
 	{
-	items={ LBUF { txt="GitHub"; }, LBUF { txt="GitHub - test builds (dev)"; }, LBUF { txt="Local server"; } };
+	items={ LBUF { txt="Released versions"; }, LBUF { txt="Test versions"; }, LBUF { txt="A computer on my network"; } };
 	}
 
 // Help on PsiWeb (Shift+Ctrl+H): the topics, and the chosen one's text
-// (pwhelp.cpp) - the same dialog as PsiMail's
+// (pwhelp.cpp). (0.99) One resource for every screen, as the family's Help:
+// the text is PsiWeb's own control (CPwHelpText: the rich text editor with
+// a scroll bar beside it), 7 whole lines on the 5mx's 240 lines and 12 on
+// the netBook's 480 (CPwHelpText::MinimumSize; the height here is the
+// 5mx's), never a line cut through
 RESOURCE DIALOG r_pw_help_dialog
 	{
 	title="Help on PsiWeb";
@@ -739,24 +868,8 @@ RESOURCE DIALOG r_pw_help_dialog
 		{
 		DLG_LINE { type=EEikCtChoiceList; prompt="Topic"; id=EPwDlgHelpTopic;
 			control=CHOICELIST { array_id=r_pw_empty_array; }; },
-		DLG_LINE { type=EEikCtRichTextEditor; prompt=""; id=EPwDlgHelpText;
-			control=RTXTED { width=520; height=118; numlines=7; textlimit=8000; flags=EEikEdwinNoAutoSelection|EEikEdwinReadOnly; }; }
-		};
-	}
-
-// (0.87) the same on a tall screen (the netBook, the Series 7): the size of
-// Psion's own large dialogs there, the viewer taking the room
-RESOURCE DIALOG r_pw_help_dialog_tall
-	{
-	title="Help on PsiWeb";
-	flags=EEikDialogFlagWait|EEikDialogFlagNotifyEsc;
-	buttons=R_EIK_BUTTONS_CONTINUE;
-	items=
-		{
-		DLG_LINE { type=EEikCtChoiceList; prompt="Topic"; id=EPwDlgHelpTopic;
-			control=CHOICELIST { array_id=r_pw_empty_array; }; },
-		DLG_LINE { type=EEikCtRichTextEditor; prompt=""; id=EPwDlgHelpText;
-			control=RTXTED { width=560; height=300; numlines=16; textlimit=8000; flags=EEikEdwinNoAutoSelection|EEikEdwinReadOnly; }; }
+		DLG_LINE { type=EPwCtHelpText; prompt=""; id=EPwDlgHelpText;
+			control=RTXTED { width=400; height=119; numlines=7; textlimit=8000; flags=EEikEdwinNoAutoSelection|EEikEdwinReadOnly; }; }
 		};
 	}
 
@@ -765,26 +878,54 @@ RESOURCE ARRAY r_pw_empty_array
 	items={ LBUF { txt="-"; } };
 	}
 
-// About: as PsiTerm's and PsiMail's (name and version, what it is and whose,
-// the link in use, then the credits in the small font). (0.82) The GPL
-// source is psiweb's repository (it said psiterm's); IJG's sentence, as its
-// licence asks; the SDK's notice for the C library (STDLIB.SIS) inside
+// About (0.99: the family's About, Coda style sheet 2.7): the name and
+// version in bold, what it is and the machines it runs on, the copyright
+// and the machine (set at run time: the © sign, and the netBook or the
+// Series 5mx), Buy me a coffee in the small font. The other people's code
+// is under Credits... (the IJG's sentence, as its licence asks; the SDK's
+// notice for the C library, STDLIB.SIS, inside). How PsiWeb connects is in
+// Page information, not here.
 RESOURCE DIALOG r_pw_about_dialog
 	{
 	title="About PsiWeb";
 	flags=EEikDialogFlagWait;
+	buttons=r_pw_about_buttons;
+	items=
+		{
+		DLG_LINE { type=EEikCtLabel; id=EPwDlgAbout1; control=LABEL { horiz_align=EEikLabelAlignHLeft; reserve_length=24; txt="PsiWeb"; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPwDlgAbout2; control=LABEL { horiz_align=EEikLabelAlignHLeft; txt="Web browser for the Psion Series 5mx, Series 7 & netBook"; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPwDlgAbout4; control=LABEL { horiz_align=EEikLabelAlignHLeft; reserve_length=60; txt="-"; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPwDlgAboutCoffee; control=LABEL { standard_font=EEikLabelFontAnnotation; horiz_align=EEikLabelAlignHLeft; txt="Buy me a coffee: buymeacoffee.com/danedge"; }; }
+		};
+	}
+
+RESOURCE DLG_BUTTONS r_pw_about_buttons
+	{
+	buttons=
+		{
+		DLG_BUTTON { id=EPwBidCredits; button=CMBUT { txt="Credits"<0x85>; }; hotkey='C'; },
+		DLG_BUTTON { id=EEikBidOk; button=CMBUT { txt="Continue"; }; hotkey=EEikBidOk; flags=0; }
+		};
+	}
+
+// About > Credits: whose code PsiWeb is built on, its own source and
+// licence (the © signs are set at run time). Short lines, so the dialog
+// stays under 500 pixels; the IJG's and Symbian's sentences word for word.
+RESOURCE DIALOG r_pw_credits_dialog
+	{
+	title="Credits";
+	flags=EEikDialogFlagWait;
 	buttons=R_EIK_BUTTONS_CONTINUE;
 	items=
 		{
-		DLG_LINE { type=EEikCtLabel; id=EPwDlgAbout1; control=LABEL { standard_font=EEikLabelFontLegend; reserve_length=24; txt="PsiWeb"; }; },
-		DLG_LINE { type=EEikCtLabel; id=EPwDlgAbout2; control=LABEL { txt="Web browser for the Psion Series 5mx, netBook and Series 7"; }; },
-		DLG_LINE { type=EEikCtLabel; id=EPwDlgAboutStatus; control=LABEL { standard_font=EEikLabelFontAnnotation; reserve_length=70; txt="-"; }; },
-		DLG_LINE { type=EEikCtLabel; id=EPwDlgAbout4; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="Links 2 browser engine (c) Mikulas Patocka & others - GPL v2 (no JavaScript)"; }; },
-		DLG_LINE { type=EEikCtLabel; id=EPwDlgAbout5; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="(c) 2026 Dan Edge - source: github.com/danieledge/psiweb - MIT, see COPYING.txt"; }; },
-		DLG_LINE { type=EEikCtLabel; id=EPwDlgAbout6; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="libpng, zlib, DejaVu fonts; TLS: LibTomCrypt, LibTomMath, TweetNaCl (public domain)"; }; },
-		DLG_LINE { type=EEikCtLabel; id=EPwDlgAbout7; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="This software is based in part on the work of the Independent JPEG Group"; }; },
-		DLG_LINE { type=EEikCtLabel; id=EPwDlgAbout8; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="This product includes software licensed from Symbian Ltd (c) Symbian Ltd 1998-9"; }; },
-		DLG_LINE { type=EEikCtLabel; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="Support: buymeacoffee.com/danedge"; }; }
+		DLG_LINE { type=EEikCtLabel; id=EPwDlgCredit1; control=LABEL { standard_font=EEikLabelFontAnnotation; horiz_align=EEikLabelAlignHLeft; reserve_length=70; txt="-"; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPwDlgCredit2; control=LABEL { standard_font=EEikLabelFontAnnotation; horiz_align=EEikLabelAlignHLeft; txt="libpng, zlib, DejaVu fonts"; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPwDlgCredit3; control=LABEL { standard_font=EEikLabelFontAnnotation; horiz_align=EEikLabelAlignHLeft; txt="TLS: LibTomCrypt, LibTomMath, TweetNaCl (public domain)"; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPwDlgCredit4; control=LABEL { standard_font=EEikLabelFontAnnotation; horiz_align=EEikLabelAlignHLeft; txt="This software is based in part on the work of the Independent JPEG Group"; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPwDlgCredit5; control=LABEL { standard_font=EEikLabelFontAnnotation; horiz_align=EEikLabelAlignHLeft; txt="This product includes software licensed from Symbian Ltd"; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPwDlgCredit6; control=LABEL { standard_font=EEikLabelFontAnnotation; horiz_align=EEikLabelAlignHLeft; reserve_length=40; txt="-"; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPwDlgCredit7; control=LABEL { standard_font=EEikLabelFontAnnotation; horiz_align=EEikLabelAlignHLeft; txt="PsiWeb's source: github.com/danieledge/psiweb"; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPwDlgCredit8; control=LABEL { standard_font=EEikLabelFontAnnotation; horiz_align=EEikLabelAlignHLeft; txt="MIT licence - see COPYING.txt"; }; }
 		};
 	}
 
