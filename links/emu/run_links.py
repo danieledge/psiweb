@@ -4,7 +4,9 @@ driver, ARM code from the 1999 EPOC GCC) in an ARM emulator on a PC.
 
 A copy of web/emu/run_psiweb.py (NetSurf's harness) with, in addition:
   --images         the app's "Show pictures" setting is on at start
-  --style N        View > Page style: 0 Full, 1 Lighter, 2 Reader, 3 Text only (0.86)
+  --style N        View > Page style: 0 Full, 1 Lighter, 2 Reader, 3 Text only (0.86);
+                   (1.03) the script line "style N" changes it, then "cmd 18" (PW_CMD_RESTYLE)
+                   lays the page showing out again in it
   --keep-cookies   Preferences > Cookies: Kept for next time (0.89), in PW_CDISK's
                    System/Apps/PsiWeb/cookies.txt
   --busy           log the busy message's figures (0.89: psiweb.h load_host,
@@ -381,6 +383,9 @@ def script_step():
             state["test_state"] = 1
             state["cmd"], state["arg"] = 20, rest
             state["last_draw"] = t
+        elif cmd == "style":                         # (1.03) View > Page style changed (then "cmd 18")
+            global STYLE
+            STYLE = int(rest)
         elif cmd == "cmd":
             n, _, a = rest.partition(" ")
             state["cmd"], state["arg"] = int(n), a

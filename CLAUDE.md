@@ -37,7 +37,8 @@ emulator tools. Core keeps the old relative paths (`core/ssh/psiglue.cpp`,
    (the chunk, PsiWeb.log, heartbeats), `engine/pwupdate.c` (signed
    updates), `engine/pwproblem.c` (the "Page not opened" page, 0.85),
    `links/psi_style.c` with `links/simp/` (View > Page style: the
-   PsiConnect Atom's simplifier, kept identical to psiconnect's, 0.86), with `core/web/engine/pwnet.c` over `core/ssh/psiglue.cpp` and
+   PsiConnect Atom's simplifier, kept in step with psiconnect's, 0.86;
+   1.03 adds PsiWeb's own change, `links/simp/psiweb.diff`), with `core/web/engine/pwnet.c` over `core/ssh/psiglue.cpp` and
    `core/ssh/tls13.c` (`tls/` holds the LibTomCrypt configuration;
    `core/web/tls` the arithmetic).
 

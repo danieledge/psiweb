@@ -14,7 +14,7 @@ static int gFail;
 int main(void)
 {
 	char page[PW_PROBLEM_MAX];
-	PwRoute direct = { 1, 0, "" }, atom = { 0, 1, "psiproxy" }, pp = { 1, 1, "10.0.0.5" };
+	PwRoute direct = { 1, 0, "", 0 }, atom = { 0, 1, "psiproxy", 8080 }, pp = { 1, 1, "10.0.0.5", 8081 };
 	int k;
 
 	CHECK(pw_problem_kind("Host not found", "") == PW_PROB_NAME);
@@ -41,6 +41,9 @@ int main(void)
 	CHECK(pw_problem_kind("x", "Could not connect - no answer from the modem") == PW_PROB_NO_LINK);
 	/* (0.90) the Atom modem's own TLS (engine/pwatom.h) did not come up: not "the modem", not "older security" */
 	CHECK(pw_problem_kind("x", "Secure connection not made by the Atom modem - example.com") == PW_PROB_ATOM_TLS);
+	/* (1.03) psiglue's hold after a failed connection: not "no connection" */
+	CHECK(pw_problem_kind("Unknown error", "The Psion's Internet connection failed a moment ago - try again in a few seconds") == PW_PROB_RETRY);
+	CHECK(pw_problem_kind("x", "The Psion's Internet connection is still busy with the last attempt - wait a moment and try again") == PW_PROB_RETRY);
 
 	for (k = 0; k < PW_PROB_COUNT; k++) {
 		const PwRoute *r = k % 3 == 0 ? &direct : k % 3 == 1 ? &atom : &pp;
@@ -90,6 +93,32 @@ int main(void)
 	CHECK(strstr(pw_problem_short(PW_PROB_REFUSED, &direct), "web helper") == NULL);
 	CHECK(strstr(pw_problem_short(PW_PROB_REFUSED, &atom), "web helper") != NULL);
 	CHECK(pw_problem_short(-1, NULL) != NULL);
+	/* (1.03) PsiProxy on a computer that does not answer: the helper, with
+	   its address, and Open directly this time; not the network card's cable */
+	{
+		PwRoute pp2 = { 1, 1, "192.0.2.7", 8081 };
+		char line[PW_PROBLEM_SHORT_MAX + 64];
+		CHECK(pw_problem_for_route(PW_PROB_NO_LINK, "Could not connect to the server - the server cannot be reached", &pp2) == PW_PROB_HELPER);
+		CHECK(pw_problem_for_route(PW_PROB_REFUSED, "Could not connect to the server - the server refused the connection", &pp2) == PW_PROB_HELPER);
+		CHECK(pw_problem_for_route(PW_PROB_TIMEOUT, "Timed out connecting to the server", &pp2) == PW_PROB_HELPER);
+		CHECK(pw_problem_for_route(PW_PROB_NO_LINK, "the network cannot be reached - the dial-up failed", &pp2) == PW_PROB_NO_LINK);
+		CHECK(pw_problem_for_route(PW_PROB_PORT_BUSY, "the serial port is in use by another program", &pp2) == PW_PROB_PORT_BUSY);
+		CHECK(pw_problem_for_route(PW_PROB_NO_LINK, "", &direct) == PW_PROB_NO_LINK);
+		CHECK(pw_problem_for_route(PW_PROB_REFUSED, "", &atom) == PW_PROB_REFUSED);
+		CHECK(pw_problem_for_route(PW_PROB_CERT, "", &pp2) == PW_PROB_CERT);
+		pw_problem_html(page, sizeof(page), "https://www.bbc.co.uk/news", PW_PROB_HELPER, "", &pp2);
+		CHECK(strstr(page, "The web helper at 192.0.2.7:8081 did not answer"));
+		CHECK(strstr(page, "about:cmd-direct") && strstr(page, "Open directly this time"));
+		CHECK(!strstr(page, "cable"));
+		pw_problem_html(page, sizeof(page), "https://www.bbc.co.uk/news", PW_PROB_NO_LINK, "", &direct);
+		CHECK(!strstr(page, "about:cmd-direct"));
+		pw_problem_short_line(line, sizeof(line), PW_PROB_HELPER, &pp2);
+		CHECK(!strcmp(line, "The web helper at 192.0.2.7:8081 did not answer"));
+		pw_problem_short_line(line, sizeof(line), PW_PROB_TIMEOUT, &pp2);
+		CHECK(!strcmp(line, pw_problem_short(PW_PROB_TIMEOUT, &pp2)));
+		pw_problem_short_line(line, 10, PW_PROB_HELPER, &pp2);
+		CHECK(strlen(line) == 9);
+	}
 	printf(gFail ? "problemtest: %d failed\n" : "problemtest: all passed\n", gFail);
 	return gFail != 0;
 }

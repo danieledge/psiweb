@@ -36,7 +36,11 @@ enum
 	                                   use, not shown; test_* say how it went */,
 	PW_CMD_TRIM                     /* 0.92: PsiWeb has been behind another program for
 	                                   a while: caches and pictures away from the view
-	                                   are dropped and the heap's free end given back */
+	                                   are dropped and the heap's free end given back */,
+	PW_CMD_ROUTE                    /* 1.03: the web helper changed (use_proxy,
+	                                   proxy_host, proxy_port): the pages from now on
+	                                   go its new way, with no restart (Links reads
+	                                   its proxy for each request) */
 	};
 
 /* test_state (psiweb.h, 0.89) */

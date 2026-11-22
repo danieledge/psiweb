@@ -94,111 +94,172 @@ kkkkkkkkkkkkkkkkkkkk
 
 
 # The toolband's pictures (0.78): 16x16, in colour, for the netBook's
-# toolband (on the 5mx its 16 greys show them as greys). Drawn from shapes,
-# each with a black outline. Colours from EPOC's 6x6x6 cube, so they show exactly on the netBook
-COL = {'k': (0,0,0), 'w': (255,255,255), 'b': (51,102,204), 'B': (153,204,255),
-       'g': (51,153,51), 'G': (153,204,102), 'r': (204,51,51), 'R': (255,153,153),
-       'y': (255,204,51), 'd': (102,102,102), 'l': (204,204,204)}
+# toolband (on the 5mx its 16 greys show them as greys).
+# (1.03) Redrawn to one grid and Coda's recipe (style sheet 2.3), so that
+# they sit alike on their buttons: each object is filled within the same
+# 12x12 square (pixels 2 to 13 both ways, centred in the 16x16 picture,
+# which EIKON centres on the button), with a 1-pixel 333333 outline round
+# it (so 14x14 in all), flat fills from the 6x6x6 cube, a lighter edge at
+# the top left and a darker one at the bottom right, and no drop shadow
+# (on a 16-pixel picture it would move the object off centre). Back and
+# Forward have a dimmed pair, 999999 and cccccc with no edges, for when
+# there is no page to go to.
 N = 16
-def blank(): return [['.'] * N for _ in range(N)]
-def outline(a):
-    o = [r[:] for r in a]
+OUT16 = (0x33, 0x33, 0x33)
+C16 = {'n': (0x00, 0x33, 0x66), 'b': (0x00, 0x66, 0xcc), 'p': (0x99, 0xcc, 0xff), 't': (0x00, 0x99, 0x99),
+       'o': (0xff, 0x66, 0x00), 'w': (0xff, 0xff, 0xff), 'g': (0xcc, 0xcc, 0xcc), 'v': (0xcc, 0xcc, 0xff),
+       'y': (0xff, 0xcc, 0x00), 'd': (0x66, 0x66, 0x66), 'm': (0x99, 0x99, 0x99), 'r': (0xcc, 0x33, 0x00)}
+def g16(): return [[None] * N for _ in range(N)]
+def f16(g, test, c, edge=True):
+    """fills the pixels at least half inside test(x, y) (8x8 samples a
+    pixel: no single-pixel spurs); c a C16 letter; edge: the recipe's light
+    and dark edges apply to this fill"""
     for y in range(N):
         for x in range(N):
-            if a[y][x] != '.': continue
-            for dx, dy in ((1,0),(-1,0),(0,1),(0,-1)):
-                X, Y = x+dx, y+dy
-                if 0 <= X < N and 0 <= Y < N and a[Y][X] not in '.k':
-                    o[y][x] = 'k'; break
-    return o
-def fill(a, test, c):
-    for y in range(N):
-        for x in range(N):
-            if test(x + .5, y + .5): a[y][x] = c
+            n = sum(1 for i in range(8) for j in range(8) if test(x + (i + .5) / 8, y + (j + .5) / 8))
+            if n >= 32: g[y][x] = (C16[c], edge)
+def a16(g, art, c, edge=True):
+    """fills from 16 lines of art: any letter is the fill, '.' nothing"""
+    rows = [r for r in art.strip('\n').split('\n')]
+    assert len(rows) == N and all(len(r) == N for r in rows), art
+    for y, r in enumerate(rows):
+        for x, ch in enumerate(r):
+            if ch != '.': g[y][x] = (C16[c], edge)
 def inpoly(p, x, y):
     n, c = len(p), False
     for i in range(n):
         x1, y1 = p[i]; x2, y2 = p[(i+1) % n]
         if (y1 > y) != (y2 > y) and x < (x2-x1)*(y-y1)/(y2-y1) + x1: c = not c
     return c
-def arrow(left):
-    a = blank()
-    p = [(1.5,8),(7,2.5),(7,5.5),(14,5.5),(14,10.5),(7,10.5),(7,13.5)]
-    if not left: p = [(N - x, y) for x, y in p]
-    fill(a, lambda x, y: inpoly(p, x, y), 'b')
-    # a light edge along the top, for depth
+def fin16(g, outline=OUT16, edges=True):
+    """the outline round the object; the light and dark edges"""
+    filled = lambda x, y: 0 <= x < N and 0 <= y < N and g[y][x] is not None
+    out = [[None] * N for _ in range(N)]
     for y in range(N):
         for x in range(N):
-            if a[y][x] == 'b' and (y == 0 or a[y-1][x] == '.'): a[y][x] = 'B'
-    return outline(a)
+            if not filled(x, y): continue
+            c, e = g[y][x]
+            if edges and e and (not filled(x - 1, y) or not filled(x, y - 1)): c = step(c, 1)
+            elif edges and e and (not filled(x + 1, y) or not filled(x, y + 1)): c = step(c, -1)
+            out[y][x] = c
+    for y in range(N):
+        for x in range(N):
+            if not filled(x, y) and any(filled(x + dx, y + dy) for dx, dy in ((1,0),(-1,0),(0,1),(0,-1))):
+                out[y][x] = outline
+    return out
+def step(c, d):
+    return tuple(max(0, min(255, v + d * 0x33)) for v in c)
+# Back, drawn by hand on the 12x12 square: the head's two halves and the
+# shaft mirror each other about the middle, and Forward mirrors Back
+ARROW = """
+................
+................
+.......#........
+......##........
+.....###........
+....##########..
+...###########..
+..############..
+..############..
+...###########..
+....##########..
+.....###........
+......##........
+.......#........
+................
+................
+"""
+def arrow(left, dim=False):
+    g = g16()
+    art = ARROW if left else '\n'.join(r[::-1] for r in ARROW.strip('\n').split('\n'))
+    a16(g, art, 'g' if dim else 'b')
+    return fin16(g, (0x99, 0x99, 0x99), False) if dim else fin16(g)
+RELOAD = """
+................
+................
+....#####.#.....
+...######.##....
+..##......###...
+..##......##....
+..##......#.....
+..##............
+..##........##..
+..##........##..
+..###......###..
+...####..####...
+....########....
+.....######.....
+................
+................
+"""
 def reload_():
-    a = blank()
-    cx, cy = 8, 8.5
-    def ring(x, y):
-        r = math.hypot(x-cx, y-cy); ang = math.degrees(math.atan2(-(y-cy), x-cx)) % 360
-        return 4.0 <= r <= 6.3 and not (15 <= ang <= 85)
-    fill(a, ring, 'b')
-    head = [(8.2,0.4),(13.4,3.6),(8.2,6.8)]
-    fill(a, lambda x, y: inpoly(head, x, y), 'b')
-    return outline(a)
+    # a ring, open at the top right, with the arrowhead there turning it
+    # clockwise; by hand on the 12x12 square
+    g = g16()
+    a16(g, RELOAD, 'b', False)           # (a 2-pixel stroke: no edges, which would stripe it)
+    return fin16(g)
 def stop():
-    a = blank()
-    fill(a, lambda x, y: math.hypot(x-8, y-8) <= 6.9, 'r')
+    # a stop sign: an octagon in Coda's orange-red, a white cross
+    g = g16()
+    oct_ = [(5.5, 2), (10.5, 2), (14, 5.5), (14, 10.5), (10.5, 14), (5.5, 14), (2, 10.5), (2, 5.5)]
+    f16(g, lambda x, y: inpoly(oct_, x, y), 'r')
     def cross(x, y):
-        return math.hypot(x-8, y-8) <= 4.6 and (abs((x-8)-(y-8)) <= 1.1 or abs((x-8)+(y-8)) <= 1.1)
-    fill(a, cross, 'w')
-    return outline(a)
-def home():
-    a = blank()
-    roof = [(8,1.2),(15.4,8.2),(0.6,8.2)]
-    fill(a, lambda x, y: 3 <= x <= 13 and 8 <= y <= 15, 'l')
-    fill(a, lambda x, y: inpoly(roof, x, y), 'r')
-    fill(a, lambda x, y: 7 <= x <= 10 and 10.5 <= y <= 15, 'b')
-    o = outline(a)
-    return o
-def pictures():
-    a = blank()
-    fill(a, lambda x, y: 1 <= x <= 15 and 2 <= y <= 14, 'B')
-    fill(a, lambda x, y: math.hypot(x-11.5, y-5.5) <= 2.1, 'y')
-    fill(a, lambda x, y: 1 <= x <= 15 and 2 <= y <= 14 and y >= 14 - 5*math.exp(-((x-5.5)/3.2)**2), 'g')
-    fill(a, lambda x, y: 1 <= x <= 15 and 2 <= y <= 14 and y >= 13.6 - 2.5*math.exp(-((x-12)/2.5)**2), 'G')
-    # the frame
-    for y in range(N):
-        for x in range(N):
-            if (x in (0, 15) and 1 <= y <= 14) or (y in (1, 14) and 0 <= x <= 15): a[y][x] = 'k'
-    return a
-def lock(closed):
-    # (0.86) the route light's padlock: closed for a secure page checked on
-    # the way, nothing for a plain one
-    a = blank()
-    if not closed: return a
-    fill(a, lambda x, y: 3 <= x <= 13 and 7 <= y <= 14, 'y')
-    def shackle(x, y):
-        r = math.hypot(x-8, y-7)
-        return 3.0 <= r <= 4.6 and y <= 7.5
-    fill(a, shackle, 'd')
-    fill(a, lambda x, y: 7 <= x <= 9 and 9.5 <= y <= 12, 'k')
-    return outline(a)
+        u, v = x - 8, y - 8
+        return abs(u) <= 3.2 and abs(v) <= 3.2 and (abs(u - v) <= 1.0 or abs(u + v) <= 1.0)
+    f16(g, cross, 'w', False)
+    return fin16(g)
+STAR = """
+................
+................
+.......##.......
+.......##.......
+......####......
+..############..
+...##########...
+....########....
+.....######.....
+.....######.....
+....########....
+....###..###....
+...###....###...
+...##......##...
+................
+................
+"""
 def star16():
-    # (0.99) Start: the favourites' star, in place of the house
-    a = blank()
-    pts = [(8 + 7.4 * math.cos(math.radians(-90 + 36 * k)) * (1 if k % 2 == 0 else 0.42),
-            8.6 + 7.4 * math.sin(math.radians(-90 + 36 * k)) * (1 if k % 2 == 0 else 0.42)) for k in range(10)]
-    fill(a, lambda x, y: inpoly(pts, x, y), 'y')
-    return outline(a)
-def lock_open():
-    # (0.99) the route light's open padlock: a page not checked on the way
-    a = blank()
-    fill(a, lambda x, y: 3 <= x <= 13 and 7 <= y <= 14, 'l')
-    def shackle(x, y):
-        r = math.hypot(x-11, y-6)
-        return 2.6 <= r <= 4.2 and y <= 7.5 and not (x < 8.5 and y > 5)
-    fill(a, shackle, 'd')
-    fill(a, lambda x, y: 7 <= x <= 9 and 9.5 <= y <= 12, 'd')
-    return outline(a)
+    # Start: the favourites' star, blue as the toolbar's Start; by hand,
+    # its two sides mirror each other
+    g = g16()
+    a16(g, STAR, 'b')
+    return fin16(g)
+def pictures():
+    # a framed picture: pale sky, white sun, teal and blue hills (the
+    # toolbar's Pictures), 12x10 inside its outline
+    g = g16()
+    box = lambda x, y: 2 <= x <= 14 and 3 <= y <= 13
+    f16(g, box, 'v', False)
+    f16(g, lambda x, y: math.hypot(x - 10.8, y - 5.8) <= 1.6, 'w', False)
+    f16(g, lambda x, y: box(x, y) and y >= 13.2 - 5 * math.exp(-((x - 5.5) / 2.8) ** 2), 't', False)
+    f16(g, lambda x, y: box(x, y) and y >= 13.2 - 2.6 * math.exp(-((x - 11) / 2.2) ** 2), 'b', False)
+    return fin16(g)
+def lock(closed):
+    # (0.86) the route light's padlock: (1.03) shut (teal) for a secure
+    # page checked on the way, open (grey) for any other; the body 10x7,
+    # the shackle above it
+    g = g16()
+    f16(g, lambda x, y: 3 <= x <= 13 and 7.5 <= y <= 14, 't' if closed else 'g')
+    if closed:
+        shackle = lambda x, y: 2.2 <= math.hypot(x - 8, y - 6.5) <= 3.8 and y <= 7.5
+    else:
+        shackle = lambda x, y: 2.2 <= math.hypot(x - 10.5, y - 5) <= 3.8 and y <= 6 and not (x < 8.5 and y > 4)
+    f16(g, shackle, 'm', False)
+    f16(g, lambda x, y: 7 <= x <= 9 and 9.5 <= y <= 12, 'n' if closed else 'd', False)
+    return fin16(g)
 BAND_ICONS = [('BandBack', arrow(True)), ('BandForward', arrow(False)), ('BandReload', reload_()),
          ('BandStop', stop()), ('BandHome', star16()), ('BandPictures', pictures()),
-         ('BandLock', lock(True)), ('BandNoLock', lock_open())]
+         ('BandLock', lock(True)), ('BandNoLock', lock(False))]
+# (1.03) after every other picture, so the ids before them stay as they were
+BAND_DIM = [('BandBackDim', arrow(True, True)), ('BandForwardDim', arrow(False, True))]
 
 
 # (0.99) The toolbar's pictures in colour, for the netBook (Coda's style
@@ -329,8 +390,8 @@ def main():
         mask = Image.new('1', (N, N), 1)
         for y in range(N):
             for x in range(N):
-                if a[y][x] != '.':
-                    img.putpixel((x, y), COL[a[y][x]])
+                if a[y][x] is not None:
+                    img.putpixel((x, y), a[y][x])
                     mask.putpixel((x, y), 0)
         fi = os.path.join(out, f'{name}.bmp')
         fm = os.path.join(out, f'{name}_m.bmp')
@@ -339,11 +400,11 @@ def main():
         files += [fi, fm]
         kinds += ['/c8', '/1']
         ids.append(name)
-    for name, g in COLOUR_ICONS:        # (0.99) after the others: the ids before stay as they were
-        gw = len(g[0])                   # (24, or 20 for Pictures)
-        img = Image.new('RGB', (gw, CH), (255, 255, 255))
-        mask = Image.new('1', (gw, CH), 1)
-        for y in range(CH):
+    for name, g in COLOUR_ICONS + [(n, a) for n, a in BAND_DIM]:   # (0.99, 1.03) after the others: the ids before stay as they were
+        gw, gh = len(g[0]), len(g)       # (24, or 20 for Pictures; 16x16 the dimmed toolband pair)
+        img = Image.new('RGB', (gw, gh), (255, 255, 255))
+        mask = Image.new('1', (gw, gh), 1)
+        for y in range(gh):
             for x in range(gw):
                 if g[y][x] is not None:
                     img.putpixel((x, y), g[y][x])

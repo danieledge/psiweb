@@ -19,6 +19,8 @@ enum TPwIconId
 	EMbmToolBackC = 26, EMbmToolBackCMask = 27,
 	EMbmToolHomeC = 28, EMbmToolHomeCMask = 29,
 	EMbmToolPicturesC = 30, EMbmToolPicturesCMask = 31,
-	EMbmCount = 32
+	EMbmBandBackDim = 32, EMbmBandBackDimMask = 33,
+	EMbmBandForwardDim = 34, EMbmBandForwardDimMask = 35,
+	EMbmCount = 36
 	};
 #endif

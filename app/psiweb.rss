@@ -187,14 +187,19 @@ RESOURCE TOOLBAR r_pw_toolbar_tall
 		};
 	}
 
-// The toolband (0.78), along the top: Back, Forward, Reload, Stop and Home
-// (16x16 colour pictures from PsiWeb.mbm, put on by CPwAppUi), the address
-// (a tap or Ctrl+L, then type an address or words to search for, Enter
-// goes there, Esc leaves it), how far the page has come, and Pictures (as
-// the toolbar's). Shown at first on a tall screen (the netBook), beside the
-// toolbar (0.99: both, as the family's programs open); on the 5mx the
-// toolbar alone, and Shift+Ctrl+T shows the toolband. Its buttons act at
-// once, as the style guide asks.
+// The toolband (0.78), along the top: Back, Forward, Reload (Stop while a
+// page loads) and Start, the address (a tap or Ctrl+L, then type an address
+// or words to search for, Enter goes there, Esc leaves it) with how far the
+// page has come along its foot, then the padlock (Page information) and
+// Pictures (as the toolbar's). Shown at first on a tall screen (the
+// netBook), beside the toolbar (0.99: both, as the family's programs open);
+// on the 5mx the toolbar alone, and Shift+Ctrl+T shows the toolband. Its
+// buttons act at once, as the style guide asks.
+// (1.03) Two groups of buttons the same width, each group's buttons side
+// by side, the address between them with the same 4-pixel gap each side;
+// the 16x16 pictures are drawn to one grid (tools/mkicons.py), so each
+// sits in the middle of its button alike; the address's frame is the
+// buttons' height (CPwAppUi::ConstructL)
 RESOURCE TOOLBAND r_pw_toolband
 	{
 	breadth=KEikStdToolBandHeight;
@@ -205,7 +210,7 @@ RESOURCE TOOLBAND r_pw_toolband
 		TBAR_BUTTON { id=EPwCmdForward; flags=EEikToolBarCtrlHasSetMinLength; length=EEikStdTwoStateIconicToolBandButtonWidth; bmpfile="*"; bmpid=EMbmBandForward; bmpmask=EMbmBandForwardMask; },
 		TBAR_BUTTON { id=EPwCmdReloadStop; flags=EEikToolBarCtrlHasSetMinLength; length=EEikStdTwoStateIconicToolBandButtonWidth; bmpfile="*"; bmpid=EMbmBandReload; bmpmask=EMbmBandReloadMask; },
 		TBAR_BUTTON { id=EPwCmdStart; flags=EEikToolBarCtrlHasSetMinLength; length=EEikStdTwoStateIconicToolBandButtonWidth; bmpfile="*"; bmpid=EMbmBandHome; bmpmask=EMbmBandHomeMask; },
-		TBAR_CTRL { type=EEikCtSpacer; flags=EEikToolBarCtrlHasSetMinLength; length=6; control=SPACER; },
+		TBAR_CTRL { type=EEikCtSpacer; flags=EEikToolBarCtrlHasSetMinLength; length=4; control=SPACER; },
 		TBAR_CTRL
 			{
 			type=EEikCtEdwin;
@@ -214,12 +219,11 @@ RESOURCE TOOLBAND r_pw_toolband
 			length=0;
 			control=EDWIN { flags=EEikEdwinNoLineOrParaBreaks|EEikEdwinNoAutoSelection|EEikEdwinJustAutoCurEnd; width=20; lines=1; maxlength=500; };
 			},
-		TBAR_CTRL { type=EEikCtSpacer; flags=EEikToolBarCtrlHasSetMinLength; length=6; control=SPACER; },
+		TBAR_CTRL { type=EEikCtSpacer; flags=EEikToolBarCtrlHasSetMinLength; length=4; control=SPACER; },
 		// (0.86) the route light; (0.99) a picture only: the padlock shut for
 		// a secure page checked on the way, open for any other. How the page
 		// came and its style are in Page information, which a tap opens
 		TBAR_BUTTON { id=EPwCmdRouteLight; flags=EEikToolBarCtrlHasSetMinLength; length=EEikStdTwoStateIconicToolBandButtonWidth; bmpfile="*"; bmpid=EMbmBandNoLock; bmpmask=EMbmBandNoLockMask; },
-		TBAR_CTRL { type=EEikCtSpacer; flags=EEikToolBarCtrlHasSetMinLength; length=6; control=SPACER; },
 		TBAR_BUTTON { id=EPwCmdImages; flags=EEikToolBarCtrlHasSetMinLength; length=EEikStdTwoStateIconicToolBandButtonWidth; bmpfile="*"; bmpid=EMbmBandPictures; bmpmask=EMbmBandPicturesMask; }
 		};
 	}
@@ -598,6 +602,29 @@ RESOURCE ARRAY r_pw_setup_pages_lines
 			txt="Only when asked suits a modem - Ctrl+I shows one page's pictures"; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="Search with"; id=EPwDlgSuSearch;
 			control=CHOICELIST { maxdisplaychar=16; array_id=r_pw_search_array; }; }
+		};
+	}
+
+// (1.03) A question whose explanation is in the dialog, not in its title
+// bar (CPwQueryDialog, its title set by the caller): the fact in bold, why
+// as an annotation under it, then the question, last, before No and Yes.
+// The labels are as wide as the longest text they take (the dialog-size
+// rule: one size whatever it says); a label's reserve_length must be at
+// least its resource text and anything set in it later (USER 23 otherwise)
+RESOURCE DIALOG r_pw_query_dialog
+	{
+	title="";
+	flags=EEikDialogFlagWait;
+	buttons=R_EIK_BUTTONS_NO_YES;
+	items=
+		{
+		DLG_LINE { type=EEikCtLabel; id=EPwDlgQueryFact; control=LABEL { horiz_align=EEikLabelAlignHLeft; reserve_length=60;
+			txt="Pages and passwords cross your network unencrypted"; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPwDlgQueryWhy; control=LABEL { standard_font=EEikLabelFontAnnotation;
+			horiz_align=EEikLabelAlignHLeft; reserve_length=110;
+			txt="Between the Series 5mx and PsiProxy at WWWWWWWWWWWWWWW - fine at home, not on public WiFi"; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPwDlgQueryQuestion; control=LABEL { horiz_align=EEikLabelAlignHLeft; reserve_length=40;
+			txt="Use PsiProxy on this network?"; }; }
 		};
 	}
 

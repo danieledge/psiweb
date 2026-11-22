@@ -28,6 +28,13 @@ int pw_problem_kind(const char *aEngineWhy, const char *aConnWhy)
 	const char *c = aConnWhy ? aConnWhy : "";
 	const char *e = aEngineWhy ? aEngineWhy : "";
 	if (*c) {
+		/* (1.03) psiglue's hold after a failed connection: this one was not
+		   tried at all, so it says nothing about the cable or the network
+		   (it read "There is no connection - the network card's cable may be
+		   out" while the network was up) */
+		if (has(c, "failed a moment ago") || has(c, "busy with the last attempt")
+		    || has(c, "connection is busy - try again"))
+			return PW_PROB_RETRY;
 		if (starts(c, "Clock not set")) return PW_PROB_CLOCK;     /* (0.98) pwcert.c */
 		if (has(c, "clock") || has(c, "out of date") || has(c, "expired") || has(c, "not valid yet"))
 			return PW_PROB_CERT_DATE;
@@ -58,6 +65,26 @@ int pw_problem_kind(const char *aEngineWhy, const char *aConnWhy)
 	return PW_PROB_OTHER;
 }
 
+/* (1.03) a web helper on a computer: PsiProxy (not the Atom modem's own) */
+static int computer_helper(const PwRoute *r)
+{
+	return r && r->use_proxy && r->proxy_host && r->proxy_host[0] && !pg_su_is_atom_host(r->proxy_host);
+}
+
+int pw_problem_for_route(int aKind, const char *aConnWhy, const PwRoute *aRoute)
+{
+	const char *c = aConnWhy ? aConnWhy : "";
+	if (!computer_helper(aRoute))
+		return aKind;
+	if (aKind != PW_PROB_NO_LINK && aKind != PW_PROB_REFUSED && aKind != PW_PROB_TIMEOUT && aKind != PW_PROB_NAME)
+		return aKind;
+	/* the link itself: the dial-up, the modem, the serial port, TCP/IP */
+	if (has(c, "dial") || has(c, "modem") || has(c, "serial port") || has(c, "name resolver")
+	    || has(c, "internet service") || has(c, "internet account") || has(c, "login"))
+		return aKind;
+	return PW_PROB_HELPER;
+}
+
 typedef struct { char *p; int left; } Out;
 
 static void put(Out *o, const char *s)
@@ -78,6 +105,17 @@ static void put_esc(Out *o, const char *s, int aMaxChars)
 		else if (*s == '"') put(o, "&quot;");
 		else if ((unsigned char)*s < ' ') put(o, " ");
 		else put(o, one);
+	}
+	if (*s) put(o, "...");
+}
+
+/* (1.03) the caller's text as it is (for a window line, not a page), at most aMaxChars */
+static void put_esc_plain(Out *o, const char *s, int aMaxChars)
+{
+	int n = 0;
+	for (; *s && n < aMaxChars; s++, n++) {
+		char one[2] = { *s, 0 };
+		put(o, (unsigned char)*s < ' ' ? " " : one);
 	}
 	if (*s) put(o, "...");
 }
@@ -126,6 +164,10 @@ static const char *cause(int aKind, const PwRoute *r)
 		return "The Atom modem could not make a secure connection to the site - the site's certificate may not be trusted, the site may be down, or the Atom may have no WiFi (the Atom's log says which)";
 	case PW_PROB_CLOCK:
 		return "The Psion's clock is not set, so no site's certificate can be checked - set the date first (Time, Ctrl+T)";
+	case PW_PROB_RETRY:
+		return "The connection before this one failed a moment ago, so this page could not be tried - Try again in a few seconds";
+	case PW_PROB_HELPER:	/* (its address: pw_problem_html) */
+		return "The web helper did not answer - PsiProxy may not be running on that computer, or the computer may be off or off the network";
 	default:
 		return "The page did not load";
 	}
@@ -150,8 +192,34 @@ const char *pw_problem_short(int aKind, const PwRoute *r)
 	case PW_PROB_NOT_FOUND:  return "The file was not found on the Psion";
 	case PW_PROB_ATOM_TLS:   return "The Atom modem did not make the secure connection";
 	case PW_PROB_CLOCK:      return "The Psion's clock is not set - set the date first (Time, Ctrl+T)";
+	case PW_PROB_HELPER:     return "The web helper did not answer - PsiProxy may not be running";
+	case PW_PROB_RETRY:      return "A connection failed a moment ago - try again in a few seconds";
 	default:                 return "The page did not come";
 	}
+}
+
+void pw_problem_short_line(char *aOut, int aMax, int aKind, const PwRoute *aRoute)
+{
+	Out o;
+	char port[12];
+	int n = 0, v;
+	if (!aOut || aMax <= 0) return;
+	o.p = aOut;
+	o.left = aMax;
+	aOut[0] = 0;
+	if (aKind != PW_PROB_HELPER || !computer_helper(aRoute)) {
+		put(&o, pw_problem_short(aKind, aRoute));
+		return;
+	}
+	put(&o, "The web helper at ");
+	put_esc_plain(&o, aRoute->proxy_host, 40);
+	v = aRoute->proxy_port > 0 ? aRoute->proxy_port : 8080;
+	port[11] = 0;
+	n = 11;
+	do { port[--n] = (char)('0' + v % 10); v /= 10; } while (v && n > 0);
+	put(&o, ":");
+	put(&o, port + n);
+	put(&o, " did not answer");
 }
 
 int pw_problem_html(char *aOut, int aMax, const char *aUrl, int aKind, const char *aConnWhy, const PwRoute *aRoute)
@@ -176,7 +244,14 @@ int pw_problem_html(char *aOut, int aMax, const char *aUrl, int aKind, const cha
 		put_esc(&o, host, 90);
 	}
 	put(&o, "</b></p>\n<p>");
-	put(&o, cause(aKind, aRoute));
+	if (aKind == PW_PROB_HELPER && computer_helper(aRoute)) {
+		/* (1.03) which helper: "The web helper at 192.0.2.7:8081 did not answer - ..." */
+		char line[PW_PROBLEM_SHORT_MAX + 64];
+		pw_problem_short_line(line, sizeof(line), aKind, aRoute);
+		put_esc(&o, line, sizeof(line));
+		put(&o, " - PsiProxy may not be running on that computer, or the computer may be off or off the network");
+	} else
+		put(&o, cause(aKind, aRoute));
 	put(&o, "</p>\n");
 	if (aKind == PW_PROB_OTHER && aConnWhy && aConnWhy[0]) {
 		put(&o, "<p>");
@@ -185,7 +260,10 @@ int pw_problem_html(char *aOut, int aMax, const char *aUrl, int aKind, const cha
 	}
 	put(&o, "<p><a href=\"");
 	put_esc(&o, url, 480);
-	put(&o, "\">Try again</a> &nbsp; &nbsp; <a href=\"about:cmd-test\">Test the connection</a> &nbsp; &nbsp; <a href=\"about:cmd-setup\">Set up PsiWeb</a></p>\n");
+	put(&o, "\">Try again</a> &nbsp; &nbsp; ");
+	if (aKind == PW_PROB_HELPER && computer_helper(aRoute))
+		put(&o, "<a href=\"about:cmd-direct\">Open directly this time</a> &nbsp; &nbsp; ");	/* (1.03) without the helper, this page */
+	put(&o, "<a href=\"about:cmd-test\">Test the connection</a> &nbsp; &nbsp; <a href=\"about:cmd-setup\">Set up PsiWeb</a></p>\n");
 	put(&o, "<p><small>Route: ");
 	if (aRoute) {
 		int helper = aRoute->use_proxy && aRoute->proxy_host && aRoute->proxy_host[0];

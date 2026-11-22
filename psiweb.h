@@ -210,7 +210,9 @@ typedef struct
 	volatile int sleep_ok;
 	volatile int waking;
 	volatile int sleeping;             /* set with quitting: the engine writes Sleep's files as it goes */
-	int spare[5];
+	volatile int direct_now;           /* (1.03) psiweb: "Open directly this time" - the page coming is
+	                                      fetched without the web helper */
+	int spare[4];
 
 	unsigned char fb[PW_MAX_H * PW_STRIDE8];   /* MUST stay last: see above */
 	} PwShared;

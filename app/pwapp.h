@@ -136,6 +136,7 @@ struct TPwSettings
 
 // TPwSettings::iFlags, one byte after the toolband's in PsiWeb.ini (0.85)
 const TInt KPwFlagKeepCookies = 1;     // (0.87) Preferences > Cookies: kept when PsiWeb closes
+const TInt KPwFlagStyleAsked = 2;      // (1.03) the one-time offer of Text only (pages without PsiProxy) was made
 
 // TPwSettings::iDisplay, one byte at the end of PsiWeb.ini (0.81); all 0 is the standard
 const TInt KPwDisplayReading = 1;      // View > Reading mode
@@ -199,6 +200,12 @@ public:
 	TBool PicturesShown() const;             // this page's pictures are shown (the Pictures button)
 	TBool Colour() const { return iColour; } // a colour screen (the netBook): EPOC's 256 colours
 	TInt MaxHeight() const { return iMaxH; } // the screen's height, at most PW_MAX_H
+	// (1.03) the route the running engine was started with (its web helper
+	// is given to Links at its start): Set up PsiWeb restarts it only when
+	// that changes
+	const TPwSettings& StartedWith() const { return iStartedWith; }
+	TBool Restarting() const { return iRestarting; }
+	void HelperChangedL();                  // (1.03) the web helper changed: the engine takes it, no restart
 private:
 	// the page's scroll bar: EIKON's, beside the page (the engine says where
 	// the page is: psiweb.h page_*)
@@ -251,6 +258,8 @@ private:
 	TUint iFrameAt;               // tick count of the last new frame
 	CIdle* iStarter;
 	TBuf<PW_URL_MAX> iStartUrl;
+	TPwSettings iStartedWith;     // (1.03) the settings the engine started with
+	TBool iRestarting;            // (1.03) RestartL: stopping one engine and starting the next
 	TUint iLastFrame;
 	TUint iLinkSeq;               // last link message shown (PsiShared link_seq)
 	TBool iLinkBusy;              // a link note is up as a busy message
@@ -508,9 +517,31 @@ private:
 	void AppChoiceChangedL();
 	void AppSaveL();
 	void ShowPicturesNoteL();
+	void ShowStyleNoteL();     // (1.03) the style that suits the fetcher
+	// (1.03) OK and Test are PsiWeb's own (core's ask about the network at
+	// every OK): the question only for a new helper, in a dialog of its own
+	TBool OkToExitL(TInt aButtonId);
+	void ReadNow(PgSuChoice& aChoice);
+	void TestNowL();
 	TPwSettings& iSettings;
 	TBool iPicturesChosen;     // the person set Pictures: the route no longer changes it
 	TBool iStyleChosen;        // (0.86) ...and Page style
+	PgSuChoice iNow;           // (1.03) the choice as OK took it
+	};
+
+// (1.03) A question with its explanation in the dialog, not in its title:
+// the fact (bold), why (an annotation), then the question; No and Yes
+class CPwQueryDialog : public CEikDialog
+	{
+public:
+	CPwQueryDialog(const TDesC& aFact, const TDesC& aWhy, const TDesC& aQuestion)
+		: iFact(aFact), iWhy(aWhy), iQuestion(aQuestion) {}
+	static TBool AskL(const TDesC& aTitle, const TDesC& aFact, const TDesC& aWhy, const TDesC& aQuestion);
+private:
+	void PreLayoutDynInitL();
+	const TDesC& iFact;
+	const TDesC& iWhy;
+	const TDesC& iQuestion;
 	};
 
 // (0.88) File > Open in full browser: which of PsiTerm's saved servers, and
@@ -569,7 +600,11 @@ public:
 	void UpdateStartPageL();            // (0.87) the start page (pwstart.cpp)
 	void OpenTileL(TInt aIndex);        // (0.87) ...its tile 1 to 8
 	void SeedFavouritesL();             // (0.87) a new PsiWeb's favourites: its first tiles
+	CPwView* View() const { return iView; }   // (1.03) for Set up PsiWeb's Test
 	void RouteLightL();                 // (0.86) the toolband's route light follows the page
+	void ShowNavStateL();               // (1.03) the toolband's Back and Forward drawn dimmed when there is nowhere to go
+	void BandPictureL(TInt aId, TInt aIcon);   // (1.03) a toolband button's picture
+	void StyleOfferL();                 // (1.03) once: Text only offered for big pages without PsiProxy
 private:
 	// Favourites and History (pwfavs.cpp)
 	TBool HavePage() const;
@@ -644,6 +679,9 @@ private:
 	TBuf<16> iRouteShown;               // (0.86) what the route light says
 	TUint iFullBusyAt;                  // (0.88) "Opening in PsiTerm..." went up (0: not up)
 	TInt iLockShown;                    // ...and whether its padlock is shut (-1: not yet)
+	TInt iBackShown, iForwardShown;     // (1.03) Back and Forward as drawn (-1: not yet)
+	CIdle* iOfferIdle;                  // (1.03) the style offer, after the tick that saw the page
+	static TInt OfferCallback(TAny* aSelf);
 	TInt iOtherZoom;                    // (0.89) the other machine's zoom in PsiWeb.ini (0: none), kept
 	                                    // as it was: zoom is remembered per machine
 public:

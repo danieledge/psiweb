@@ -25,6 +25,9 @@ enum
 	PW_PROB_NOT_FOUND,      /* a file on the Psion was not found */
 	PW_PROB_ATOM_TLS,       /* (0.90) the Atom modem did not make the secure connection (its certificate check, the name, the site) */
 	PW_PROB_CLOCK,          /* (0.98) the Psion's clock is not set: no certificate can be checked */
+	PW_PROB_HELPER,         /* (1.03) the web helper on a computer (PsiProxy) did not answer */
+	PW_PROB_RETRY,          /* (1.03) not tried: the connection before it failed moments ago (psiglue holds
+	                           off for a few seconds), so nothing is known about the network */
 	PW_PROB_COUNT
 	};
 
@@ -39,7 +42,15 @@ typedef struct
 	int net_mode;           /* 1 network card or dial-up, 0 modem */
 	int use_proxy;          /* a web helper is set */
 	const char *proxy_host; /* its address ("psiproxy": the Atom modem helper) */
+	int proxy_port;         /* (1.03) and its port, for "the web helper at ... did not answer" */
 	} PwRoute;
+
+/* (1.03) The kind for this route: through a web helper on a computer
+ * (PsiProxy), every connection is to the helper, so a connection that was
+ * not made (no answer, refused, timed out, its name not found) is the
+ * helper not answering, not the network card's cable: PW_PROB_HELPER. What
+ * the link itself said (the dial-up, the modem, the serial port) stays. */
+int pw_problem_for_route(int aKind, const char *aConnWhy, const PwRoute *aRoute);
 
 /* Writes the page (HTML, UTF-8 safe: only the address is the caller's, and
  * it is escaped) into aOut, at most aMax bytes with its 0. aUrl is the
@@ -51,6 +62,9 @@ int pw_problem_html(char *aOut, int aMax, const char *aUrl, int aKind, const cha
  * window (at most PW_PROBLEM_SHORT_MAX bytes with its 0) */
 #define PW_PROBLEM_SHORT_MAX 72
 const char *pw_problem_short(int aKind, const PwRoute *aRoute);
+/* (1.03) the same into aOut (aMax with its 0), with the helper's address
+ * where the kind names it */
+void pw_problem_short_line(char *aOut, int aMax, int aKind, const PwRoute *aRoute);
 
 /* The engine side (psi_drv.c): the page is kept here until shown */
 #define PW_PROBLEM_MAX 3072

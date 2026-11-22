@@ -164,6 +164,21 @@ void psi_about_func(struct connection *c)
 		abort_connection(c);
 		return;
 	}
+	else if (!casecmp(u, cast_uchar "about:cmd-direct", 16)) {
+		/* (1.03) a "Page not opened" page's Open directly this time: the
+		   engine opens the page without the web helper (psi_drv.c); only
+		   from that page */
+		extern void psi_direct_command(void);
+		if (!c->prev_url || casecmp(c->prev_url, cast_uchar "about:problem", 13)) {
+			setcstate(c, S_BAD_URL);
+			abort_connection(c);
+			return;
+		}
+		psi_direct_command();
+		setcstate(c, S_INTERRUPTED);
+		abort_connection(c);
+		return;
+	}
 	else {
 		setcstate(c, S_BAD_URL);
 		abort_connection(c);

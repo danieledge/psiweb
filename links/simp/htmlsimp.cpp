@@ -141,6 +141,16 @@ bool Droppable(const char* aName)
 	return !OneOf(aName, kKeepEmpty);
 	}
 
+// (PsiWeb) inside a collapsed <nav>: the tags that would break its line
+bool NavUnwrap(const char* aName)
+	{
+	static const char* const kBlocks[] = { "ul", "ol", "li", "div", "p", "br", "h1", "h2", "h3", "h4", "h5", "h6",
+		"dl", "dt", "dd", "menu", "dir", "section", "header", "article", "figure", "figcaption", "details",
+		"summary", "hgroup", "aside", "footer", "table", "thead", "tbody", "tfoot", "tr", "td", "th", "center",
+		"blockquote", "hr", 0 };
+	return OneOf(aName, kBlocks);
+	}
+
 // reader mode: a class or id that names page furniture. The word must
 // start a token of the value ("main-nav", "navigation", "site_footer"),
 // so "unavailable" is not navigation
@@ -173,6 +183,53 @@ bool Furniture(const char* aV, size_t aLen)
 	}
 
 bool IsSpace(uint8_t aC) { return aC == ' ' || aC == '\n' || aC == '\r' || aC == '\t' || aC == '\f'; }
+
+uint8_t Lower(uint8_t aC);
+
+// (PsiWeb) a class that hides its element from the eye and leaves it to
+// screen readers ("visually-hidden", "sr-only", the BBC's "...-VisuallyHidden"):
+// a browser with style sheets never shows it, so neither does PsiWeb. It is
+// where a news index's "Attribution", "Posted", "9 hours ago" and the second
+// copy of each video's headline come from. A token that ends in one of these
+// words, after its start or a '-' or '_', and has no "not-" in it (Tailwind's
+// "not-sr-only" shows it again)
+bool HiddenClass(const char* aV, size_t aLen)
+	{
+	static const char* const kWords[] = { "visually-hidden", "visuallyhidden", "sr-only", "screen-reader-text",
+		"screenreader-only", "hide-visually", "visually-hide", "a11y-hidden", "hidden-visually", 0 };
+	size_t i = 0;
+	while (i < aLen)
+		{
+		while (i < aLen && IsSpace((uint8_t)aV[i]))
+			i++;
+		size_t start = i;
+		while (i < aLen && !IsSpace((uint8_t)aV[i]))
+			i++;
+		size_t n = i - start;
+		const char* t = aV + start;
+		bool notWord = false;
+		for (size_t k = 0; k + 4 <= n; k++)
+			if (Lower((uint8_t)t[k]) == 'n' && Lower((uint8_t)t[k + 1]) == 'o' && Lower((uint8_t)t[k + 2]) == 't' && t[k + 3] == '-')
+				notWord = true;
+		if (notWord)
+			continue;
+		for (const char* const* w = kWords; *w; w++)
+			{
+			size_t l = strlen(*w);
+			if (l > n)
+				continue;
+			const char* e = t + n - l;
+			if (e != t && e[-1] != '-' && e[-1] != '_')
+				continue;
+			size_t k = 0;
+			while (k < l && Lower((uint8_t)e[k]) == (uint8_t)(*w)[k])
+				k++;
+			if (k == l)
+				return true;
+			}
+		}
+	return false;
+	}
 bool IsAlpha(uint8_t aC) { return (aC >= 'a' && aC <= 'z') || (aC >= 'A' && aC <= 'Z'); }
 uint8_t Lower(uint8_t aC) { return (aC >= 'A' && aC <= 'Z') ? aC + 32 : aC; }
 
@@ -214,6 +271,9 @@ void HtmlSimplifier::Begin(HtmlSink* aOut, int aMode, const char* aBase)
 	iMainDepth = iMainOther = 0;
 	iDone = false;
 	iLinkDepth = 0;
+	iNavDepth = iNavLinks = iNavSeenN = 0;
+	iNavCur = 0;
+	iOpenPrefix = 0;
 	iCapLen = 0;
 	iCapturing = false;
 	iCapDepth = iCapOther = 0;
@@ -285,9 +345,15 @@ void HtmlSimplifier::OpenTag(const char* aName, const char* aAttrs, size_t aLen,
 	{
 	FlushSpace();
 	size_t n = strlen(aName);
-	if (aDroppable && iPendN < (int)(sizeof(iPendAt) / sizeof(iPendAt[0])) && iPendLen + n + aLen + 2 <= sizeof(iPend))
+	const char* pre = iOpenPrefix ? iOpenPrefix : "";
+	size_t pn = strlen(pre);
+	iOpenPrefix = 0;
+	if (aDroppable && iPendN < (int)(sizeof(iPendAt) / sizeof(iPendAt[0])) && iPendLen + pn + n + aLen + 2 <= sizeof(iPend))
 		{
+		iPendPre[iPendN] = (uint8_t)pn;
 		iPendAt[iPendN++] = (uint16_t)iPendLen;
+		memcpy(iPend + iPendLen, pre, pn);
+		iPendLen += pn;
 		iPend[iPendLen++] = '<';
 		memcpy(iPend + iPendLen, aName, n);
 		iPendLen += n;
@@ -296,6 +362,8 @@ void HtmlSimplifier::OpenTag(const char* aName, const char* aAttrs, size_t aLen,
 		iPend[iPendLen++] = '>';
 		return;
 		}
+	if (pn)
+		Emit(pre, pn);
 	Emit("<", 1);
 	Write(aName, n);
 	Write(aAttrs, aLen);
@@ -307,7 +375,7 @@ void HtmlSimplifier::CloseTag(const char* aName)
 	if (iPendN)
 		{
 		// the end of the last open tag held back: the pair was empty
-		const char* p = iPend + iPendAt[iPendN - 1] + 1;
+		const char* p = iPend + iPendAt[iPendN - 1] + iPendPre[iPendN - 1] + 1;
 		size_t n = strlen(aName);
 		if (strncmp(p, aName, n) == 0 && (p[n] == '>' || p[n] == ' '))
 			{
@@ -417,6 +485,7 @@ void HtmlSimplifier::StartTag(bool aEnd)
 	iFurniture = iMainTag = false;
 	iImgW = iImgH = -1;
 	iAltLen = 0;
+	iAltSeen = false;
 	iAttrLen = 0;
 	iTagInfo = 0;
 	}
@@ -674,6 +743,8 @@ void HtmlSimplifier::AttrDone()
 		iHidden = true;
 		return;
 		}
+	if (strcmp(a, "class") == 0 && !iValLong && HiddenClass(iVal, iValLen))
+		iHidden = true;                          // (PsiWeb) seen by screen readers only
 	if (iMode == EReader)
 		{
 		if (strcmp(a, "role") == 0)
@@ -722,6 +793,7 @@ void HtmlSimplifier::AttrDone()
 			size_t n = iValLen < sizeof(iAlt) - 1 ? iValLen : sizeof(iAlt) - 1;
 			memcpy(iAlt, iVal, n);
 			iAltLen = n;
+			iAltSeen = true;
 			keep = true;
 			}
 		else if (strcmp(a, "width") == 0 || strcmp(a, "height") == 0)
@@ -856,15 +928,38 @@ void HtmlSimplifier::TagDone()
 
 	if (iEnd)
 		{
-		if (reader && strcmp(iName, "a") == 0 && iLinkDepth > 0)
-			iLinkDepth--;
+		if (strcmp(iName, "a") == 0 && iLinkDepth > 0)
+			iLinkDepth--;                        // (PsiWeb: in every mode)
+		if (iNavDepth && !iNameLong)
+			{
+			// (PsiWeb) lighter mode's collapsed <nav>: its end closes the line
+			if (strcmp(iName, iNavName) == 0)
+				{
+				if (--iNavDepth == 0)
+					CloseTag("div");
+				return;
+				}
+			if (NavUnwrap(iName))
+				{
+				iSpace = true;                   // (a word apart, not a line)
+				return;
+				}
+			}
 		if (action == AKeep && !t.iVoid)
 			{
 			if (strcmp(iName, "pre") == 0 || strcmp(iName, "listing") == 0 || strcmp(iName, "xmp") == 0)
 				{
 				if (iPre > 0) iPre--;
 				}
+			int pend = iPendN;
 			CloseTag(iName);
+			if (iNavDepth && iPendN >= pend && strcmp(iName, "a") == 0)
+				{
+				// (PsiWeb) a link that was sent: the next has " | " before it
+				iNavLinks++;
+				if (iNavSeenN < (int)(sizeof(iNavSeen) / sizeof(iNavSeen[0])))
+					iNavSeen[iNavSeenN++] = iNavCur;
+				}
 			}
 		else if (action == ADiv)
 			CloseTag("div");
@@ -927,6 +1022,55 @@ void HtmlSimplifier::TagDone()
 				}
 			}
 		}
+	if (!reader && action == AKeep && !iSelfClose && !iNameLong && strcmp(iName, "a") == 0)
+		iLinkDepth++;                            // (PsiWeb: alt text only for a picture that is a link)
+	// (PsiWeb) lighter mode: a site's menu (<nav>, <footer>) collapsed into one line
+	// of links with " | " between them, in place of a screenful of lists
+	if (iMode == EKeepPictures && !iNameLong && action != ASkip)
+		{
+		if ((!iNavDepth && (strcmp(iName, "nav") == 0 || strcmp(iName, "footer") == 0))
+			|| (iNavDepth && strcmp(iName, iNavName) == 0))
+			{
+			if (!iSelfClose && iNavDepth++ == 0)
+				{
+				strcpy(iNavName, iName);
+				OpenTag("div", "", 0, true);
+				iNavLinks = 0;
+				iNavSeenN = 0;
+				}
+			return;
+			}
+		if (iNavDepth)
+			{
+			if (NavUnwrap(iName))
+				{
+				iSpace = true;                   // (a word apart, not a line)
+				return;
+				}
+			if (t.iAttrs == TImg)
+				return;                          // (its pictures: icons)
+			if (strcmp(iName, "a") == 0 && !iSelfClose)
+				{
+				// the same address again (the menu for a narrow screen): gone
+				uint32_t h = 5381;
+				for (size_t k = 0; k < iTagLen; k++)
+					h = h * 33 + (uint8_t)iTag[k];
+				for (int k = 0; k < iNavSeenN; k++)
+					if (iNavSeen[k] == h)
+						{
+						strcpy(iSkip, "a");
+						iSkipDepth = 1;
+						iSkipOther = 0;
+						iSkipBytes = 0;
+						iLinkDepth--;
+						return;
+						}
+				iNavCur = h;
+				if (iNavLinks > 0)
+					iOpenPrefix = " | ";         // (with the link: gone with it if it is empty)
+				}
+			}
+		}
 	switch (action)
 		{
 	case ARawDrop:
@@ -968,10 +1112,15 @@ void HtmlSimplifier::TagDone()
 		{
 		if (iImgW >= 0 && iImgH >= 0 && iImgW <= 2 && iImgH <= 2)
 			return;                              // a tracking pixel
+		// (PsiWeb) lighter mode: a picture marked as decoration (alt="") goes
+		if (iMode == EKeepPictures && iAltSeen && !iAltLen && !iLinkDepth)
+			return;
 		if (iMode >= ETextOnly || !iHaveSrc)
 			{
-			// the alt text in its place
-			if (iAltLen)
+			// the alt text in its place; (PsiWeb) in text-only and reader
+			// mode only for a picture that is a link, which would otherwise
+			// be lost: a news photo's description is not the story's text
+			if (iAltLen && (iMode < ETextOnly || iLinkDepth))
 				{
 				FlushSpace();
 				EmitText("[", 1);

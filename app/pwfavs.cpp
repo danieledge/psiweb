@@ -481,6 +481,16 @@ void CPwOpenDialog::PreLayoutDynInitL()
 	cl->SetCurrentItem(0);
 	if (iHistory.Count() == 0)
 		SetLineDimmedNow(EPwDlgRecent, ETrue);
+	else if (iUrl.Length() == 0)
+		{
+		// (1.03) no page showing (a page that never came, a restarted
+		// engine): the last page in its place, chosen, so Enter opens it
+		// again; Recent says which it is
+		cl->SetCurrentItem(1);
+		TBuf<PW_URL_MAX> u(iHistory.At(0).iUrl);
+		ed->SetTextL(&u);
+		ed->SelectAllL();
+		}
 	}
 
 // choosing a recent address puts it in the Address line

@@ -119,7 +119,10 @@ enum TPwDialogControls
 	EPwDlgFullNote,
 	EPwDlgAboutCoffee,       // (0.99) About: Buy me a coffee (the small font)
 	EPwDlgCredit1,           // (0.99) About > Credits: the other people's code
-	EPwDlgCredit2, EPwDlgCredit3, EPwDlgCredit4, EPwDlgCredit5, EPwDlgCredit6, EPwDlgCredit7, EPwDlgCredit8
+	EPwDlgCredit2, EPwDlgCredit3, EPwDlgCredit4, EPwDlgCredit5, EPwDlgCredit6, EPwDlgCredit7, EPwDlgCredit8,
+	EPwDlgQueryFact,         // (1.03) CPwQueryDialog: the fact, why, the question
+	EPwDlgQueryWhy,
+	EPwDlgQueryQuestion
 	};
 
 // (0.99) the toolbar's name box (Coda's, a CEikFileNameLabel) and Help's

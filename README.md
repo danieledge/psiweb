@@ -14,9 +14,48 @@ A web browser for the **Psion Series 5mx**, the **netBook** and the **Series 7**
 
 Up to 0.61 the engine was NetSurf. Its sources are still in the tree as a fallback (see *The NetSurf engine* below), until Links has been proved on the device. The whole port is described in [`links/PORTING.md`](links/PORTING.md).
 
-**Status: beta (1.01).** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
+**Status: beta (1.03).** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
 
 [![Download PsiWeb.sis](https://img.shields.io/badge/Download-PsiWeb.sis-2ea44f?logo=github)](https://github.com/danieledge/psiterm/raw/main/dist/PsiWeb.sis)
+
+## What's new in 1.03
+
+From Dan's evening with BBC News on his netBook:
+
+- **The toolband, redrawn.** Back, Forward, Reload and Start side by side,
+  then the address, then the padlock and Pictures side by side, with the
+  same gap each side of the address. The pictures are drawn to one grid, so
+  each sits in the middle of its button alike, in Coda's colours; Back and
+  Forward turn grey when there is no page to go to; the address has a plain
+  frame the buttons' height; the progress along its foot is in the
+  highlight colour.
+- **Page styles that earn their names.** Lighter puts a site's menus and
+  footer in one line of links each, so a news site's headlines start on the
+  first screen. Text only and Lighter no longer show the words a site
+  hides for screen readers ("Attribution", "Posted", "9 hours ago", a
+  video's headline twice), nor a news photo's description. Reader on a page
+  of headlines shows it as Text only does, and says so, instead of leaving
+  only the section headings.
+- **View > Page style and Shift+Ctrl+R change the page showing at once.**
+  Links handed back the page as it was already laid out, so a new style
+  showed only on the next page (on the netBook, which keeps laid-out pages);
+  Show the rest did the same.
+- **Fetched without PsiProxy**, the first big page in Full or Lighter brings
+  a one-time offer of Text only; Set up PsiWeb's Pages page says so too.
+- **Set up PsiWeb** asks about pages crossing the network unencrypted only
+  when PsiProxy on a computer is new to the settings, in a dialog with the
+  explanation in it. A new web helper (Direct, the Atom's, PsiProxy) is
+  taken by the running browser engine at once, so the page, Back and the
+  connection stay; the engine starts again only for a new way online or
+  pictures on every page, and then on the page that was showing (it lost
+  the page: a blank screen and an empty address). Changing the way online
+  says what it did to Pictures.
+- **When PsiProxy does not answer**, "Page not opened" says so, with its
+  address, and offers *Open directly this time*. Test the connection names
+  the route when the test page opens, not only when it does not.
+- **A page not tried** because the connection before it failed a moment
+  ago is tried again once, after the pause, instead of "There is no
+  connection - the network card's cable may be out".
 
 ## What's new in 1.01
 

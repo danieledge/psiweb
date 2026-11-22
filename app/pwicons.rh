@@ -31,3 +31,7 @@
 #define EMbmToolHomeCMask 29
 #define EMbmToolPicturesC 30
 #define EMbmToolPicturesCMask 31
+#define EMbmBandBackDim 32
+#define EMbmBandBackDimMask 33
+#define EMbmBandForwardDim 34
+#define EMbmBandForwardDimMask 35

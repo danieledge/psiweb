@@ -69,6 +69,14 @@ static unsigned char *psi_param;
 static unsigned char *psi_pics_url;	/* View > Show pictures was asked for this page */
 static char psi_conn_why[160];		/* why the last connection failed (psi_os.c) */
 static char psi_problem[PW_PROBLEM_MAX];	/* (0.85) the "Page not opened" page (about:problem) */
+static unsigned char psi_problem_addr[PW_URL_MAX];	/* (1.03) ...the address it is about */
+/* (1.03) a page not tried because the connection before it failed a moment
+   ago (psiglue holds off for 8 s: PW_PROB_RETRY) is tried again once, after
+   the hold, rather than shown as "Page not opened" */
+static unsigned char psi_retry_url[PW_URL_MAX];
+static int psi_retry_used;		/* the page's one retry has been made (until another page is asked for) */
+static int psi_retrying;		/* psi_goto from the retry itself */
+#define PSI_RETRY_MS	9000
 static int psi_problem_due;		/* ...to be shown at the next poll */
 static uttime psi_cmd_sent;		/* when an about:cmd- link was handed to the app (no "Stopped") */
 
@@ -721,6 +729,7 @@ static void report_state(int force)
 			}
 #endif
 			psi_page_done(ses);
+			psi_direct_end();	/* (1.03) "Open directly this time": this page only */
 			psi_mem_report(cast_const_char u);
 			psi_cookies(1);		/* (0.87) a page done: its cookies kept, if asked (a crash keeps them too) */
 		}
@@ -894,6 +903,53 @@ void psi_conn_failed(const char *why)
 	snprintf(psi_conn_why, sizeof(psi_conn_why), "%s", why ? why : "");
 }
 
+/* (1.03) the route as the engine has it: (the chunk's, or Direct while
+   "Open directly this time" holds the helper back) */
+static char psi_proxy_held[MAX_STR_LEN];	/* the helper, held back for this page */
+static int psi_direct_due;		/* about:cmd-direct: to be done at the next poll */
+static void psi_route(PwRoute *r)
+{
+	r->net_mode = 0;
+	r->use_proxy = 0;
+	r->proxy_host = "";
+	r->proxy_port = 0;
+#ifdef PSI_EPOC
+	{
+		PwShared *s = (PwShared *)pwb_shared();
+		if (s) {
+			r->net_mode = s->net.net_mode;
+			r->use_proxy = s->use_proxy && !psi_proxy_held[0];
+			r->proxy_host = s->proxy_host;
+			r->proxy_port = s->proxy_port;
+		}
+	}
+#endif
+}
+
+/* (1.03) "Open directly this time" (about:cmd-direct, only from a "Page
+   not opened" page that blames the web helper): the page again without the
+   helper. Links reads its proxy for each request (sched.c
+   get_proxy_string), so it is held back until this page and its pictures
+   are in, then put back: the next page goes through the helper again */
+void psi_direct_command(void)
+{
+	psi_direct_due = 1;
+	psi_cmd_sent = get_time();
+}
+
+static void psi_direct_end(void)
+{
+	if (!psi_proxy_held[0]) return;
+	safe_strncpy(proxies.http_proxy, cast_uchar psi_proxy_held, sizeof(proxies.http_proxy));
+	psi_proxy_held[0] = 0;
+#ifdef PSI_EPOC
+	{
+		PwShared *s = (PwShared *)pwb_shared();
+		if (s) s->direct_now = 0;
+	}
+#endif
+}
+
 /* about:problem's page (psi_os.c psi_about_func) */
 const char *psi_problem_page(void)
 {
@@ -944,12 +1000,11 @@ static void psi_test_end(struct status *st, void *data)
 		unsigned char *why = get_err_msg(st->state, ses ? ses->term : NULL);
 		if (ses) why = get_text_translation(why, ses->term);
 		PwRoute route;
-		route.net_mode = s->net.net_mode;
-		route.use_proxy = s->use_proxy;
-		route.proxy_host = s->proxy_host;
-		s->test_kind = pw_problem_kind((const char *)why, psi_conn_why);
-		/* the likely cause, in a line of the result window */
-		snprintf(s->test_why, sizeof(s->test_why), "%s", pw_problem_short(s->test_kind, &route));
+		psi_route(&route);
+		s->test_kind = pw_problem_for_route(pw_problem_kind((const char *)why, psi_conn_why), psi_conn_why, &route);
+		/* the likely cause, in a line of the result window; (1.03) the
+		   helper's address when it is the helper that did not answer */
+		pw_problem_short_line(s->test_why, sizeof(s->test_why), s->test_kind, &route);
 		s->test_state = PW_TEST_FAILED;
 		{
 			extern void pw_log(const char *);
@@ -1025,6 +1080,18 @@ static void psi_load_figures(struct session *ses, int busy)
 #endif
 }
 
+static void psi_goto(struct session *ses, const char *url);
+static void psi_unformat(struct f_data_c *fd);
+static void psi_retry_fn(void *p)
+{
+	struct session *ses = psi_ses();
+	(void)p;
+	if (!ses || ses->rq || !psi_retry_url[0]) return;	/* (another page asked for meanwhile) */
+	psi_retrying = 1;
+	psi_goto(ses, cast_const_char psi_retry_url);
+	psi_retry_url[0] = 0;
+}
+
 /* session.c print_error_dialog: the page did not load. (0.85) In place of
    an infoprint, a page that says what happened, the likely cause and what
    to do (engine/pwproblem.c), shown at the next poll; the address that did
@@ -1046,19 +1113,29 @@ void psi_load_failed(unsigned char *why, struct session *ses, unsigned char *url
 		psi_conn_why[0] = 0;
 		return;			/* (an about: page of ours: nothing to say) */
 	}
-	kind = pw_problem_kind((const char *)why, psi_conn_why);
-	route.net_mode = 0;
-	route.use_proxy = 0;
-	route.proxy_host = "";
+	psi_route(&route);
+	kind = pw_problem_for_route(pw_problem_kind((const char *)why, psi_conn_why), psi_conn_why, &route);
+	if (kind == PW_PROB_RETRY && url && !psi_retry_used && strlen((char *)url) < sizeof(psi_retry_url)) {
+		/* (1.03) once, after psiglue's hold: no "Page not opened" for a
+		   page that was never tried */
+		psi_retry_used = 1;
+		safe_strncpy(psi_retry_url, url, sizeof(psi_retry_url));
+		install_timer(PSI_RETRY_MS, psi_retry_fn, NULL);
+		psi_infoprint("A connection failed a moment ago - trying again shortly");
+		psi_conn_why[0] = 0;
+#ifdef PSI_EPOC
+		{
+			extern void pw_log(const char *);
+			pw_log("page not tried (the connection's hold): again in 9 s");
+		}
+#endif
+		return;
+	}
+	safe_strncpy(psi_problem_addr, url ? url : cast_uchar "", sizeof(psi_problem_addr));
 #ifdef PSI_EPOC
 	{
 		PwShared *s = (PwShared *)pwb_shared();
-		if (s) {
-			route.net_mode = s->net.net_mode;
-			route.use_proxy = s->use_proxy;
-			route.proxy_host = s->proxy_host;
-			snprintf(s->problem_url, sizeof(s->problem_url), "%s", url ? (char *)url : "");
-		}
+		if (s) snprintf(s->problem_url, sizeof(s->problem_url), "%s", url ? (char *)url : "");
 	}
 #endif
 	pw_problem_html(psi_problem, sizeof(psi_problem), url ? (const char *)url : "", kind, psi_conn_why, &route);
@@ -1499,6 +1576,8 @@ int pw_grey_check(void);
 
 static void load_start(void)
 {
+	if (psi_retrying) psi_retrying = 0;	/* (1.03) the retry: its one try is spent */
+	else psi_retry_used = 0;
 	if (!psi_colour) pw_grey_check();	/* PsiGrey.ini changed (Display calibration)? (MEM-77: 16 greys only) */
 	psi_mem_page_start();
 	too_big_said = 0;
@@ -1831,9 +1910,28 @@ static void run_command(int cmd, char *arg)
 		/* (0.89) Test the connection's web part */
 		psi_test_start(arg);
 		break;
+	case PW_CMD_ROUTE:
+		/* (1.03) Set up PsiWeb changed the web helper: Links takes it for
+		   the next request, as main() gave it at the start. The engine is
+		   not restarted, so the page, Back and Forward stay, and so does
+		   the link (a restart hung it up, and a dial-up through the Atom
+		   then failed to come back: "There is no connection") */
+		psi_direct_end();
+		proxies.http_proxy[0] = 0;
+#ifdef PSI_EPOC
+		{
+			PwShared *s = (PwShared *)pwb_shared();
+			if (s && s->use_proxy && s->proxy_host[0])
+				snprintf(cast_char proxies.http_proxy, sizeof(proxies.http_proxy), "%s:%d", s->proxy_host,
+					s->proxy_port > 0 ? s->proxy_port : 8080);
+		}
+#endif
+		break;
 	case PW_CMD_RESTYLE:
 		/* (0.86) View > Page style: the page showing, laid out again in the
-		   new style (psi_style.c reads it) */
+		   new style (psi_style.c reads it). (1.03) Really laid out again:
+		   psi_unformat */
+		psi_unformat(ses->screen);
 		html_interpret_recursive(ses->screen);
 		draw_formatted(ses);
 		break;
@@ -1897,6 +1995,30 @@ static int poll_ms(void)
 
 static void poll_fn(void *p);
 
+/* (1.03) the page showing (and its frames) is laid out again from its HTML,
+   not handed back as it is: session.c cached_format_html reuses the page
+   showing, or one in its format cache, for the same address and options,
+   which do not include the page style. So View > Page style, Shift+Ctrl+R
+   and Show the rest did nothing to the page showing (the style showed on
+   the next page) */
+static void psi_unformat_mark(struct f_data_c *fd)
+{
+	struct f_data_c *sub;
+	struct list_head *l;
+	if (!fd) return;
+	/* (out of date for cached_format_html, which otherwise hands back
+	   the page showing as it is: same address, same options; it is then
+	   laid out afresh, and the old one is not kept) */
+	if (fd->f_data) fd->f_data->use_tag ^= 1;
+	foreach(struct f_data_c, sub, l, fd->subframes) psi_unformat_mark(sub);
+}
+
+static void psi_unformat(struct f_data_c *fd)
+{
+	psi_unformat_mark(fd);
+	shrink_format_cache(SH_FREE_ALL);
+}
+
 /* PsiWeb.app has rung: take its input now, not at the next slow poll */
 void psi_poll_soon(void)
 {
@@ -1944,6 +2066,7 @@ static void poll_fn(void *p)
 			if (which == 1) {
 				void psi_style_rest(unsigned char *url);
 				psi_style_rest(cur_loc(ses)->url);
+				psi_unformat(ses->screen);	/* (1.03) as for a new style */
 				html_interpret_recursive(ses->screen);
 				draw_formatted(ses);
 			} else
@@ -1954,6 +2077,23 @@ static void poll_fn(void *p)
 		struct session *ses = psi_ses();
 		psi_problem_due = 0;
 		if (ses) psi_goto(ses, "about:problem");
+	}
+	if (psi_direct_due) {
+		struct session *ses = psi_ses();
+		psi_direct_due = 0;
+		if (ses && psi_problem_addr[0]) {
+			if (proxies.http_proxy[0] && !psi_proxy_held[0]) {
+				safe_strncpy(cast_uchar psi_proxy_held, proxies.http_proxy, sizeof(psi_proxy_held));
+				proxies.http_proxy[0] = 0;
+			}
+#ifdef PSI_EPOC
+			{
+				PwShared *s = (PwShared *)pwb_shared();
+				if (s) s->direct_now = psi_proxy_held[0] != 0;
+			}
+#endif
+			psi_goto(ses, cast_const_char psi_problem_addr);
+		}
 	}
 
 	for (n = 0; n < 32 && pwb_next_event(&ev, 0); n++) {

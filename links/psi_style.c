@@ -39,6 +39,8 @@ static int k_imgs;
 static int k_raw;
 static int k_fed;		/* bytes of the page fed so far */
 static int k_done;		/* the page was whole: the simplifier has ended */
+static int k_links;		/* (1.03) links in the page as it came ("<a "), counted as it is fed */
+static int k_index;		/* (1.03) Reader found no article: the page is shown as Text only */
 static unsigned char k_head[64];	/* the page's first bytes: the same page? */
 /* the page handed to Links: the notes and the body */
 static unsigned char *k_page;
@@ -49,6 +51,13 @@ static unsigned char *g_url_rest;	/* Show the rest: this address is not cut */
 #define PSI_STYLE_MAX_5MX	(512L * 1024)
 #define PSI_STYLE_MAX_NB	(2048L * 1024)
 #define PSI_SCRIPT_TEXT		200	/* less text than this, and scripts: drawn by scripts */
+/* (1.03) Reader on a page of headlines (a news site's front page): its
+   lists of links are menus to Reader and its sections are page furniture,
+   so only the section headings were left. Less text than this from Reader,
+   from a page with at least this many links, is an index, not an article:
+   the page is shown as Text only does it, with a line that says so */
+#define PSI_READER_MIN_TEXT	1500
+#define PSI_INDEX_MIN_LINKS	20
 
 int pwb_style(void);
 int psi_pictures_for(unsigned char *url);	/* psi_drv.c */
@@ -76,6 +85,17 @@ static void put(void *ctx, const char *data, unsigned long len)
 {
 	(void)ctx;
 	add_bytes_to_str(&k_body, &k_len, (unsigned char *)data, len);
+}
+
+/* (1.03) "<a" and a space: a link (across pieces only roughly: enough here) */
+static int count_links(const unsigned char *s, size_t n)
+{
+	size_t i;
+	int c = 0;
+	for (i = 0; i + 2 < n; i++)
+		if (s[i] == '<' && (s[i + 1] | 0x20) == 'a' && (s[i + 2] == ' ' || s[i + 2] == '\n' || s[i + 2] == '\t' || s[i + 2] == '\r'))
+			c++;
+	return c;
 }
 
 static int count_imgs(const unsigned char *s, int n)
@@ -218,6 +238,8 @@ unsigned char *psi_style_page(struct cache_entry *ce, unsigned char *start, size
 		k_done = 0;
 		k_text = 0;
 		k_scripts = 0;
+		k_links = 0;
+		k_index = 0;
 		memset(k_head, 0, sizeof(k_head));
 		memcpy(k_head, start, *len < sizeof(k_head) ? *len : sizeof(k_head));
 		psi_simp_begin(mode, put, NULL);
@@ -226,12 +248,27 @@ unsigned char *psi_style_page(struct cache_entry *ce, unsigned char *start, size
 		k_style = style;
 	}
 	if (!k_done && (size_t)k_fed < *len) {
+		k_links += count_links(start + k_fed, *len - k_fed);
 		psi_simp_feed(start + k_fed, (unsigned long)(*len - k_fed));
 		k_fed = (int)*len;
 	}
 	if (!k_done && !ce->incomplete) {
 		psi_simp_end(&k_text, &k_scripts);
 		k_done = 1;
+		/* (1.03) Reader with next to nothing left of a page full of links:
+		   a page of headlines. Simplified again as Text only, once, from
+		   the whole page (it is all here now) */
+		if (style == PW_STYLE_READER && k_text < PSI_READER_MIN_TEXT && k_links >= PSI_INDEX_MIN_LINKS
+		    && !(k_scripts > 0 && k_text < PSI_SCRIPT_TEXT)) {
+			int scripts = k_scripts;
+			mem_free(k_body);
+			k_body = init_str();
+			k_off = 0;
+			k_len = 0;
+			psi_simp_run(start, (unsigned long)*len, PSI_SIMP_TEXT, put, NULL, &k_text, &k_scripts);
+			k_scripts = scripts;
+			k_index = 1;
+		}
 	}
 	k_imgs = count_imgs(k_body + k_off, k_len);
 	k_raw = (int)*len;
@@ -252,7 +289,9 @@ unsigned char *psi_style_page(struct cache_entry *ce, unsigned char *start, size
 		int pl = 0;
 		char b[80];
 		int light = light_edition(url, &p, &pl);
-		if (!cut && !pics && !drawn && !light) {
+		if (k_index)
+			add_to_str(&p, &pl, cast_uchar "<p><small>A page of headlines, not an article - Reader shows it as Text only does</small></p>");
+		if (!cut && !pics && !drawn && !light && !k_index) {
 			mem_free(p);
 			*len = (size_t)k_len;
 			return k_body + k_off;

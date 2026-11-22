@@ -110,6 +110,13 @@ private:
 	int iImgW, iImgH;                    // img: width/height, for tracking pixels
 	char iAlt[160];                      // img: the alt text (text-only mode)
 	size_t iAltLen;
+	bool iAltSeen;                       // (PsiWeb) img: an alt attribute, even an empty one
+	int iNavDepth;                       // (PsiWeb) lighter mode: inside <nav> or <footer>, collapsed to one line
+	char iNavName[8];                    // ... which of the two (its nesting is counted by name)
+	int iNavLinks;                       // ... its links so far
+	uint32_t iNavSeen[48];               // ... the addresses linked (a hash each): a menu given
+	int iNavSeenN;                       //     twice, for wide and narrow screens, shows once
+	uint32_t iNavCur;                    // ... the link open now (kept when it is sent)
 	// an element dropped with everything inside it (svg, noscript...)
 	char iSkip[16];
 	int iSkipDepth;
@@ -126,6 +133,8 @@ private:
 	char iPend[1024];
 	size_t iPendLen;
 	uint16_t iPendAt[32];
+	uint8_t iPendPre[32];                // (PsiWeb) text held before each tag (a collapsed menu's " | ")
+	const char* iOpenPrefix;             // (PsiWeb) ...for the next OpenTag
 	int iPendN;
 	// reader mode
 	bool iFurniture;                     // this tag: a role, class or id that marks page furniture

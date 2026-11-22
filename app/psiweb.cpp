@@ -154,7 +154,7 @@ static TBool PwDiagOn()
 _LIT(KIniFile, "C:\\System\\Apps\\PsiWeb\\PsiWeb.ini");
 _LIT(KUpdIniFile, "C:\\System\\Apps\\PsiWeb\\Update.ini");
 _LIT(KFavsKept, "C:\\System\\Apps\\PsiWeb\\Favourites.dat");   // (pwfavs.cpp's KFavsFile)
-_LIT(KVersion, "1.02");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
+_LIT(KVersion, "1.03");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
 _LIT(KDefaultHome, "http://68k.news/");
 const TInt KZoomSteps[] = { 50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200 };
 const TInt KZoomCount = 11;
@@ -497,6 +497,7 @@ void CPwView::StartEngineL()
 	s->waking = iWaking;                     // (0.92) Sleep's history and cookies: taken up, or deleted
 	iWaking = EFalse;
 	iAsleep = EFalse;
+	iStartedWith = iSettings;                // (1.03) what this engine was given (its web helper is fixed at its start)
 
 	// the engine and its resources (Messages, CSS) live next to the app
 	TParse parse;
@@ -606,7 +607,10 @@ void CPwView::LoadBusyL()
 	if (s && iRunning && s->busy && !iLinkBusy)
 		{
 		TBuf<32> route;
-		RouteBusyWords(iSettings, route);
+		RouteBusyWords(iStartedWith, route);
+		if (s->direct_now)
+			route.Copy(_L(" directly"));     // (1.03) "Open directly this time"
+
 		if (s->load_host[0])
 			{
 			TBuf<64> host;
@@ -889,6 +893,19 @@ void CPwView::WakeL()
 	StartEngineL();
 	}
 
+// (1.03) The web helper changed (Set up PsiWeb, Connection settings): the
+// running engine takes it for its next request (PW_CMD_ROUTE), as it would
+// have at its start; nothing is restarted or hung up
+void CPwView::HelperChangedL()
+	{
+	LinkToShared();
+	iStartedWith.iUseProxy = iSettings.iUseProxy;
+	iStartedWith.iProxyHost = iSettings.iProxyHost;
+	iStartedWith.iProxyPort = iSettings.iProxyPort;
+	if (iRunning)
+		Command(PW_CMD_ROUTE, KNullDesC);
+	}
+
 // Stops the engine and starts it again, on the page it was showing if asked
 // (settings that the engine reads at start, and the toolbar's room)
 void CPwView::RestartL(TBool aSamePage)
@@ -897,14 +914,23 @@ void CPwView::RestartL(TBool aSamePage)
 	if (aSamePage && iRunning)
 		{
 		FromUtf8(url, iShared->url);
-		if (url.Compare(_L("about:blank")) == 0)
+		// (1.03) a "Page not opened" page is about the address that did
+		// not open: that is the page to try again (about:problem itself is
+		// only the engine's, and a new engine has nothing to show for it:
+		// it was a blank page, an empty address and nothing to reload)
+		if (url.Compare(_L("about:problem")) == 0)
+			FromUtf8(url, iShared->problem_url);
+		if (url.Compare(_L("about:blank")) == 0 || Clip(url, 10).Compare(_L("about:cmd-")) == 0)
 			url.Zero();
 		}
+	iRestarting = ETrue;
 	StartBusy(_L("Restarting the browser engine\x85"));
 	StopEngine();
 	if (url.Length())
 		iStartUrl = url;
-	StartEngineL();
+	TRAPD(err, StartEngineL());
+	iRestarting = EFalse;
+	User::LeaveIfError(err);
 	}
 
 // The page area changed (the toolbar or toolband was shown or hidden).
@@ -1356,6 +1382,8 @@ void CPwView::Tick()
 		if (iLastBusy && !busy)
 			{
 			ui->PageLoaded();
+			TRAPD(oe, ui->StyleOfferL());    // (1.03) once: Text only, for big pages without PsiProxy
+			(void)oe;
 			if (iWakeY > 0)
 				{
 				// (0.92) woken: back to the place it slept at
@@ -2313,6 +2341,7 @@ void CPwAppUi::ConstructL()
 	LoadSettings(settings);
 	iShownProgress = -1;
 	iLockShown = -1;
+	iBackShown = iForwardShown = -1;
 	TallToolbarL();                          // (0.99) the netBook's own toolbar
 	// (0.99) the toolbar's name is a CEikFileNameLabel, as in Psion's own
 	// programs: it shows the "file" name, which is the program's here
@@ -2339,7 +2368,21 @@ void CPwAppUi::ConstructL()
 		iAddress = (CEikEdwin*)iToolBand->ControlById(EPwCtlAddress);
 		if (iAddress)
 			{
-			iAddress->SetBorder(TEikBorder::EShallowSunken);
+			// (1.03) a plain 1-pixel frame all round, on the band's own top
+			// and bottom lines: the address is exactly the buttons' height and
+			// lines up with them (the shallow sunken edge had two black lines
+			// at its top, one grey at its left and none at its foot or right)
+			iAddress->SetBorder(TEikBorder::ESingleBlack);
+			// the text 4 pixels in from the frame's sides and, in the
+			// band's 25 lines, set down 3 so it sits in the middle above
+			// the progress bar (it touched the frame at the left and sat
+			// high)
+			TMargins8 m;
+			m.iLeft = 4;
+			m.iRight = 4;
+			m.iTop = 3;
+			m.iBottom = 0;
+			iAddress->SetBorderViewMargins(m);
 			iAddress->SetObserver(this);
 			}
 		// (0.87) how far the page has come: a bar along the address's
@@ -2642,6 +2685,8 @@ void CPwAppUi::ChromeTick()
 		TBuf<PW_URL_MAX> url;
 		if (iView->EngineRunning() || iView->Asleep())   // (0.92) asleep: the address stays
 			FromUtf8(url, s->url);
+		if (url.Length() == 0 && iView->EngineRunning() && s->busy)
+			FromUtf8(url, s->start_url);     // (1.03) a new engine opening its first page: that page, not nothing
 		if (url.Compare(_L("about:problem")) == 0)
 			FromUtf8(url, s->problem_url);   // (0.85) the address that did not open, to correct
 		else if (Clip(url, 6).Compare(_L("about:")) == 0)
@@ -2665,9 +2710,9 @@ void CPwAppUi::ChromeTick()
 			iBar->MakeVisible(EFalse);   // (the address shows again beneath)
 		else
 			{
-			// along the address's lower edge, inside its border
+			// along the address's lower edge, inside its frame
 			TRect a(iAddress->Position(), iAddress->Size());
-			a.Shrink(2, 2);
+			a.Shrink(1, 1);
 			TRAPD(e3, iBar->SetExtentL(TPoint(a.iTl.iX, a.iBr.iY - 3), TSize(a.Width(), 3)));
 			(void)e3;
 			iBar->SetValue(p);
@@ -2682,19 +2727,54 @@ void CPwAppUi::ChromeTick()
 	if (busy != iBandBusy)
 		{
 		iBandBusy = busy;
-		CEikCommandButton* b = (CEikCommandButton*)iToolBand->ControlById(EPwCmdReloadStop);
-		if (b)
-			{
-			TRAPD(e4, {
-				CFbsBitmap* bmp = iEikonEnv->CreateBitmapL(Application()->BitmapStoreName(), busy ? EMbmBandStop : EMbmBandReload);
-				CleanupStack::PushL(bmp);
-				CFbsBitmap* mask = iEikonEnv->CreateBitmapL(Application()->BitmapStoreName(), busy ? EMbmBandStopMask : EMbmBandReloadMask);
-				CleanupStack::Pop();
-				b->SetPictureL(bmp, mask);
-				b->DrawNow();
-				});
-			(void)e4;
-			}
+		TRAPD(e4, BandPictureL(EPwCmdReloadStop, busy ? EMbmBandStop : EMbmBandReload));
+		(void)e4;
+		}
+	TRAPD(e5, ShowNavStateL());
+	(void)e5;
+	}
+
+// (1.03) a toolband button's picture (and its mask, the next id), redrawn
+void CPwAppUi::BandPictureL(TInt aId, TInt aIcon)
+	{
+	CEikCommandButton* b = iToolBand ? (CEikCommandButton*)iToolBand->ControlById(aId) : NULL;
+	if (!b)
+		return;
+	CFbsBitmap* bmp = iEikonEnv->CreateBitmapL(Application()->BitmapStoreName(), aIcon);
+	CleanupStack::PushL(bmp);
+	CFbsBitmap* mask = iEikonEnv->CreateBitmapL(Application()->BitmapStoreName(), aIcon + 1);
+	CleanupStack::PushL(mask);
+	b->SetPictureL(bmp, mask);               // (the button owns them now)
+	CleanupStack::Pop(2);
+	// in the middle of the button, as the resource's pictures are: a
+	// picture set later sat 5 pixels left of the others (Reload's, in 1.02,
+	// was the one Dan saw out of line)
+	if (b->Picture())
+		b->Picture()->SetAlignment(EHCenterVCenter);
+	b->LayoutComponentsL();
+	if (iToolBand->IsVisible())
+		b->DrawNow();
+	}
+
+// (1.03) Back and Forward drawn dimmed (grey) when there is no page to go
+// to. They still press, and say so, as EIKON's buttons do (DoCommandL).
+void CPwAppUi::ShowNavStateL()
+	{
+	PwShared* s = iView ? iView->Shared() : NULL;
+	if (!s || !iToolBand || !iToolBand->IsVisible())
+		return;
+	TBool on = iView->EngineRunning() || iView->Asleep();
+	TInt back = on && s->can_back ? 1 : 0;
+	TInt fwd = on && s->can_forward ? 1 : 0;
+	if (back != iBackShown)
+		{
+		iBackShown = back;
+		BandPictureL(EPwCmdBack, back ? EMbmBandBack : EMbmBandBackDim);
+		}
+	if (fwd != iForwardShown)
+		{
+		iForwardShown = fwd;
+		BandPictureL(EPwCmdForward, fwd ? EMbmBandForward : EMbmBandForwardDim);
 		}
 	}
 
@@ -2714,9 +2794,12 @@ void CPwBar::Draw(const TRect& /*aRect*/) const
 	TInt done = r.Width() * iValue / 100;
 	gc.SetPenStyle(CGraphicsContext::ENullPen);
 	gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
-	gc.SetBrushColor(TRgb::Gray4(1));        // the dark grey (85), or EPOC's on a colour screen
+	// (1.03) done in the highlight colour (Coda's navy, the theme's; black
+	// in 16 greys), the rest a pale track, both from the cube (style sheet
+	// 2.4): it was 555555 on white
+	gc.SetBrushColor(iEikonEnv->ControlColor(EEikColorControlHighlightBackground, *this));
 	gc.DrawRect(TRect(r.iTl, TSize(done, r.Height())));
-	gc.SetBrushColor(TRgb::Gray4(3));
+	gc.SetBrushColor(TRgb(0xcc, 0xcc, 0xcc));
 	gc.DrawRect(TRect(TPoint(r.iTl.iX + done, r.iTl.iY), r.iBr));
 	}
 
@@ -3013,6 +3096,7 @@ CPwAppUi::~CPwAppUi()
 	SaveHistory();                           // (0.96) what the last minute added
 	delete iHist;
 	delete iSetupIdle;
+	delete iOfferIdle;
 	delete iBar;
 	}
 
@@ -3095,7 +3179,7 @@ void CPwAppUi::LoadSettings(TPwSettings& aSettings)
 						aSettings.iStyle = b >= 1 && b <= 4 ? b - 1 : -1;
 						}
 					if (pos < d.Length())            // (0.85) KPwFlag* bits
-						aSettings.iFlags = d[pos++] & KPwFlagKeepCookies;
+						aSettings.iFlags = d[pos++] & (KPwFlagKeepCookies | KPwFlagStyleAsked);
 					// (0.88) Open in full browser: the server, the program
 					if (pos < d.Length() && pos + 1 + d[pos] <= d.Length() && d[pos] <= 24)
 						{
@@ -3434,13 +3518,20 @@ void CPwAppUi::UpdateL()
 	}
 
 // (0.94) the connection settings the engine reads at its start
-static TBool RouteChanged(const TPwSettings& aWas, const TPwSettings& aNow)
+// (1.03) the link itself (not the web helper): a change needs the engine
+// started again, which hangs the link up and dials afresh
+static TBool LinkChanged(const TPwSettings& aWas, const TPwSettings& aNow)
 	{
 	return aWas.iBaudIndex != aNow.iBaudIndex || aWas.iRtsCts != aNow.iRtsCts
-		|| aWas.iNetMode != aNow.iNetMode || aWas.iPppStart.Compare(aNow.iPppStart) != 0
-		|| aWas.iUseProxy != aNow.iUseProxy || aWas.iProxyHost.Compare(aNow.iProxyHost) != 0
-		|| aWas.iProxyPort != aNow.iProxyPort;
+		|| aWas.iNetMode != aNow.iNetMode || aWas.iPppStart.Compare(aNow.iPppStart) != 0;
 	}
+
+static TBool HelperChanged(const TPwSettings& aWas, const TPwSettings& aNow)
+	{
+	return (aWas.iUseProxy != 0) != (aNow.iUseProxy != 0)
+		|| (aNow.iUseProxy && (aWas.iProxyHost.CompareF(aNow.iProxyHost) != 0 || aWas.iProxyPort != aNow.iProxyPort));
+	}
+
 
 // (1.00) while a command runs (a dialog up) PsiWeb is busy for the memory
 // watcher: not put to sleep or closed then
@@ -3678,9 +3769,15 @@ void CPwAppUi::DoCommandL(TInt aCommand)
 			UseSharedLink(iCoeEnv->FsSession(), st);
 			UpdateStartPageL();
 			// (0.94) the engine started again only if the route changed:
-			// a restart loses what was typed into the page's forms
-			if (RouteChanged(was, st))
-				RestartEngineL();
+			// a restart loses what was typed into the page's forms. (1.03)
+			// Only the link itself: a new web helper is taken at once
+			if (!iView->EngineRunning() || LinkChanged(iView->StartedWith(), st))
+				{
+				if (!iView->Asleep())
+					RestartEngineL();
+				}
+			else if (HelperChanged(iView->StartedWith(), st))
+				iView->HelperChangedL();
 			}
 		break;
 		}
@@ -3827,21 +3924,28 @@ void CPwAppUi::ProcessMessageL(TUid aUid, const TDesC8& aParams)
 // Set up PsiWeb (0.85; core/docs/setup-assistant.md)
 // ===========================================================================
 
-// Pictures' standard by route: on every page for the netBook's network card
-// (or dial-up) going direct, else only when asked
+// Pictures' standard by the way online: on every page for the netBook's
+// network card (or dial-up), else (a modem, the 5mx) only when asked.
+// (1.03) By the connection only: PsiProxy on a computer over the network
+// card sends small pictures quickly too (it was only when asked there)
 TInt CPwSetupDialog::StandardPictures(const PgSuChoice& aChoice, TBool aTall)
 	{
-	return aTall && aChoice.conn == PG_SU_CONN_NET && aChoice.helper == PG_SU_HELPER_DIRECT;
+	return aTall && aChoice.conn == PG_SU_CONN_NET;
 	}
 
 void CPwSetupDialog::AppPreLayoutL()
 	{
 	// the settings PsiWeb has (a file there), else the route's standard
-	TInt pics = iHadFile ? iSettings.iImages : StandardPictures(Choice(), iTall);
+	TInt std = StandardPictures(Choice(), iTall);
+	TInt pics = iHadFile ? iSettings.iImages : std;
+	// (1.03) Pictures set otherwise than the route's standard was a choice:
+	// another way online no longer changes it behind the person's back
+	iPicturesChosen = iHadFile && (pics != 0) != (std != 0);
 	SetChoiceListCurrentItem(EPwDlgSuPictures, pics ? 1 : 0);
 	SetChoiceListCurrentItem(EPwDlgSuSearch, iSettings.iSearch == PW_SEARCH_FROGFIND ? 1 : 0);
 	SetChoiceListCurrentItem(EPwDlgSuStyle, iHadFile && iSettings.iStyle >= 0 ? iSettings.iStyle : StandardStyle(Choice()));
 	ShowPicturesNoteL();
+	ShowStyleNoteL();
 	}
 
 // (0.86) Page style's standard: Full, on every route. (Measured in the ARM
@@ -3861,6 +3965,21 @@ void CPwSetupDialog::ShowPicturesNoteL()
 		: _L("Only when asked suits a modem - Ctrl+I shows one page's pictures"));
 	}
 
+// (1.03) Page style's note follows the fetcher: without PsiProxy a big
+// site's page starts with a screen of its menus in Full and Lighter, and
+// Text only leaves them out. Offered here, not chosen: the person picks it
+void CPwSetupDialog::ShowStyleNoteL()
+	{
+	PgSuChoice c;
+	ReadNow(c);
+	pg_su_fix(&c);
+	TInt style = ChoiceListCurrentItem(EPwDlgSuStyle);
+	if (c.helper != PG_SU_HELPER_PSIPROXY && style != PW_STYLE_TEXT && style != PW_STYLE_READER)
+		SetLabelL(EPwDlgSuStyleNote, _L("Without PsiProxy, Text only suits big sites - it skips their menus"));
+	else
+		SetLabelL(EPwDlgSuStyleNote, _L("Reader shows the article first - Shift+Ctrl+R changes the page's style"));
+	}
+
 void CPwSetupDialog::AppControlChangedL(TInt aControlId)
 	{
 	if (aControlId == EPwDlgSuPictures)
@@ -3869,17 +3988,176 @@ void CPwSetupDialog::AppControlChangedL(TInt aControlId)
 		ShowPicturesNoteL();
 		}
 	else if (aControlId == EPwDlgSuStyle)
+		{
 		iStyleChosen = ETrue;
+		ShowStyleNoteL();
+		}
 	}
 
 void CPwSetupDialog::AppChoiceChangedL()
 	{
 	if (!iStyleChosen)
 		SetChoiceListCurrentItem(EPwDlgSuStyle, StandardStyle(Choice()));
+	ShowStyleNoteL();
 	if (iPicturesChosen)
 		return;
-	SetChoiceListCurrentItem(EPwDlgSuPictures, StandardPictures(Choice(), iTall) ? 1 : 0);
+	TInt was = ChoiceListCurrentItem(EPwDlgSuPictures);
+	TInt now = StandardPictures(Choice(), iTall) ? 1 : 0;
+	SetChoiceListCurrentItem(EPwDlgSuPictures, now);
 	ShowPicturesNoteL();
+	// (1.03) the Pages page is out of sight: say what the new way online
+	// did to Pictures (it was a quiet change)
+	if (was != now)
+		iEikonEnv->InfoMsg(now ? _L("Pictures on every page - it suits a network card (Pages)")
+			: _L("Pictures only when asked - it suits a modem (Pages)"));
+	}
+
+// (1.03) the dialog's choice as it stands (core's ReadChoice is private)
+void CPwSetupDialog::ReadNow(PgSuChoice& aChoice)
+	{
+	Mem::FillZ(&aChoice, sizeof(aChoice));
+	aChoice.conn = ChoiceListCurrentItem(EPgSuDlgConn);
+	aChoice.baud_index = ChoiceListCurrentItem(EPgSuDlgBaud);
+	aChoice.helper = ChoiceListCurrentItem(EPgSuDlgHelper);
+	TBuf<PG_SU_HOST_MAX> h;
+	GetEdwinText(h, EPgSuDlgHost);
+	h.Trim();
+	TInt n = h.Length();
+	for (TInt i = 0; i < n; i++)
+		aChoice.host[i] = (char)h[i];
+	aChoice.host[n] = 0;
+	aChoice.port = NumberEditorValue(EPgSuDlgPort);
+	}
+
+static void PwToSuLink(const TPsiLink& aIn, PgSuLink& aOut)
+	{
+	aOut.net_mode = aIn.iNetMode;
+	aOut.baud_index = aIn.iBaudIndex;
+	aOut.use_proxy = aIn.iUseProxy;
+	TInt n = aIn.iProxyHost.Length() < PG_SU_HOST_MAX ? aIn.iProxyHost.Length() : PG_SU_HOST_MAX;
+	for (TInt i = 0; i < n; i++)
+		aOut.host[i] = (char)aIn.iProxyHost[i];
+	aOut.host[n] = 0;
+	aOut.port = aIn.iProxyPort;
+	}
+
+static void SuToPwLink(const PgSuLink& aIn, TPsiLink& aOut)
+	{
+	aOut.iNetMode = aIn.net_mode;
+	aOut.iBaudIndex = aIn.baud_index;
+	aOut.iUseProxy = aIn.use_proxy;
+	aOut.iProxyHost.Copy(TPtrC8((const TUint8*)aIn.host));
+	aOut.iProxyPort = aIn.port;
+	}
+
+// (1.03) OK as core's assistant does it (the shared link first, then
+// PsiWeb's own), except the question about plain pages on the network:
+// asked only when PsiProxy on a computer is new - not the helper the
+// settings already had, at the same address and port - so OK with nothing
+// changed, or after another change, does not ask again. Its words are in
+// the dialog, not its title bar.
+TBool CPwSetupDialog::OkToExitL(TInt aButtonId)
+	{
+	if (aButtonId == EPgSuBidTest)
+		{
+		TestNowL();
+		return EFalse;
+		}
+	if (aButtonId != EEikBidOk)
+		return ETrue;
+	ReadNow(iNow);
+	pg_su_fix(&iNow);
+	if (pg_su_check(&iNow) == 1)
+		{
+		iEikonEnv->InfoMsg(_L("No address entered"));
+		TryChangeFocusToL(EPgSuDlgHost);
+		return EFalse;
+		}
+	RFs& fs = iCoeEnv->FsSession();
+	TPsiLink link;
+	link.SetDefaults();
+	TBool had = link.Load(fs);
+	PgSuLink was, now;
+	PwToSuLink(link, was);
+	now = was;
+	pg_su_to_link(&iNow, &now);
+	TBool known = had && was.use_proxy && pg_su_same(was.host, now.host) && was.port == now.port;
+	if (pg_su_needs_privacy_query(&iNow) && !known)
+		{
+		TBuf<120> why;
+		if (iNow.conn == PG_SU_CONN_ATOM)
+			why.Copy(_L("Between the Atom modem and PsiProxy - fine at home, not on public WiFi"));
+		else
+			{
+			TBuf<PG_SU_HOST_MAX> h;
+			h.Copy(TPtrC8((const TUint8*)now.host));
+			TPtrC hc = Clip(h, 24);
+			why.Format(iTall ? _L("Between the netBook and PsiProxy at %S - fine at home, not on public WiFi")
+				: _L("Between the Series 5mx and PsiProxy at %S - fine at home, not on public WiFi"), &hc);
+			}
+		if (!CPwQueryDialog::AskL(_L("PsiProxy on a computer"), _L("Pages and passwords cross your network unencrypted"),
+			why, _L("Use PsiProxy on this network?")))
+			return EFalse;
+		}
+	SuToPwLink(now, link);
+	link.Save(fs);
+	AppSaveL();
+	return ETrue;
+	}
+
+void WebTestThen(PgLinkTest* aTest, void* aCtx);   // (0.89) below
+
+// (1.03) Test: the way online as shown; and, when the dialog shows the
+// route the browser engine uses now, a page through it as well, so the
+// result names the web helper when it works too, not only when it fails
+static void SetupTestNote(PgLinkTest* aTest, void* aCtx)
+	{
+	if (pg_lt_link_ok(aTest))
+		pg_lt_add_line(aTest, (const char*)aCtx);
+	}
+
+void CPwSetupDialog::TestNowL()
+	{
+	PgSuChoice c;
+	ReadNow(c);
+	pg_su_fix(&c);
+	TPsiLink link;
+	link.SetDefaults();
+	link.Load(iCoeEnv->FsSession());
+	PgSuLink l;
+	PwToSuLink(link, l);
+	pg_su_to_link(&c, &l);
+	CPwAppUi* ui = (CPwAppUi*)iEikonEnv->EikAppUi();
+	CPwView* v = ui->View();
+	const TPwSettings& e = v->StartedWith();
+	TBuf<PG_SU_HOST_MAX> h;
+	h.Copy(TPtrC8((const TUint8*)l.host));
+	TBool same = v->EngineRunning() && (e.iNetMode != 0) == (l.net_mode != 0) && e.iBaudIndex == l.baud_index
+		&& (e.iUseProxy != 0) == (l.use_proxy != 0)
+		&& (!l.use_proxy || (e.iProxyHost.CompareF(h) == 0 && e.iProxyPort == l.port));
+	if (same)
+		PgLinkTestThenL(l.baud_index, link.iRtsCts, l.net_mode, link.iPppStart, R_PW_TEST_DIALOG, EPwDlgTest1,
+			WebTestThen, ui);
+	else
+		PgLinkTestThenL(l.baud_index, link.iRtsCts, l.net_mode, link.iPppStart, R_PW_TEST_DIALOG, EPwDlgTest1,
+			SetupTestNote, (void*)(l.use_proxy ? "A page through the web helper is tried once OK is pressed"
+				: "A page is tried once OK is pressed"));
+	}
+
+// (1.03) CPwQueryDialog: a question with its words in the dialog
+TBool CPwQueryDialog::AskL(const TDesC& aTitle, const TDesC& aFact, const TDesC& aWhy, const TDesC& aQuestion)
+	{
+	CPwQueryDialog* d = new(ELeave) CPwQueryDialog(aFact, aWhy, aQuestion);
+	d->PrepareLC(R_PW_QUERY_DIALOG);
+	d->SetTitleL(aTitle);
+	return d->RunLD() == EEikBidYes;
+	}
+
+void CPwQueryDialog::PreLayoutDynInitL()
+	{
+	SetLabelL(EPwDlgQueryFact, iFact);
+	SetLabelL(EPwDlgQueryWhy, iWhy);
+	SetLabelL(EPwDlgQueryQuestion, iQuestion);
 	}
 
 void CPwSetupDialog::AppSaveL()
@@ -3895,7 +4173,7 @@ void CPwSetupDialog::AppSaveL()
 	TPsiLink link;
 	link.SetDefaults();
 	link.Load(fs);
-	link.iModemTls = Choice().conn == PG_SU_CONN_ATOM ? 1 : 0;
+	link.iModemTls = iNow.conn == PG_SU_CONN_ATOM ? 1 : 0;
 	link.Save(fs);
 	}
 
@@ -3908,23 +4186,47 @@ TInt CPwAppUi::SetupCallback(TAny* aSelf)
 	}
 
 // Tools > Set up PsiWeb..., and at the first start of a new user. OK saves
-// the shared link (the assistant) and PsiWeb's own settings, then the
-// engine starts again with them; Cancel changes nothing, but PsiWeb.ini
-// is written all the same at a first start, so it asks only once.
+// the shared link (the assistant) and PsiWeb's own settings; Cancel changes
+// nothing, but PsiWeb.ini is written all the same at a first start, so it
+// asks only once. (1.03) The engine starts again only for what it takes at
+// its start - the route (Links is given the web helper then) and pictures
+// on every page - on the page that was showing; a new page style is laid
+// out at once, and the rest is used as it is. (It restarted at every OK, and
+// the page was lost.)
 void CPwAppUi::SetupL()
 	{
 	TPwSettings& st = iView->Settings();
+	TInt styleWas = StyleNow(st);
 	iView->StartBusyCancel();            // (the engine's "Starting..." is not over the dialog)
 	CPwSetupDialog* dlg = new(ELeave) CPwSetupDialog(st, R_PW_TEST_DIALOG, EPwDlgTest1);
 	TBool ok = dlg->ExecuteLD(R_PW_SETUP_DIALOG);
 	if (ok)
 		UseSharedLink(iCoeEnv->FsSession(), st);
 	SaveSettings(st);
-	if (ok)
+	if (!ok)
+		return;
+	ShowPicturesState(st.iImages);
+	UpdateStartPageL();
+	if (iView->Asleep())
+		return;                          // (it starts with them when it wakes)
+	const TPwSettings& e = iView->StartedWith();
+	if (!iView->EngineRunning() || LinkChanged(e, st) || (e.iImages != 0) != (st.iImages != 0))
 		{
-		ShowPicturesState(st.iImages);
-		UpdateStartPageL();
 		RestartEngineL();
+		return;
+		}
+	// (1.03) a new web helper (Direct, the Atom's, PsiProxy, another
+	// address): taken by the running engine, so the page, Back and Forward
+	// and the connection stay
+	if (HelperChanged(e, st))
+		iView->HelperChangedL();
+	else
+		iView->LinkToShared();               // ("Modem provides TLS" and the rest, read at each connection)
+	PwShared* sh = iView->Shared();
+	if (sh && StyleNow(st) != styleWas)
+		{
+		sh->style = StyleNow(st);
+		iView->Command(PW_CMD_RESTYLE, KNullDesC);
 		}
 	}
 
@@ -4040,6 +4342,26 @@ void CPwAppUi::WebTestL(PgLinkTest* aTest)
 	RouteBusyWords(iView->Settings(), route);
 	TBuf<80> busy;
 	busy.Format(_L("Opening the test page%S\x85"), &route);
+	// (1.03) the outcome names the route the engine uses, whether the page
+	// opened or not: "through PsiProxy at 192.0.2.7:8081", "through the
+	// Atom modem helper", "directly"
+	TBuf<80> how;
+	{
+	const TPwSettings& e = iView->StartedWith();
+	TBuf8<64> h8;
+	h8.Copy(Clip(e.iProxyHost, 60));
+	h8.ZeroTerminate();
+	if (!e.iUseProxy || e.iProxyHost.Length() == 0)
+		how.Copy(_L(" directly"));
+	else if (pg_su_is_atom_host((const char*)h8.Ptr()))
+		how.Copy(_L(" through the Atom modem helper"));
+	else
+		{
+		how.Copy(_L(" through PsiProxy at "));
+		how.Append(Clip(e.iProxyHost, 40));
+		how.AppendFormat(_L(":%d"), e.iProxyPort > 0 ? e.iProxyPort : 8080);
+		}
+	}
 	CPwTestKeys* keys = new(ELeave) CPwTestKeys;
 	CleanupStack::PushL(keys);
 	CPeriodic* tick = CPeriodic::NewL(CActive::EPriorityStandard);
@@ -4088,12 +4410,12 @@ void CPwAppUi::WebTestL(PgLinkTest* aTest)
 		{
 		TInt ms = s->test_ms;
 		if (ms < 10000)
-			line.Format(_L("Test page opened%S in %d.%d s"), &route, ms / 1000, (ms % 1000) / 100);
+			line.Format(_L("The test page opened%S in %d.%d s"), &how, ms / 1000, (ms % 1000) / 100);
 		else
-			line.Format(_L("Test page opened%S in %d s"), &route, (ms + 500) / 1000);
+			line.Format(_L("The test page opened%S in %d s"), &how, (ms + 500) / 1000);
 		}
 	else if (state == PW_TEST_FAILED)
-		line.Format(_L("The test page did not open%S"), &route);
+		line.Format(_L("The test page did not open%S"), &how);
 	else
 		line = _L("Stopped before the test page opened");
 	TBuf8<PG_LT_LINE> l8;
@@ -4126,6 +4448,64 @@ void CPwAppUi::SetStyleL(TInt aStyle)
 	iEikonEnv->InfoMsg(TPtrC(KNames[aStyle & 3]));
 	}
 
+// (1.03) Fetched directly or by the Atom modem's helper, a big site's page
+// comes whole: in Full and Lighter it starts with a screen or more of the
+// site's menus, which PsiProxy would have taken out. The first time such a
+// page has loaded, PsiWeb offers Text only, once (the answer is kept, and
+// View > Page style changes it at any time). Shown from an idle callback,
+// not from the tick that saw the page.
+static TBool WithoutPsiProxy(const TPwSettings& aS)
+	{
+	if (!aS.iUseProxy || aS.iProxyHost.Length() == 0)
+		return ETrue;
+	TBuf8<64> h;
+	h.Copy(Clip(aS.iProxyHost, 60));
+	h.ZeroTerminate();
+	return pg_su_is_atom_host((const char*)h.Ptr());
+	}
+
+const TInt KPwOfferBytes = 150 * 1024;   // a page this big (as it came) is a big site's
+
+void CPwAppUi::StyleOfferL()
+	{
+	PwShared* s = iView->Shared();
+	TPwSettings& st = iView->Settings();
+	if (!s || !iView->EngineRunning() || (st.iFlags & KPwFlagStyleAsked) || (iOfferIdle && iOfferIdle->IsActive()))
+		return;
+	TInt style = StyleNow(st);
+	if ((style != PW_STYLE_FULL && style != PW_STYLE_LIGHTER) || s->page_style != style
+		|| s->page_bytes < KPwOfferBytes || !(WithoutPsiProxy(iView->StartedWith()) || s->direct_now))
+		return;
+	TBuf<8> u;
+	FromUtf8(u, s->url);
+	if (Clip(u, 5).CompareF(_L("http:")) != 0 && Clip(u, 6).CompareF(_L("https:")) != 0)
+		return;
+	if (!iOfferIdle)
+		iOfferIdle = CIdle::NewL(CActive::EPriorityIdle);
+	iOfferIdle->Start(TCallBack(OfferCallback, this));
+	}
+
+TInt CPwAppUi::OfferCallback(TAny* aSelf)
+	{
+	CPwAppUi* ui = (CPwAppUi*)aSelf;
+	TPwSettings& st = ui->iView->Settings();
+	if ((st.iFlags & KPwFlagStyleAsked) || !ui->iForeground || ui->IsDisplayingMenuOrDialog() || ui->iEditing)
+		return 0;                            // (another page will offer it)
+	st.iFlags |= KPwFlagStyleAsked;          // asked once, whatever the answer
+	ui->SaveSettings(st);
+	TBool yes = EFalse;
+	TRAPD(err, yes = CPwQueryDialog::AskL(_L("Page style"),
+		_L("Without PsiProxy, big sites start with a screen of menus"),
+		_L("Text only leaves menus and pictures out - View > Page style changes it"),
+		_L("Show pages as Text only?")));
+	if (err == KErrNone && yes)
+		{
+		TRAP(err, ui->SetStyleL(PW_STYLE_TEXT));
+		}
+	(void)err;
+	return 0;
+	}
+
 // (0.86) The route light; (0.99) a picture only, as toolband buttons are:
 // the padlock shut when the page came by https and was checked on the way
 // (by the netBook or 5mx, the modem or the helper), open for any other.
@@ -4140,16 +4520,8 @@ void CPwAppUi::RouteLightL()
 	TInt lock = url && s->page_secure != PW_SECURE_NO ? 1 : 0;
 	if (lock == iLockShown)
 		return;
-		{
-		iLockShown = lock;
-		CFbsBitmap* bmp = iEikonEnv->CreateBitmapL(Application()->BitmapStoreName(), lock ? EMbmBandLock : EMbmBandNoLock);
-		CleanupStack::PushL(bmp);
-		CFbsBitmap* mask = iEikonEnv->CreateBitmapL(Application()->BitmapStoreName(), lock ? EMbmBandLockMask : EMbmBandNoLockMask);
-		CleanupStack::Pop();
-		b->SetPictureL(bmp, mask);
-		}
-	b->LayoutComponentsL();
-	b->DrawNow();
+	iLockShown = lock;
+	BandPictureL(EPwCmdRouteLight, lock ? EMbmBandLock : EMbmBandNoLock);
 	}
 
 // (0.88) Route 4, a full browser elsewhere: the page showing, opened by
