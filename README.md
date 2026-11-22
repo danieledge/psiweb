@@ -14,9 +14,22 @@ A web browser for the **Psion Series 5mx**, the **netBook** and the **Series 7**
 
 Up to 0.61 the engine was NetSurf. Its sources are still in the tree as a fallback (see *The NetSurf engine* below), until Links has been proved on the device. The whole port is described in [`links/PORTING.md`](links/PORTING.md).
 
-**Status: beta (1.03).** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
+**Status: beta (1.04).** The exact ARM code that goes into `psiweb.exe` runs in an ARM emulator harness, and the whole package runs in a 5mx emulator (see *Testing*). It has not yet been timed on a real 5mx. Bug reports are welcome via [GitHub issues](https://github.com/danieledge/psiweb/issues).
 
 [![Download PsiWeb.sis](https://img.shields.io/badge/Download-PsiWeb.sis-2ea44f?logo=github)](https://github.com/danieledge/psiterm/raw/main/dist/PsiWeb.sis)
+
+## What's new in 1.04
+
+psion-core 959b8fd's Psion Internet fixes, the same as PsiMail 1.17's and
+PsiTerm 1.24's:
+
+- **A server that refuses the connection** no longer holds the next one off
+  for 8 seconds: the link is up, so the next page or picture goes out at once.
+- **A redial after a hang-up** sends the start command (ATD777 for the
+  PsiConnect Atom) as the first dial does, instead of NetDial's own modem
+  script, which the Atom answers with NO CARRIER.
+- **Through the Atom modem**, Coda's toolbar shows Online while PsiWeb's
+  call is up.
 
 ## What's new in 1.03
 
