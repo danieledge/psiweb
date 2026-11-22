@@ -600,10 +600,11 @@ RESOURCE ARRAY r_pw_setup_pages_lines
 		DLG_LINE { type=EEikCtLabel; id=EPwDlgSuPicturesNote; control=LABEL { standard_font=EEikLabelFontAnnotation;
 			horiz_align=EEikLabelAlignHLeft; reserve_length=72;
 			txt="Only when asked suits a modem - Ctrl+I shows one page's pictures"; }; },
+		// (1.05) Fetch the next page ahead in place of Search with, which
+		// stays in Tools > Preferences: a fourth line did not fit the 5mx's
+		// screen (the dialog-size rule)
 		DLG_LINE { type=EEikCtChoiceList; prompt="Fetch the next page ahead"; id=EPwDlgSuAhead;
-			control=CHOICELIST { maxdisplaychar=16; array_id=r_pw_ahead_array; }; },
-		DLG_LINE { type=EEikCtChoiceList; prompt="Search with"; id=EPwDlgSuSearch;
-			control=CHOICELIST { maxdisplaychar=16; array_id=r_pw_search_array; }; }
+			control=CHOICELIST { maxdisplaychar=16; array_id=r_pw_ahead_array; }; }
 		};
 	}
 

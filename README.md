@@ -226,7 +226,7 @@ Measured (ARM harness, the same pages served locally so only the Psion's own wor
 
 ## What's new in 0.85
 
-- **Set up PsiWeb.** The first time PsiWeb starts on a Psion with no settings from any program of the suite, one dialog asks how the Psion goes online (a network card or dial-up, the Atom modem, another WiFi modem), how pages come (Direct, the Atom modem helper, PsiProxy on a computer) and about pictures and search. It is always on Tools > Set up PsiWeb... It writes the same connection settings as before (shared with PsiTerm and PsiMail): nothing new in them, and Cancel changes nothing. A netBook is offered the network card first.
+- **Set up PsiWeb.** The first time PsiWeb starts on a Psion with no settings from any program of the suite, one dialog asks how the Psion goes online (a network card or dial-up, the Atom modem, another WiFi modem), how pages come (Direct, the Atom modem helper, PsiProxy on a computer) and about pictures, the page style and (1.05) fetching the next page ahead; search is chosen in Tools > Preferences. It is always on Tools > Set up PsiWeb... It writes the same connection settings as before (shared with PsiTerm and PsiMail): nothing new in them, and Cancel changes nothing. A netBook is offered the network card first.
 - **The routes are named.** *Direct*, *Atom modem helper* and *PsiProxy on a computer* everywhere: setup, Help, About, Page information. The word "proxy" is gone from what you read. In Connection settings the link is now *Network card or dial-up (Psion TCP/IP)* (it was *Psion TCP/IP (dial-up)*), the same in PsiTerm and PsiMail, and *Use proxy* is the *Web helper*. The settings themselves did not change.
 - **Pages that do not open say why.** In place of a two-second infoprint, a *Page not opened* page: what could not be reached, the likely cause in plain words (the serial port in use, no connection, the name not found, refused, no answer, older security, a certificate not trusted or the Psion's date), and *Try again*, *Test the connection* and *Set up PsiWeb* as links. The address that did not open stays in the address box to correct. The route is on the page.
 - **Search works.** Words typed for an address (Ctrl+L, Ctrl+O) go to DuckDuckGo's page without scripts, or FrogFind (Tools > Preferences > Search with). Before, "Or words to search for" gave "No such file or directory".
@@ -323,7 +323,7 @@ PsiWeb 0.89 to 0.85 (the first rows) and 0.80 on the netBook (colour, 640x480) a
 <td><a href="docs/img/netbook-psiweb-setup-helper.png"><img src="docs/img/netbook-psiweb-setup-helper.png" alt="netBook: the Web helper page of Set up PsiWeb" width="400"></a></td>
 <td><a href="docs/img/5mx-psiweb-setup-helper.png"><img src="docs/img/5mx-psiweb-setup-helper.png" alt="Series 5mx: the Web helper page of Set up PsiWeb" width="400"></a></td>
 </tr>
-<tr><td colspan="2"><b>Set up PsiWeb: pictures and search</b></td></tr>
+<tr><td colspan="2"><b>Set up PsiWeb: page style, pictures and fetching ahead</b></td></tr>
 <tr>
 <td><a href="docs/img/netbook-psiweb-setup-pages.png"><img src="docs/img/netbook-psiweb-setup-pages.png" alt="netBook: the Pages page of Set up PsiWeb" width="400"></a></td>
 <td><a href="docs/img/5mx-psiweb-setup-pages.png"><img src="docs/img/5mx-psiweb-setup-pages.png" alt="Series 5mx: the Pages page of Set up PsiWeb" width="400"></a></td>

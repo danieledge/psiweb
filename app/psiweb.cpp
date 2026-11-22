@@ -3805,6 +3805,8 @@ void CPwAppUi::DoCommandL(TInt aCommand)
 				}
 			else if (HelperChanged(iView->StartedWith(), st))
 				iView->HelperChangedL();
+			if (iView->EngineRunning())
+				RefreshStartPageL();             // (1.05) the start page, if showing, names the new route
 			}
 		break;
 		}
@@ -3969,7 +3971,6 @@ void CPwSetupDialog::AppPreLayoutL()
 	// another way online no longer changes it behind the person's back
 	iPicturesChosen = iHadFile && (pics != 0) != (std != 0);
 	SetChoiceListCurrentItem(EPwDlgSuPictures, pics ? 1 : 0);
-	SetChoiceListCurrentItem(EPwDlgSuSearch, iSettings.iSearch == PW_SEARCH_FROGFIND ? 1 : 0);
 	SetChoiceListCurrentItem(EPwDlgSuStyle, iHadFile && iSettings.iStyle >= 0 ? iSettings.iStyle : StandardStyle(Choice()));
 	// (1.05) Fetch the next page ahead: as set, else the route's standard
 	iAheadChosen = iHadFile && (iSettings.iFlags & KPwFlagAheadChosen) != 0;
@@ -4212,7 +4213,6 @@ void CPwQueryDialog::PreLayoutDynInitL()
 void CPwSetupDialog::AppSaveL()
 	{
 	iSettings.iImages = ChoiceListCurrentItem(EPwDlgSuPictures) == 1;
-	iSettings.iSearch = ChoiceListCurrentItem(EPwDlgSuSearch) == 1 ? PW_SEARCH_FROGFIND : PW_SEARCH_DDG;
 	TInt style = ChoiceListCurrentItem(EPwDlgSuStyle);
 	iSettings.iStyle = iStyleChosen || style != StandardStyle(Choice()) ? style : -1;
 	// (1.05) Fetch the next page ahead: kept as set only when set
@@ -4278,6 +4278,7 @@ void CPwAppUi::SetupL()
 	else
 		iView->LinkToShared();               // ("Modem provides TLS" and the rest, read at each connection)
 	FollowRouteL(styleWas);              // (1.05) the page style and fetching ahead
+	RefreshStartPageL();                 // (1.05) the start page, if showing, names the new route
 	}
 
 // (0.85) What a "Page not opened" page's links ask for
