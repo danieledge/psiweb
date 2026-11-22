@@ -74,7 +74,8 @@ the SDK link `ptproj/psitermssh`, which `build.sh` points at `core/ssh`.
 - **netBook emulator:** put a test build in a scratch ROM image with
   `../psion-netbook/tools/mkimage.mts --with PATH/PsiWeb.sis` (the file
   must be called PsiWeb.sis; `--test-pictures=DIR` adds local pages in
-  `Z:\Pictures`, with `--without PsiCall` for room) and start it from
+  `Z:\Pictures`; leave out another program with `--without NAME` if the
+  image needs room) and start it from
   PsiHub (Ctrl+Menu, type, Enter). In that emulator a key often keeps
   repeating after it is let go, as Enter or the letter: test with the pen
   where possible.
