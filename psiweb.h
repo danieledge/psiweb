@@ -212,7 +212,13 @@ typedef struct
 	volatile int sleeping;             /* set with quitting: the engine writes Sleep's files as it goes */
 	volatile int direct_now;           /* (1.03) psiweb: "Open directly this time" - the page coming is
 	                                      fetched without the web helper */
-	int spare[4];
+	/* (1.05) start_gen: the app counts each new start page (s->start_page),
+	   so the engine drops the copy of about:start in its cache, which
+	   Links would show again (psi_os.c psi_start_page_check); prefetch:
+	   the app's word that pages may be fetched ahead now (psi_drv.c) */
+	volatile int start_gen;
+	volatile int prefetch;
+	int spare[2];
 
 	unsigned char fb[PW_MAX_H * PW_STRIDE8];   /* MUST stay last: see above */
 	} PwShared;

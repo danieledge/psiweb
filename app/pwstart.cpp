@@ -196,6 +196,7 @@ void CPwAppUi::UpdateStartPageL()
 	TInt len = p.Length() < (TInt)sizeof(s->start_page) - 1 ? p.Length() : (TInt)sizeof(s->start_page) - 1;
 	Mem::Copy(s->start_page, p.Ptr(), len);
 	s->start_page[len] = 0;
+	s->start_gen++;                          // (1.05) the engine drops its cached copy (psi_os.c)
 	CleanupStack::PopAndDestroy();          // page
 	}
 

@@ -29,6 +29,9 @@
 #include "psiweb.h"
 #endif
 #include "../engine/pwproblem.h"	/* (0.85) the "Page not opened" page */
+#ifndef PW_URL_MAX
+#define PW_URL_MAX 512		/* (psiweb.h, which the PC build has not got) */
+#endif
 
 /* NSFB key codes (libnsfb_event.h) that PsiWeb.app sends */
 enum {
@@ -96,6 +99,11 @@ static void report_page(void);
 static void psi_load_figures(struct session *ses, int busy);
 static void psi_cookies(int save);
 static void psi_page_done(struct session *ses);
+static int user_busy(void);		/* (1.05) a page or download coming: not a page fetched ahead */
+static void psi_direct_end(void);	/* (1.05: declared before report_state uses it; the PC build stopped on it) */
+static void ahead_busy(int busy, struct session *ses);
+static void ahead_tick(struct session *ses);
+static void ahead_cancel_all(void);
 #ifdef PSI_EPOC
 /* (0.92) memory: trim and sleep, below */
 static int psi_waking;
@@ -704,7 +712,7 @@ static void psi_set_title(struct graphics_device *dev, unsigned char *title)
 static void report_state(int force)
 {
 	struct session *ses = psi_ses();
-	int busy = !list_empty(queue) || !list_empty(downloads);	/* (Esc stops a file being saved too) */
+	int busy = user_busy();	/* (Esc stops a file being saved too; (1.05) a page fetched ahead is not "busy") */
 	int back = 0, fwd = 0;
 	unsigned char *u = cast_uchar "", *st = cast_uchar "";
 
@@ -719,6 +727,7 @@ static void report_state(int force)
 	check_heap(busy);
 	save_progress();
 	if (force || busy != last_busy) {
+		if (busy != last_busy) ahead_busy(busy, ses);	/* (1.05) before the page's end: its speed */
 		if (last_busy == 1 && !busy) {
 #ifdef PSI_EPOC
 			/* (0.92) the first page after a waking: the lists of before */
@@ -824,8 +833,8 @@ static void report_page(void)
 		int t = fd->f_data->links[fd->vs->current_link].type;
 		s->field_active = t == L_FIELD || t == L_AREA;
 	}
-	s->progress = page_progress(ses, !list_empty(queue) || !list_empty(downloads));
-	psi_load_figures(ses, !list_empty(queue) || !list_empty(downloads));
+	s->progress = page_progress(ses, user_busy());
+	psi_load_figures(ses, user_busy());
 #endif
 }
 
@@ -1642,7 +1651,8 @@ static void psi_free_scratch(void)
 static void psi_trim(void)
 {
 	struct session *ses = psi_ses();
-	if (!list_empty(queue) || !list_empty(downloads)) {
+	ahead_cancel_all();	/* (1.05) pages fetched ahead: not now (the cache's copies go below) */
+	if (user_busy()) {
 		psi_trim_due = 1;	/* (busy: at the page's end instead, psi_page_done) */
 		return;
 	}
@@ -1691,7 +1701,7 @@ static int psi_sleep_ok(struct session *ses)
 	struct location *loc;
 	struct list_head *lloc;
 	if (!ses || !ses->term || !ses->win) return 0;
-	if (!list_empty(queue) || !list_empty(downloads) || ses->rq) return 0;
+	if (user_busy() || ses->rq) return 0;
 	if (ses->term->windows.next != &ses->win->list_entry) return 0;	/* a list or dialog of Links' is open */
 	if (list_empty(ses->history)) return 0;
 	/* a page that came from a form (its address carries what was sent):
@@ -1836,6 +1846,282 @@ static void psi_page_done(struct session *ses)
 #ifdef PSI_EPOC
 	if (psi_trim_due) psi_trim();
 #endif
+}
+
+/* ---------- (1.05) Fetch the next page ahead ----------
+ * Set up PsiWeb > Pages > "Fetch the next page ahead" (PsiWeb.app works
+ * out whether it applies: on, PsiProxy on a computer, not a modem; it says
+ * so in PwShared.prefetch). While a page is read, the page likely to be
+ * opened next is fetched into Links' cache at PRI_PRELOAD, the lowest
+ * priority, so it opens at once when its link is followed (Links finds it
+ * there, or joins the fetch still coming):
+ *   - on an article, its next part: rel="next", or a link that says "Next"
+ *     or "Next page";
+ *   - on PsiProxy's list of headlines (a news site's front page), the first
+ *     AHEAD_N headlines;
+ *   - the link the cursor has stayed on for AHEAD_DWELL_MS.
+ * Nothing shows: no busy message, progress or Stop (user_busy leaves these
+ * fetches out). The proxy is told with "X-PsiWeb-Prefetch: 1"
+ * (links-2.30-prefetch.diff), so it can serve them from its own cache.
+ * Strict on memory: only at the memory service's level 0 (more than 3 MB
+ * free); a page bigger than AHEAD_MAX_KB is not fetched on; a trim (and
+ * the level rising) stops them, and the trim's shrink_memory drops the
+ * pages fetched; a new page stops the last page's. Never on a slow line:
+ * only while pages come at AHEAD_MIN_RATE or more. */
+#define AHEAD_N		2
+#define AHEAD_MAX_KB	256
+#define AHEAD_MIN_RATE	2048		/* bytes a second, the last page of 8 KB or more */
+#define AHEAD_DWELL_MS	1200
+
+static struct status ahead_stat[AHEAD_N + 1];	/* (the last: the cursor's link) */
+static int ahead_on[AHEAD_N + 1];		/* its fetch is coming */
+static int ahead_rate = -1;			/* the last page's bytes a second (-1 not known) */
+static uttime ahead_t0;				/* the page began coming */
+static int ahead_link = -1;			/* the cursor's link, and since when */
+static uttime ahead_link_t;
+static int ahead_link_done;
+static int ahead_page_done;			/* this page's own (next part, headlines) started */
+
+static int conn_top_pri(struct connection *c)
+{
+	int i;
+	for (i = 0; i < N_PRI; i++) if (c->pri[i]) return i;
+	return N_PRI;
+}
+
+static int user_busy(void)
+{
+	struct connection *c;
+	struct list_head *lc;
+	if (!list_empty(downloads)) return 1;
+	foreach(struct connection, c, lc, queue) if (conn_top_pri(c) != PRI_PRELOAD) return 1;
+	return 0;
+}
+
+static void ahead_end(struct status *st, void *data)
+{
+	int i = (int)(my_intptr_t)data;
+	if (st->state < 0) ahead_on[i] = 0;
+}
+
+static void ahead_cancel(int i)
+{
+	struct connection *c;
+	if (!ahead_on[i]) return;
+	ahead_on[i] = 0;
+	if (ahead_stat[i].state < 0 || !(c = ahead_stat[i].c)) return;
+	change_connection(&ahead_stat[i], NULL, PRI_CANCEL);
+	/* (no one else wants it: it goes now, not on into the cache) */
+	if (conn_top_pri(c) == PRI_CANCEL) {
+		setcstate(c, S_INTERRUPTED);
+		abort_connection(c);
+	}
+}
+
+static void ahead_cancel_all(void)
+{
+	int i;
+	for (i = 0; i <= AHEAD_N; i++) ahead_cancel(i);
+}
+
+/* the app's word, the memory level, the line's speed */
+static int ahead_allowed(void)
+{
+#ifdef PSI_EPOC
+	PwShared *s = (PwShared *)pwb_shared();
+	if (!s || !s->prefetch || s->direct_now) return 0;
+	if (pg_mem_level() != 0) return 0;
+	return ahead_rate < 0 || ahead_rate >= AHEAD_MIN_RATE;
+#else
+	return getenv("PSI_AHEAD") != NULL;
+#endif
+}
+
+static void ahead_start(int i, unsigned char *url, unsigned char *prev)
+{
+	struct cache_entry *e;
+	if (casecmp(url, cast_uchar "http://", 7) && casecmp(url, cast_uchar "https://", 8)) return;
+	if (prev && !strcmp(cast_const_char url, cast_const_char prev)) return;
+	if (!find_in_cache(url, &e)) {		/* here already (or coming) */
+		e->refcount--;
+		return;
+	}
+	ahead_cancel(i);
+	memset(&ahead_stat[i], 0, sizeof(ahead_stat[i]));
+	ahead_stat[i].end = ahead_end;
+	ahead_stat[i].data = (void *)(my_intptr_t)i;
+	ahead_on[i] = 1;
+	load_url(url, prev, &ahead_stat[i], PRI_PRELOAD, NC_CACHE, 0, 0, 0, 0);
+}
+
+/* a tag's attribute: its value, unquoted, "&amp;" as "&" (into out) */
+static int ahead_attr(const unsigned char *t, const unsigned char *e, const char *name, unsigned char *out, int max)
+{
+	size_t nl = strlen(name);
+	const unsigned char *p;
+	for (p = t; p + nl + 1 < e; p++) {
+		const unsigned char *v;
+		unsigned char q;
+		int k = 0;
+		if (casecmp(p, cast_uchar name, nl) || p[nl] != '=' || (p[-1] != ' ' && p[-1] != '\t' && p[-1] != '\n' && p[-1] != '\r'))
+			continue;
+		v = p + nl + 1;
+		q = (*v == '"' || *v == '\'') ? *v++ : 0;
+		while (v < e && k < max - 1 && (q ? *v != q : (*v != ' ' && *v != '>'))) {
+			if (*v == '&' && v + 4 < e && !casecmp(v, cast_uchar "&amp;", 5)) { out[k++] = '&'; v += 5; continue; }
+			out[k++] = *v++;
+		}
+		out[k] = 0;
+		return k > 0;
+	}
+	return 0;
+}
+
+/* rel's words include "next" */
+static int ahead_rel_next(const unsigned char *t, const unsigned char *e)
+{
+	unsigned char rel[64];
+	unsigned char *p;
+	if (!ahead_attr(t, e, "rel", rel, sizeof(rel))) return 0;
+	for (p = rel; *p; p++) {
+		if (casecmp(p, cast_uchar "next", 4)) continue;
+		if ((p == rel || p[-1] == ' ') && (!p[4] || p[4] == ' ')) return 1;
+	}
+	return 0;
+}
+
+/* an <a>'s words, tags left out, white space as one space: "Next" or "Next
+   page", with a sign or two after them ("Next >", "Next page »") */
+static int ahead_says_next(const unsigned char *p, const unsigned char *end)
+{
+	unsigned char w[24];
+	int k = 0, sp = 1, in = 0;
+	for (; p < end && k < (int)sizeof(w) - 1; p++) {
+		if (*p == '<') {
+			if (p + 3 < end && p[1] == '/' && (p[2] | 0x20) == 'a' && (p[3] == '>' || p[3] == ' ')) break;
+			in = 1;
+			continue;
+		}
+		if (in) { if (*p == '>') in = 0; continue; }
+		if (*p == ' ' || *p == '\n' || *p == '\r' || *p == '\t') { if (!sp) w[k++] = ' '; sp = 1; continue; }
+		w[k++] = *p;
+		sp = 0;
+	}
+	if (p >= end || k >= (int)sizeof(w) - 1) return 0;
+	for (;;) {			/* signs after the words: " >", "»" (UTF-8), "&raquo;" */
+		if (k > 0 && (w[k - 1] == ' ' || w[k - 1] == '>' || w[k - 1] >= 0x80)) { k--; continue; }
+		if (k > 0 && w[k - 1] == ';') {
+			int j = k - 1;
+			while (j > 0 && w[j - 1] != '&' && w[j - 1] != ' ') j--;
+			if (j > 0 && w[j - 1] == '&') { k = j - 1; continue; }
+		}
+		break;
+	}
+	w[k] = 0;
+	return !casestrcmp(w, cast_uchar "next") || !casestrcmp(w, cast_uchar "next page");
+}
+
+/* This page's own: its next part, else PsiProxy's first headlines */
+static void ahead_page(struct session *ses)
+{
+	struct f_data_c *fd = ses ? ses->screen : NULL;
+	unsigned char *start, *base, *t, *te, *end, *u;
+	unsigned char href[512];
+	size_t len;
+	int n = 0, index;
+	if (!fd || !fd->f_data || !fd->f_data->rq || !fd->f_data->rq->ce) return;
+	if (get_file(fd->f_data->rq, &start, &len) || !len) return;
+	base = fd->f_data->rq->url;
+	if (!base || (casecmp(base, cast_uchar "http://", 7) && casecmp(base, cast_uchar "https://", 8))) return;
+	end = start + len;
+	/* PsiProxy's list of headlines: its index view has "[ Menu ]" first */
+	index = 0;
+	for (t = start; t + 15 <= start + (len < 4096 ? len : 4096); t++)
+		if (*t == 'h' && !memcmp(t, "href=\"#psi-nav\"", 15)) { index = 1; break; }
+	for (t = start; t < end && n < AHEAD_N; t++) {
+		int is_a, is_link;
+		if (*t != '<') continue;
+		is_a = t + 2 < end && (t[1] | 0x20) == 'a' && (t[2] == ' ' || t[2] == '\n' || t[2] == '\t');
+		is_link = t + 5 < end && !casecmp(t + 1, cast_uchar "link ", 5);
+		if (!is_a && !is_link) continue;
+		for (te = t; te < end && *te != '>'; te++) ;
+		if (te >= end) break;
+		if (!ahead_attr(t, te, "href", href, sizeof(href)) || href[0] == '#') continue;
+		if (ahead_rel_next(t, te) || (is_a && ahead_says_next(te + 1, end))) {
+			/* the next part: the one to fetch, and the only one */
+			u = join_urls(base, href);
+			if (u) { ahead_start(0, u, base); mem_free(u); }
+			return;
+		}
+		/* a headline: an <a> straight after <li> */
+		if (index && is_a && t >= start + 4 && !casecmp(t - 4, cast_uchar "<li>", 4)) {
+			u = join_urls(base, href);
+			if (u) { ahead_start(n, u, base); mem_free(u); }
+			n++;
+		}
+	}
+}
+
+/* (report_state) a page began coming, or has come: the line's speed, and
+   the last page's fetches stopped */
+static void ahead_busy(int busy, struct session *ses)
+{
+	uttime now = get_time();
+	if (busy) {
+		/* a page asked for: the last page's fetches stop (one the new
+		   page joined goes on for it) */
+		ahead_t0 = now;
+		ahead_cancel_all();
+		return;
+	}
+	if (ses && ses->screen && ses->screen->f_data && ses->screen->f_data->rq && ses->screen->f_data->rq->ce) {
+		off_t got = ses->screen->f_data->rq->ce->length;
+		if (got >= 8192 && now > ahead_t0)
+			ahead_rate = (int)((longlong)got * 1000 / (longlong)(now - ahead_t0));
+	}
+	ahead_page_done = 0;
+	ahead_link = -1;
+}
+
+/* every STATUS_MS, from the poll */
+static void ahead_tick(struct session *ses)
+{
+	struct f_data_c *fd;
+	int i, cur;
+	uttime now = get_time();
+	if (!ahead_allowed()) {
+		ahead_cancel_all();
+		return;
+	}
+	/* one getting too big for the memory kept for it */
+	for (i = 0; i <= AHEAD_N; i++)
+		if (ahead_on[i] && ahead_stat[i].state >= 0 && ahead_stat[i].c
+		    && (ahead_stat[i].c->est_length > AHEAD_MAX_KB * 1024L || ahead_stat[i].c->received > AHEAD_MAX_KB * 1024L))
+			ahead_cancel(i);
+	if (!ses || user_busy() || ses->rq || last_busy) return;
+	if (!ahead_page_done) {
+		ahead_page_done = 1;
+		ahead_page(ses);
+	}
+	/* the link the cursor rests on */
+	fd = ses->screen;
+	cur = fd && fd->f_data && fd->vs ? fd->vs->current_link : -1;
+	if (cur < 0 || cur >= (fd && fd->f_data ? fd->f_data->nlinks : 0)) {
+		ahead_link = -1;
+		return;
+	}
+	if (cur != ahead_link) {
+		ahead_link = cur;
+		ahead_link_t = now;
+		ahead_link_done = 0;
+		return;
+	}
+	if (!ahead_link_done && now - ahead_link_t >= AHEAD_DWELL_MS) {
+		struct link *l = &fd->f_data->links[cur];
+		ahead_link_done = 1;
+		if (l->type == L_LINK && l->where && !l->form)
+			ahead_start(AHEAD_N, l->where, fd->f_data->rq ? fd->f_data->rq->url : NULL);
+	}
 }
 
 static void run_command(int cmd, char *arg)
@@ -2137,6 +2423,13 @@ static void poll_fn(void *p)
 	if (now - last_status >= STATUS_MS) {
 		last_status = now;
 		report_state(0);
+		ahead_tick(psi_ses());	/* (1.05) the next page, fetched ahead */
+#ifdef PSI_EPOC
+		{
+			void psi_start_page_check(void);	/* psi_os.c (1.05) */
+			psi_start_page_check();
+		}
+#endif
 		/* (1.00) pictures finished since (a page still coming, a scroll
 		   decoding them): into the store; one still being decoded stays */
 		psi_store_move();

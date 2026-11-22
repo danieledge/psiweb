@@ -58,6 +58,14 @@ static unsigned char *g_url_rest;	/* Show the rest: this address is not cut */
    the page is shown as Text only does it, with a line that says so */
 #define PSI_READER_MIN_TEXT	1500
 #define PSI_INDEX_MIN_LINKS	20
+/* (1.05) A page of headlines that PsiProxy has already made into lists
+   under headings: Reader takes out the lists and leaves the headings with
+   nothing under them, and one list it keeps (BBC News: "Most read") can
+   bring the text over PSI_READER_MIN_TEXT. Two or more empty headings and
+   less text than this: an index too. (A long article with a table under
+   two headings has far more text.) */
+#define PSI_READER_INDEX_TEXT	4000
+#define PSI_INDEX_EMPTY_HEADINGS	2
 
 int pwb_style(void);
 int psi_pictures_for(unsigned char *url);	/* psi_drv.c */
@@ -95,6 +103,22 @@ static int count_links(const unsigned char *s, size_t n)
 	for (i = 0; i + 2 < n; i++)
 		if (s[i] == '<' && (s[i + 1] | 0x20) == 'a' && (s[i + 2] == ' ' || s[i + 2] == '\n' || s[i + 2] == '\t' || s[i + 2] == '\r'))
 			c++;
+	return c;
+}
+
+/* (1.05) headings with nothing under them: "</hN>", white space, "<hM" */
+static int empty_headings(const unsigned char *s, int n)
+{
+	int i, j, c = 0;
+	for (i = 0; i + 5 < n; i++) {
+		if (s[i] != '<' || s[i + 1] != '/' || (s[i + 2] | 0x20) != 'h' || s[i + 3] < '1' || s[i + 3] > '6' || s[i + 4] != '>')
+			continue;
+		for (j = i + 5; j < n && (s[j] == ' ' || s[j] == '\n' || s[j] == '\r' || s[j] == '\t'); j++)
+			;
+		if (j + 3 < n && s[j] == '<' && (s[j + 1] | 0x20) == 'h' && s[j + 2] >= '1' && s[j + 2] <= '6'
+		    && (s[j + 3] == '>' || s[j + 3] == ' '))
+			c++;
+	}
 	return c;
 }
 
@@ -256,9 +280,12 @@ unsigned char *psi_style_page(struct cache_entry *ce, unsigned char *start, size
 		psi_simp_end(&k_text, &k_scripts);
 		k_done = 1;
 		/* (1.03) Reader with next to nothing left of a page full of links:
-		   a page of headlines. Simplified again as Text only, once, from
+		   a page of headlines; (1.05) or one PsiProxy had already made into
+		   lists, left as empty headings. Simplified again as Text only, once, from
 		   the whole page (it is all here now) */
-		if (style == PW_STYLE_READER && k_text < PSI_READER_MIN_TEXT && k_links >= PSI_INDEX_MIN_LINKS
+		if (style == PW_STYLE_READER && k_links >= PSI_INDEX_MIN_LINKS
+		    && (k_text < PSI_READER_MIN_TEXT
+		        || (k_text < PSI_READER_INDEX_TEXT && empty_headings(k_body + k_off, k_len) >= PSI_INDEX_EMPTY_HEADINGS))
 		    && !(k_scripts > 0 && k_text < PSI_SCRIPT_TEXT)) {
 			int scripts = k_scripts;
 			mem_free(k_body);

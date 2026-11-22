@@ -1,0 +1,22 @@
+Links 2.30 for PsiWeb: Fetch the next page ahead (PsiWeb 1.05, links/psi_drv.c). Applied by
+links/fetch.sh last (the name sorts after the others' patches).
+- http.c (PSIWEB): a request at PRI_PRELOAD, a page fetched ahead, sends "X-PsiWeb-Prefetch: 1"
+  to a proxy (PsiProxy), so it can serve it from its own cache or after pages asked for.
+
+--- a/http.c
++++ b/http.c
+@@ -494,6 +494,14 @@
+ 			add_to_str(&hdr, &l, cast_uchar "\r\n");
+ 		}
+ 	}
++	/* PsiWeb 1.05: a page fetched ahead, at the lowest priority
++	   (psi_drv.c), says so to a proxy, which may serve it from its own
++	   cache or put it after pages asked for */
++	if (proxy) {
++		int psi_p;
++		for (psi_p = 0; psi_p < N_PRI && !c->pri[psi_p]; psi_p++) ;
++		if (psi_p == PRI_PRELOAD) add_to_str(&hdr, &l, cast_uchar "X-PsiWeb-Prefetch: 1\r\n");
++	}
+ #endif
+ 	if (!info->https_forward) {
+ 		test_restart(c);

@@ -120,6 +120,27 @@ static const char psi_welcome[] =
 #include "welcome.inc"
 ;
 
+/* (1.05) The start page as Links keeps it in its cache: Links shows that
+   copy again when about:start is next opened (its cache is aggressive), so
+   after Set up PsiWeb or Connection settings it named the web helper of
+   before, Direct newly set (review RR-15). PsiWeb.app counts each start page
+   it makes (start_gen); a new one and the copy goes, and the next visit,
+   Back included, asks psi_about_func again. From the engine's poll. */
+static int psi_start_made = -1;
+
+void psi_start_page_check(void)
+{
+	PwShared *ps = (PwShared *)pwb_shared();
+	struct cache_entry *e;
+	if (!ps || ps->start_gen == psi_start_made) return;
+	psi_start_made = ps->start_gen;
+	if (!find_in_cache(cast_uchar "about:start", &e)) {
+		e->refcount--;
+		finish_cache_entry(e);	/* (a new count: its laid-out page in the format cache is out of date too) */
+		detach_cache_entry(e);	/* (out of the cache's index: freed when unused) */
+	}
+}
+
 void psi_about_func(struct connection *c)
 {
 	struct cache_entry *e;
@@ -133,6 +154,7 @@ void psi_about_func(struct connection *c)
 	else if (!casecmp(u, cast_uchar "about:start", 11) && ps && ps->start_page[0]) {
 		/* (0.87) the start page PsiWeb.app made (a copy: it may change it) */
 		static char start_copy[sizeof(ps->start_page)];
+		psi_start_made = ps->start_gen;	/* (1.05) */
 		memcpy(start_copy, ps->start_page, sizeof(start_copy));
 		start_copy[sizeof(start_copy) - 1] = 0;
 		page = start_copy;

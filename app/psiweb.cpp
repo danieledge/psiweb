@@ -154,7 +154,7 @@ static TBool PwDiagOn()
 _LIT(KIniFile, "C:\\System\\Apps\\PsiWeb\\PsiWeb.ini");
 _LIT(KUpdIniFile, "C:\\System\\Apps\\PsiWeb\\Update.ini");
 _LIT(KFavsKept, "C:\\System\\Apps\\PsiWeb\\Favourites.dat");   // (pwfavs.cpp's KFavsFile)
-_LIT(KVersion, "1.04");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
+_LIT(KVersion, "1.05");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
 _LIT(KDefaultHome, "http://68k.news/");
 const TInt KZoomSteps[] = { 50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200 };
 const TInt KZoomCount = 11;
@@ -482,6 +482,7 @@ void CPwView::StartEngineL()
 	s->proxy_port = iSettings.iProxyPort;
 	s->load_images = iSettings.iImages;
 	s->style = StyleNow(iSettings);          // (0.86) View > Page style
+	s->prefetch = AheadNow(iSettings);       // (1.05) Fetch the next page ahead (psi_drv.c)
 	s->keep_cookies = (iSettings.iFlags & KPwFlagKeepCookies) != 0;   // (0.87)
 	s->zoom = iSettings.iZoom;
 	s->display = (iSettings.iDisplay & KPwDisplayScaledText) ? PW_DISPLAY_SCALED_TEXT : 0;
@@ -2134,17 +2135,41 @@ void CPwConnDialog::HandleControlStateChangeL(TInt aControlId)
 		DimKeepUpLine();
 	}
 
+void WebTestThen(PgLinkTest* aTest, void* aCtx);   // (0.89) below
+static void SetupTestNote(PgLinkTest* aTest, void* aCtx);
+
 // Test: tries the values shown (not yet saved). If the browser engine has
-// the port (mid-connection), the test says the port is in use.
+// the port (mid-connection), the test says the port is in use. (1.05) As
+// Set up PsiWeb's Test does: when the values shown are the route the
+// browser engine uses now, a page through it as well, so the result names
+// the way pages come (through the web helper, or directly); otherwise a
+// line says the page is tried once OK is pressed (it only said the link was
+// up and names were found)
 void CPwConnDialog::TestL()
 	{
 	TBuf<40> ppp;
 	GetEdwinText(ppp, EPwDlgPppStart);
 	ppp.TrimAll();
-	PgLinkTestL(((CEikChoiceList*)Control(EPwDlgBaud))->CurrentItem(),
-		((CEikChoiceList*)Control(EPwDlgFlow))->CurrentItem() == 1,
-		((CEikChoiceList*)Control(EPwDlgLink))->CurrentItem() == 1,
-		ppp, R_PW_TEST_DIALOG, EPwDlgTest1);
+	TInt baud = ((CEikChoiceList*)Control(EPwDlgBaud))->CurrentItem();
+	TInt flow = ((CEikChoiceList*)Control(EPwDlgFlow))->CurrentItem() == 1;
+	TInt net = ((CEikChoiceList*)Control(EPwDlgLink))->CurrentItem() == 1;
+	TInt proxy = ChoiceListCurrentItem(EPwDlgProxy) == 1;
+	TBuf<60> host;
+	GetEdwinText(host, EPwDlgProxyHost);
+	host.Trim();
+	TInt port = NumberEditorValue(EPwDlgProxyPort);
+	CPwAppUi* ui = (CPwAppUi*)iEikonEnv->EikAppUi();
+	CPwView* v = ui->View();
+	const TPwSettings& e = v->StartedWith();
+	TBool same = v->EngineRunning() && (e.iNetMode != 0) == (net != 0) && e.iBaudIndex == baud
+		&& (e.iRtsCts != 0) == (flow != 0) && (e.iUseProxy != 0) == (proxy != 0)
+		&& (!proxy || (e.iProxyHost.CompareF(host) == 0 && e.iProxyPort == port));
+	if (same)
+		PgLinkTestThenL(baud, flow, net, ppp, R_PW_TEST_DIALOG, EPwDlgTest1, WebTestThen, ui);
+	else
+		PgLinkTestThenL(baud, flow, net, ppp, R_PW_TEST_DIALOG, EPwDlgTest1, SetupTestNote,
+			(void*)(proxy ? "A page through the web helper is tried once OK is pressed"
+				: "A page is tried once OK is pressed"));
 	}
 
 TBool CPwConnDialog::OkToExitL(TInt aButtonId)
@@ -3179,7 +3204,7 @@ void CPwAppUi::LoadSettings(TPwSettings& aSettings)
 						aSettings.iStyle = b >= 1 && b <= 4 ? b - 1 : -1;
 						}
 					if (pos < d.Length())            // (0.85) KPwFlag* bits
-						aSettings.iFlags = d[pos++] & (KPwFlagKeepCookies | KPwFlagStyleAsked);
+						aSettings.iFlags = d[pos++] & (KPwFlagKeepCookies | KPwFlagStyleAsked | KPwFlagAheadChosen | KPwFlagAheadOn);
 					// (0.88) Open in full browser: the server, the program
 					if (pos < d.Length() && pos + 1 + d[pos] <= d.Length() && d[pos] <= 24)
 						{
@@ -3762,12 +3787,14 @@ void CPwAppUi::DoCommandL(TInt aCommand)
 	case EPwCmdConnSettings:
 		{
 		TPwSettings was(st);
+		TInt styleWas = StyleNow(st);
 		CPwConnDialog* dlg = new(ELeave) CPwConnDialog(st);
 		if (dlg->ExecuteLD(R_PW_CONN_DIALOG))
 			{
 			SaveSettings(st);
 			UseSharedLink(iCoeEnv->FsSession(), st);
 			UpdateStartPageL();
+			FollowRouteL(styleWas);              // (1.05) a new helper: its standard style, fetching ahead
 			// (0.94) the engine started again only if the route changed:
 			// a restart loses what was typed into the page's forms. (1.03)
 			// Only the link itself: a new web helper is taken at once
@@ -3944,6 +3971,9 @@ void CPwSetupDialog::AppPreLayoutL()
 	SetChoiceListCurrentItem(EPwDlgSuPictures, pics ? 1 : 0);
 	SetChoiceListCurrentItem(EPwDlgSuSearch, iSettings.iSearch == PW_SEARCH_FROGFIND ? 1 : 0);
 	SetChoiceListCurrentItem(EPwDlgSuStyle, iHadFile && iSettings.iStyle >= 0 ? iSettings.iStyle : StandardStyle(Choice()));
+	// (1.05) Fetch the next page ahead: as set, else the route's standard
+	iAheadChosen = iHadFile && (iSettings.iFlags & KPwFlagAheadChosen) != 0;
+	SetChoiceListCurrentItem(EPwDlgSuAhead, iAheadChosen ? ((iSettings.iFlags & KPwFlagAheadOn) ? 1 : 0) : StandardAhead(Choice()));
 	ShowPicturesNoteL();
 	ShowStyleNoteL();
 	}
@@ -3953,9 +3983,18 @@ void CPwSetupDialog::AppPreLayoutL()
 // the Psion costs as much as it saves - Lighter about 10 to 25% more, Reader
 // about the same - so the styles are for reading, not for speed: Reader puts
 // an article first. A helper lightens pages before they arrive anyway.)
-TInt CPwSetupDialog::StandardStyle(const PgSuChoice& /*aChoice*/)
+// (1.05) Not chosen, Text only without PsiProxy (Direct, or the Atom
+// modem's helper), Full with it: StyleNow
+TInt CPwSetupDialog::StandardStyle(const PgSuChoice& aChoice)
 	{
-	return PW_STYLE_FULL;
+	return aChoice.helper == PG_SU_HELPER_PSIPROXY ? PW_STYLE_FULL : PW_STYLE_TEXT;
+	}
+
+// (1.05) Fetch the next page ahead's standard: on with PsiProxy on a
+// computer by the network card or dial-up, off on a modem or Direct
+TInt CPwSetupDialog::StandardAhead(const PgSuChoice& aChoice)
+	{
+	return aChoice.helper == PG_SU_HELPER_PSIPROXY && aChoice.conn == PG_SU_CONN_NET ? 1 : 0;
 	}
 
 void CPwSetupDialog::ShowPicturesNoteL()
@@ -3974,7 +4013,13 @@ void CPwSetupDialog::ShowStyleNoteL()
 	ReadNow(c);
 	pg_su_fix(&c);
 	TInt style = ChoiceListCurrentItem(EPwDlgSuStyle);
-	if (c.helper != PG_SU_HELPER_PSIPROXY && style != PW_STYLE_TEXT && style != PW_STYLE_READER)
+	// (1.05) the style this fetcher takes unless one is chosen, said when
+	// it is the one shown
+	if (style == StandardStyle(c) && style == PW_STYLE_TEXT)
+		SetLabelL(EPwDlgSuStyleNote, _L("Text only is the standard without PsiProxy - it skips big sites' menus"));
+	else if (style == StandardStyle(c))
+		SetLabelL(EPwDlgSuStyleNote, _L("Full is the standard with PsiProxy, which lightens pages itself"));
+	else if (c.helper != PG_SU_HELPER_PSIPROXY && style != PW_STYLE_TEXT && style != PW_STYLE_READER)
 		SetLabelL(EPwDlgSuStyleNote, _L("Without PsiProxy, Text only suits big sites - it skips their menus"));
 	else
 		SetLabelL(EPwDlgSuStyleNote, _L("Reader shows the article first - Shift+Ctrl+R changes the page's style"));
@@ -3992,6 +4037,8 @@ void CPwSetupDialog::AppControlChangedL(TInt aControlId)
 		iStyleChosen = ETrue;
 		ShowStyleNoteL();
 		}
+	else if (aControlId == EPwDlgSuAhead)
+		iAheadChosen = ETrue;
 	}
 
 void CPwSetupDialog::AppChoiceChangedL()
@@ -3999,6 +4046,8 @@ void CPwSetupDialog::AppChoiceChangedL()
 	if (!iStyleChosen)
 		SetChoiceListCurrentItem(EPwDlgSuStyle, StandardStyle(Choice()));
 	ShowStyleNoteL();
+	if (!iAheadChosen)
+		SetChoiceListCurrentItem(EPwDlgSuAhead, StandardAhead(Choice()));
 	if (iPicturesChosen)
 		return;
 	TInt was = ChoiceListCurrentItem(EPwDlgSuPictures);
@@ -4166,6 +4215,12 @@ void CPwSetupDialog::AppSaveL()
 	iSettings.iSearch = ChoiceListCurrentItem(EPwDlgSuSearch) == 1 ? PW_SEARCH_FROGFIND : PW_SEARCH_DDG;
 	TInt style = ChoiceListCurrentItem(EPwDlgSuStyle);
 	iSettings.iStyle = iStyleChosen || style != StandardStyle(Choice()) ? style : -1;
+	// (1.05) Fetch the next page ahead: kept as set only when set
+	TInt ahead = ChoiceListCurrentItem(EPwDlgSuAhead) == 1;
+	if (iAheadChosen || ahead != StandardAhead(Choice()))
+		iSettings.iFlags = (iSettings.iFlags & ~KPwFlagAheadOn) | KPwFlagAheadChosen | (ahead ? KPwFlagAheadOn : 0);
+	else
+		iSettings.iFlags &= ~(KPwFlagAheadChosen | KPwFlagAheadOn);
 	// (0.91) "Modem provides TLS", in the shared PsiLink.ini, as PsiMail's
 	// assistant sets it: on for the Atom modem, off for another one (the
 	// Atom does the TLS on 443, so PsiWeb must not wrap its own inside)
@@ -4222,12 +4277,7 @@ void CPwAppUi::SetupL()
 		iView->HelperChangedL();
 	else
 		iView->LinkToShared();               // ("Modem provides TLS" and the rest, read at each connection)
-	PwShared* sh = iView->Shared();
-	if (sh && StyleNow(st) != styleWas)
-		{
-		sh->style = StyleNow(st);
-		iView->Command(PW_CMD_RESTYLE, KNullDesC);
-		}
+	FollowRouteL(styleWas);              // (1.05) the page style and fetching ahead
 	}
 
 // (0.85) What a "Page not opened" page's links ask for
@@ -4425,11 +4475,51 @@ void CPwAppUi::WebTestL(PgLinkTest* aTest)
 		pg_lt_add_line(aTest, s->test_why);
 	}
 
+static TBool WithoutPsiProxy(const TPwSettings& aS);
+
+// (1.05) Not chosen, the style follows the fetcher (Set up PsiWeb shows
+// which): without PsiProxy on a computer - Direct, or the Atom modem's
+// helper - a big site's page comes whole and starts with a screen or more
+// of its menus, so Text only; PsiProxy takes those out itself, so Full. A
+// style the person has chosen (View > Page style, Preferences, Set up) is
+// kept on every route; for one who chose Full or Lighter without PsiProxy,
+// the once-only offer of Text only stays (StyleOfferL).
 TInt StyleNow(const TPwSettings& aS)
 	{
 	if (aS.iStyle >= PW_STYLE_FULL && aS.iStyle <= PW_STYLE_TEXT)
 		return aS.iStyle;
-	return PW_STYLE_FULL;
+	return WithoutPsiProxy(aS) ? PW_STYLE_TEXT : PW_STYLE_FULL;
+	}
+
+// (1.05) Set up PsiWeb > Pages > Fetch the next page ahead: as the person
+// set it, else on with PsiProxy on a computer by the network, off on a
+// modem or Direct. Used only by the network (iNetMode): never on a modem's
+// line, which is slow (the engine also waits for a page to come at 2 KB a
+// second or more, and for plenty of memory: links/psi_drv.c)
+TBool AheadSetting(const TPwSettings& aS)
+	{
+	if (aS.iFlags & KPwFlagAheadChosen)
+		return (aS.iFlags & KPwFlagAheadOn) != 0;
+	return !WithoutPsiProxy(aS) && aS.iNetMode;
+	}
+
+TBool AheadNow(const TPwSettings& aS)
+	{
+	return AheadSetting(aS) && aS.iNetMode;
+	}
+
+void CPwAppUi::FollowRouteL(TInt aStyleWas)
+	{
+	PwShared* sh = iView->Shared();
+	if (!sh)
+		return;
+	const TPwSettings& st = iView->Settings();
+	sh->prefetch = AheadNow(st);
+	if (iView->EngineRunning() && StyleNow(st) != aStyleWas)
+		{
+		sh->style = StyleNow(st);
+		iView->Command(PW_CMD_RESTYLE, KNullDesC);
+		}
 	}
 
 // (0.86) View > Page style and Shift+Ctrl+R: kept as the choice from now

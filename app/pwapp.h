@@ -55,8 +55,13 @@ void FromUtf8(TDes& aDst, const char* aSrc);
 struct TPwSettings;
 // the route in the user's words: About, Page information (psiweb.cpp)
 void RouteWords(const TPwSettings& aSettings, TDes& aOut);
-// (0.86) the page style in use: the one chosen, or the standard, Full
+// (0.86) the page style in use: the one chosen, or the route's standard:
+// (1.05) Text only without PsiProxy on a computer, Full with it
 TInt StyleNow(const TPwSettings& aSettings);
+// (1.05) Fetch the next page ahead: the setting (chosen, or the route's
+// standard), and whether it is used now (not on a modem)
+TBool AheadSetting(const TPwSettings& aSettings);
+TBool AheadNow(const TPwSettings& aSettings);
 
 // Favourites and History (pwfavs.cpp): one entry is a title and an address.
 // They are kept in their own files (Favourites.dat, History.dat) beside
@@ -137,6 +142,8 @@ struct TPwSettings
 // TPwSettings::iFlags, one byte after the toolband's in PsiWeb.ini (0.85)
 const TInt KPwFlagKeepCookies = 1;     // (0.87) Preferences > Cookies: kept when PsiWeb closes
 const TInt KPwFlagStyleAsked = 2;      // (1.03) the one-time offer of Text only (pages without PsiProxy) was made
+const TInt KPwFlagAheadChosen = 4;     // (1.05) Set up > Pages > Fetch the next page ahead: set by the person...
+const TInt KPwFlagAheadOn = 8;         // ...and on (not chosen: on with PsiProxy on a computer, AheadNow)
 
 // TPwSettings::iDisplay, one byte at the end of PsiWeb.ini (0.81); all 0 is the standard
 const TInt KPwDisplayReading = 1;      // View > Reading mode
@@ -508,9 +515,10 @@ class CPwSetupDialog : public CPgSetupDialog
 	{
 public:
 	CPwSetupDialog(TPwSettings& aSettings, TInt aTestDialog, TInt aTestFirstLine)
-		: CPgSetupDialog(aTestDialog, aTestFirstLine), iSettings(aSettings), iPicturesChosen(EFalse), iStyleChosen(EFalse) {}
+		: CPgSetupDialog(aTestDialog, aTestFirstLine), iSettings(aSettings), iPicturesChosen(EFalse), iStyleChosen(EFalse), iAheadChosen(EFalse) {}
 	static TInt StandardPictures(const PgSuChoice& aChoice, TBool aTall);
 	static TInt StandardStyle(const PgSuChoice& aChoice);
+	static TInt StandardAhead(const PgSuChoice& aChoice);
 private:
 	void AppPreLayoutL();
 	void AppControlChangedL(TInt aControlId);
@@ -526,6 +534,7 @@ private:
 	TPwSettings& iSettings;
 	TBool iPicturesChosen;     // the person set Pictures: the route no longer changes it
 	TBool iStyleChosen;        // (0.86) ...and Page style
+	TBool iAheadChosen;        // (1.05) ...and Fetch the next page ahead
 	PgSuChoice iNow;           // (1.03) the choice as OK took it
 	};
 
@@ -597,6 +606,7 @@ public:
 	void SaveHistory();                 // (0.96) History.dat, if changed (review R115)
 	void EngineCommandL(TInt aCmd);     // (0.85) a "Page not opened" page's links (PW_APP_*)
 	void SetStyleL(TInt aStyle);        // (0.86) View > Page style
+	void FollowRouteL(TInt aStyleWas);  // (1.05) a new web helper: the route's style and fetching ahead
 	void UpdateStartPageL();            // (0.87) the start page (pwstart.cpp)
 	void OpenTileL(TInt aIndex);        // (0.87) ...its tile 1 to 8
 	void SeedFavouritesL();             // (0.87) a new PsiWeb's favourites: its first tiles

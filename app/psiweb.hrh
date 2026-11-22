@@ -122,7 +122,8 @@ enum TPwDialogControls
 	EPwDlgCredit2, EPwDlgCredit3, EPwDlgCredit4, EPwDlgCredit5, EPwDlgCredit6, EPwDlgCredit7, EPwDlgCredit8,
 	EPwDlgQueryFact,         // (1.03) CPwQueryDialog: the fact, why, the question
 	EPwDlgQueryWhy,
-	EPwDlgQueryQuestion
+	EPwDlgQueryQuestion,
+	EPwDlgSuAhead            // (1.05) Set up PsiWeb > Pages: Fetch the next page ahead
 	};
 
 // (0.99) the toolbar's name box (Coda's, a CEikFileNameLabel) and Help's

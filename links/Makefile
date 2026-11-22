@@ -77,10 +77,10 @@ $(O)/psi/psi_style.o: psi_style.c simp/psi_simp.h $(HDRS) $(WEB)/fb/pwback.h $(S
 	$(CC) -c $(LCFLAGS) -I$(WEB)/fb -I$(WEB) -I. $< -o $@
 $(O)/psi/psi_simp.o: simp/psi_simp.cpp simp/psi_simp.h simp/htmlsimp.h
 	@mkdir -p $(dir $@)
-	g++ -m32 -c $(OPT) -w -fno-exceptions -fno-rtti $< -o $@
+	g++ -m32 -c $(OPT) -w -fno-exceptions -fno-rtti -fno-sized-deallocation $< -o $@
 $(O)/psi/htmlsimp.o: simp/htmlsimp.cpp simp/htmlsimp.h
 	@mkdir -p $(dir $@)
-	g++ -m32 -c $(OPT) -w -fno-exceptions -fno-rtti $< -o $@
+	g++ -m32 -c $(OPT) -w -fno-exceptions -fno-rtti -fno-sized-deallocation $< -o $@
 $(O)/psi/pwproblem.o: $(WEB)/engine/pwproblem.c $(WEB)/engine/pwproblem.h
 	@mkdir -p $(dir $@)
 	$(CC) -c $(OPT) -w -std=gnu99 -I$(CORE)/ssh $< -o $@
