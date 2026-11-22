@@ -18,6 +18,13 @@ Up to 0.61 the engine was NetSurf. Its sources are still in the tree as a fallba
 
 [![Download PsiWeb.sis](https://img.shields.io/badge/Download-PsiWeb.sis-2ea44f?logo=github)](https://github.com/danieledge/psiterm/raw/main/dist/PsiWeb.sis)
 
+## What's new in 1.06
+
+- **The busy message stays steady.** "Opening ... - 64 KB" and the other
+  busy messages at the bottom left are drawn as before, without EIKON's
+  flashing: for a quarter of every second its text was off, and while a big
+  page loaded that could be seen as an empty dark box.
+
 ## What's new in 1.04
 
 psion-core 959b8fd's Psion Internet fixes, the same as PsiMail 1.17's and

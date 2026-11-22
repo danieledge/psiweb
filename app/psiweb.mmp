@@ -18,4 +18,4 @@ SYSTEMINCLUDE \ptproj\psiwebinc \ptproj\psitermssh \epoc32\include\libc \epoc32\
 
 LIBRARY       euser.lib efsrv.lib apparc.lib cone.lib eikon.lib ws32.lib gdi.lib
 LIBRARY       fbscli.lib bafl.lib apgrfx.lib nifman.lib etext.lib form.lib
-LIBRARY       c32.lib esock.lib insock.lib
+LIBRARY       c32.lib esock.lib insock.lib clock.lib

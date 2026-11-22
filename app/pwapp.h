@@ -588,6 +588,12 @@ private:
 	TInt iValue;
 	};
 
+// (1.06) the busy message, bottom left, as EIKON's but steady (psiweb.cpp):
+// EIKON's flashes, and for a quarter of every second it is an empty dark box
+class CPwBusyWin;
+void PwBusyMsgL(const TDesC& aText);
+void PwBusyMsgCancel();
+
 class CPwAppUi : public CEikAppUi, public MCoeControlObserver
 	{
 public:
@@ -696,6 +702,8 @@ private:
 	                                    // as it was: zoom is remembered per machine
 public:
 	void WebTestL(PgLinkTest* aTest);   // (0.89) Test the connection's web part
+	CPwBusyWin* iBusyWin;               // (1.06) the steady busy message (0: not made yet, or no memory)
+	TBool iBusyEikon;                   // (1.06) ...EIKON's own is up instead
 	};
 
 class CPwDocument : public CEikDocument

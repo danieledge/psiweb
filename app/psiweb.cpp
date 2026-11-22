@@ -24,6 +24,8 @@
 #include <eikfnlab.h>
 #include <eikcfdlg.h>
 #include <eikseced.h>
+#include <eikmsg.h>               // (1.06) CEikBusyMsgWin: the steady busy message
+#include <clock.h>
 #include <eikon.rsg>
 #include "pwapp.h"
 #include "pwicons.h"
@@ -40,6 +42,71 @@
 // (psilink.h). The proxy fields of TPwSettings are only a copy of the shared
 // ones, kept for the code that shows them; the old own proxy (0.71 and
 // before) is carried over once, into a PsiLink.ini that has no proxy yet.
+// (1.06) The busy message, bottom left: EIKON's own window, font, colours,
+// border and corner, but steady. EIKON's (CEikonEnv::BusyMsgL) flashes: a
+// quarter of every second its text is off, and while a big page loaded that
+// was seen as an empty dark box (as in PsiPDF before 0.15). One window,
+// kept by the AppUi; with no memory for it, EIKON's own is used.
+class CPwBusyWin : public CEikBusyMsgWin
+	{
+public:
+	CPwBusyWin(CEikonEnv& aEnv) : CEikBusyMsgWin(aEnv) {}
+	void Show(const TDesC& aText) { StartDisplay(aText, EHLeftVBottom); }
+private:
+	void DoStartDisplay(const TDesC& aText)
+		{
+		iMessageWindow->StartDisplay(EFalse, TTimeIntervalMicroSeconds32(0), aText);
+		}
+	};
+
+static CPwAppUi* PwUi()
+	{
+	CEikonEnv* env = CEikonEnv::Static();
+	return env ? (CPwAppUi*)env->EikAppUi() : NULL;
+	}
+
+void PwBusyMsgL(const TDesC& aText)
+	{
+	CPwAppUi* ui = PwUi();
+	TPtrC text(aText.Left(Min(aText.Length(), KEikBusyMsgMaxLen)));
+	if (ui && !ui->iBusyWin)
+		{
+		CPwBusyWin* w = new CPwBusyWin(*CEikonEnv::Static());
+		TInt err = KErrNoMemory;
+		if (w)
+			TRAP(err, w->ConstructL(CCoeEnv::Static()->RootWin()));
+		if (err == KErrNone)
+			ui->iBusyWin = w;
+		else
+			delete w;
+		}
+	if (ui && ui->iBusyWin)
+		{
+		if (ui->iBusyEikon)
+			{
+			CEikonEnv::Static()->BusyMsgCancel();
+			ui->iBusyEikon = EFalse;
+			}
+		ui->iBusyWin->Show(text);
+		return;
+		}
+	// (short of memory for the window: EIKON's own, which flashes)
+	CEikonEnv::Static()->BusyMsgL(text, EHLeftVBottom, TTimeIntervalMicroSeconds32(0));
+	if (ui)
+		ui->iBusyEikon = ETrue;
+	}
+
+void PwBusyMsgCancel()
+	{
+	CPwAppUi* ui = PwUi();
+	if (ui && ui->iBusyWin)
+		ui->iBusyWin->CancelDisplay();
+	if (!ui || ui->iBusyEikon)
+		CEikonEnv::Static()->BusyMsgCancel();
+	if (ui)
+		ui->iBusyEikon = EFalse;
+	}
+
 static void UseSharedLink(RFs& aFs, TPwSettings& aSettings)
 	{
 	TPsiLink link;
@@ -154,7 +221,7 @@ static TBool PwDiagOn()
 _LIT(KIniFile, "C:\\System\\Apps\\PsiWeb\\PsiWeb.ini");
 _LIT(KUpdIniFile, "C:\\System\\Apps\\PsiWeb\\Update.ini");
 _LIT(KFavsKept, "C:\\System\\Apps\\PsiWeb\\Favourites.dat");   // (pwfavs.cpp's KFavsFile)
-_LIT(KVersion, "1.05");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
+_LIT(KVersion, "1.06");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
 _LIT(KDefaultHome, "http://68k.news/");
 const TInt KZoomSteps[] = { 50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200 };
 const TInt KZoomCount = 11;
@@ -571,9 +638,9 @@ void CPwView::StartEngineL()
 void CPwView::StartBusy(const TDesC& aText)
 	{
 	if (iStartBusy)
-		iEikonEnv->BusyMsgCancel();
+		PwBusyMsgCancel();
 	iStartBusy = EFalse;
-	TRAPD(err, iEikonEnv->BusyMsgL(aText, EHLeftVBottom, TTimeIntervalMicroSeconds32(0)));
+	TRAPD(err, PwBusyMsgL(aText));
 	iStartBusy = err == KErrNone;
 	iStartBusyAt = User::TickCount();
 	}
@@ -581,7 +648,7 @@ void CPwView::StartBusy(const TDesC& aText)
 void CPwView::StartBusyCancel()
 	{
 	if (iStartBusy)
-		iEikonEnv->BusyMsgCancel();
+		PwBusyMsgCancel();
 	iStartBusy = EFalse;
 	}
 
@@ -630,7 +697,7 @@ void CPwView::LoadBusyL()
 	if (t.Length() == 0)
 		{
 		if (iLoadBusy)
-			iEikonEnv->BusyMsgCancel();
+			PwBusyMsgCancel();
 		iLoadBusy = EFalse;
 		iLoadShown.Zero();
 		return;
@@ -640,7 +707,7 @@ void CPwView::LoadBusyL()
 	TUint now = User::TickCount();
 	if (iLoadBusy && iLoadShown.Length() && now - iLoadAt < 32)
 		return;                          // (the figure changes again soon)
-	iEikonEnv->BusyMsgL(t, EHLeftVBottom, TTimeIntervalMicroSeconds32(0));
+	PwBusyMsgL(t);
 	iLoadBusy = ETrue;
 	iLoadShown = t;
 	iLoadAt = now;
@@ -1134,7 +1201,7 @@ void CPwView::EngineEnded()
 		{
 		// the engine went while sending the log
 		iLogState = PW_LOG_IDLE;
-		iEikonEnv->BusyMsgCancel();
+		PwBusyMsgCancel();
 		iEikonEnv->InfoMsg(_L("Cannot send the log - the browser engine stopped"));
 		}
 	if (iUpdState == PW_UPD_RUNNING || iUpdState == -1)
@@ -1336,7 +1403,7 @@ void CPwView::Tick()
 			}
 		else if (dots)
 			{
-			TRAPD(err, iEikonEnv->BusyMsgL(m, EHLeftVBottom, TTimeIntervalMicroSeconds32(0)));
+			TRAPD(err, PwBusyMsgL(m));
 			iLinkBusy = err == KErrNone;
 			iLoadBusy = EFalse;              // (its busy message has gone under this one)
 			iLoadShown.Zero();
@@ -1347,7 +1414,7 @@ void CPwView::Tick()
 			// "CONNECT 115200"): that step is over
 			if (iLinkBusy)
 				{
-				iEikonEnv->BusyMsgCancel();
+				PwBusyMsgCancel();
 				iLinkBusy = EFalse;
 				}
 			iEikonEnv->InfoMsg(m);
@@ -1357,7 +1424,7 @@ void CPwView::Tick()
 		LogTick();
 	if (s && iLinkBusy && !s->busy && iLogState != PW_LOG_RUNNING)
 		{
-		iEikonEnv->BusyMsgCancel();
+		PwBusyMsgCancel();
 		iLinkBusy = EFalse;
 		}
 	if (s && !iUpdDlg && !iTesting && iLogState != PW_LOG_RUNNING)
@@ -1443,7 +1510,7 @@ TInt CPwView::AskCallback(TAny* aSelf)
 	v->iAsking = ETrue;
 	if (v->iLinkBusy)
 		{
-		CEikonEnv::Static()->BusyMsgCancel();
+		PwBusyMsgCancel();
 		v->iLinkBusy = EFalse;
 		}
 	if (s->auth_state == PW_ASK_ASKING)
@@ -1627,7 +1694,7 @@ void CPwView::SendLog()
 	iShared->log_state = PW_LOG_RUNNING;
 	iShared->log_msg[0] = 0;
 	iLogState = PW_LOG_RUNNING;
-	TRAPD(err, iEikonEnv->BusyMsgL(_L("Sending the log\x85"), EHLeftVBottom, TTimeIntervalMicroSeconds32(0)));
+	TRAPD(err, PwBusyMsgL(_L("Sending the log\x85")));
 	(void)err;
 	Command(PW_CMD_PUTLOG, KNullDesC);
 	}
@@ -1647,7 +1714,7 @@ void CPwView::LogTick()
 		return;
 		}
 	iLogState = st;
-	iEikonEnv->BusyMsgCancel();
+	PwBusyMsgCancel();
 	iLinkBusy = EFalse;
 	if (st == PW_LOG_SENT)
 		iEikonEnv->InfoMsg(_L("Log sent"));
@@ -2485,7 +2552,7 @@ void CPwAppUi::HandleWsEventL(const TWsEvent& aEvent, CCoeControl* aDestination)
 		UpdateReading();
 		if (iFullBusyAt)                     // (0.88) PsiTerm came in front: "Opening in PsiTerm..." goes
 			{
-			iEikonEnv->BusyMsgCancel();
+			PwBusyMsgCancel();
 			iFullBusyAt = 0;
 			}
 		}
@@ -3123,6 +3190,7 @@ CPwAppUi::~CPwAppUi()
 	delete iSetupIdle;
 	delete iOfferIdle;
 	delete iBar;
+	delete iBusyWin;                         // (1.06) after the view, which may still cancel it
 	}
 
 void CPwAppUi::LoadSettings(TPwSettings& aSettings)
@@ -4424,7 +4492,7 @@ void CPwAppUi::WebTestL(PgLinkTest* aTest)
 	CleanupStack::PushL(TCleanupItem(WebTestUnstack, &stacked));
 	AddToStackL(keys, ECoeStackPriorityAlert, ECoeStackFlagRefusesFocus);
 	iView->iTesting = ETrue;
-	iEikonEnv->BusyMsgL(busy, EHLeftVBottom, TTimeIntervalMicroSeconds32(0));
+	PwBusyMsgL(busy);
 	s->test_state = PW_TEST_RUNNING;
 	iView->Command(PW_CMD_TEST, KWebTestUrl);
 	TPwTestWait wait;
@@ -4441,7 +4509,7 @@ void CPwAppUi::WebTestL(PgLinkTest* aTest)
 		iView->Command(PW_CMD_STOP, KNullDesC);   // Esc, the limit, or the app closing
 		s->test_state = PW_TEST_STOPPED;
 		}
-	iEikonEnv->BusyMsgCancel();
+	PwBusyMsgCancel();
 	CleanupStack::PopAndDestroy(3);      // unstack, tick, keys
 	if (!wait.iEnded)
 		{
@@ -4732,7 +4800,7 @@ void CPwAppUi::FullBrowserL()
 	cl->SetTailEndL(line);
 	EikDll::StartAppL(*cl);
 	CleanupStack::PopAndDestroy();          // cl
-	iEikonEnv->BusyMsgL(_L("Opening in PsiTerm\x85"), EHLeftVBottom, TTimeIntervalMicroSeconds32(0));
+	PwBusyMsgL(_L("Opening in PsiTerm\x85"));
 	iFullBusyAt = User::TickCount();
 	}
 
