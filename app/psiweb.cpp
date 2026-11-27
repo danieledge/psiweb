@@ -221,7 +221,7 @@ static TBool PwDiagOn()
 _LIT(KIniFile, "C:\\System\\Apps\\PsiWeb\\PsiWeb.ini");
 _LIT(KUpdIniFile, "C:\\System\\Apps\\PsiWeb\\Update.ini");
 _LIT(KFavsKept, "C:\\System\\Apps\\PsiWeb\\Favourites.dat");   // (pwfavs.cpp's KFavsFile)
-_LIT(KVersion, "1.07");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
+_LIT(KVersion, "1.08");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
 _LIT(KDefaultHome, "http://68k.news/");
 const TInt KZoomSteps[] = { 50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200 };
 const TInt KZoomCount = 11;
@@ -4070,7 +4070,7 @@ void CPwSetupDialog::ShowPicturesNoteL()
 	{
 	SetLabelL(EPwDlgSuPicturesNote, ChoiceListCurrentItem(EPwDlgSuPictures) == 1
 		? _L("For network cards. Ctrl+I hides them on one page")
-		: _L("Only when asked suits a modem - Ctrl+I shows one page's pictures"));
+		: _L("Only when asked suits a modem. Ctrl+I shows one page's pictures"));
 	}
 
 // (1.03) Page style's note follows the fetcher: without PsiProxy a big
@@ -4085,13 +4085,13 @@ void CPwSetupDialog::ShowStyleNoteL()
 	// (1.05) the style this fetcher takes unless one is chosen, said when
 	// it is the one shown
 	if (style == StandardStyle(c) && style == PW_STYLE_TEXT)
-		SetLabelL(EPwDlgSuStyleNote, _L("Text only is the standard without PsiProxy - it skips big sites' menus"));
+		SetLabelL(EPwDlgSuStyleNote, _L("Text only is the standard without PsiProxy. It omits big sites' menus"));
 	else if (style == StandardStyle(c))
 		SetLabelL(EPwDlgSuStyleNote, _L("Full is the standard with PsiProxy, which lightens pages itself"));
 	else if (c.helper != PG_SU_HELPER_PSIPROXY && style != PW_STYLE_TEXT && style != PW_STYLE_READER)
-		SetLabelL(EPwDlgSuStyleNote, _L("Without PsiProxy, Text only skips big sites' menus"));
+		SetLabelL(EPwDlgSuStyleNote, _L("Without PsiProxy, Text only omits big sites' menus"));
 	else
-		SetLabelL(EPwDlgSuStyleNote, _L("Reader shows the article first - Shift+Ctrl+R changes the page's style"));
+		SetLabelL(EPwDlgSuStyleNote, _L("Reader shows the article first. Shift+Ctrl+R changes the page style"));
 	}
 
 void CPwSetupDialog::AppControlChangedL(TInt aControlId)

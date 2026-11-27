@@ -189,12 +189,12 @@ const char *pw_problem_short(int aKind, const PwRoute *r)
 	case PW_PROB_CERT:       return "The site's certificate was not trusted";
 	case PW_PROB_CERT_DATE:  return "The certificate's dates and the Psion's clock disagree (Time, Ctrl+T)";
 	case PW_PROB_BROKE:      return "The connection broke part way";
-	case PW_PROB_BAD_ANSWER: return "The answer made no sense - the site may be down";
+	case PW_PROB_BAD_ANSWER: return "The reply could not be read - the site may be down";
 	case PW_PROB_NOT_FOUND:  return "The file was not found on the Psion";
 	case PW_PROB_ATOM_TLS:   return "The Atom modem did not make the secure connection";
 	case PW_PROB_CLOCK:      return "The Psion's clock is not set - set the date first (Time, Ctrl+T)";
 	case PW_PROB_HELPER:     return "The web helper did not answer - PsiProxy may not be running";
-	case PW_PROB_RETRY:      return "A connection failed a moment ago - try again in a few seconds";
+	case PW_PROB_RETRY:      return "The last connection failed - try again in a few seconds";
 	default:                 return "The page did not come";
 	}
 }
