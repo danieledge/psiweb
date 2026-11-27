@@ -221,7 +221,7 @@ static TBool PwDiagOn()
 _LIT(KIniFile, "C:\\System\\Apps\\PsiWeb\\PsiWeb.ini");
 _LIT(KUpdIniFile, "C:\\System\\Apps\\PsiWeb\\Update.ini");
 _LIT(KFavsKept, "C:\\System\\Apps\\PsiWeb\\Favourites.dat");   // (pwfavs.cpp's KFavsFile)
-_LIT(KVersion, "1.06");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
+_LIT(KVersion, "1.07");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
 _LIT(KDefaultHome, "http://68k.news/");
 const TInt KZoomSteps[] = { 50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200 };
 const TInt KZoomCount = 11;
@@ -1231,7 +1231,7 @@ void CPwView::EngineEnded()
 	AppLog(iShared, iCoeEnv->FsSession(), l);
 	}
 	if (type == EExitPanic)
-		why = _L("It stopped unexpectedly - Tools > Troubleshooting > Restart browser engine starts it again");
+		why = _L("Stopped - use Tools > Troubleshooting > Restart browser engine");
 	else if (iShared->exit_msg[0])
 		{
 		FromUtf8(why, iShared->exit_msg);
@@ -4069,7 +4069,7 @@ TInt CPwSetupDialog::StandardAhead(const PgSuChoice& aChoice)
 void CPwSetupDialog::ShowPicturesNoteL()
 	{
 	SetLabelL(EPwDlgSuPicturesNote, ChoiceListCurrentItem(EPwDlgSuPictures) == 1
-		? _L("On every page suits a network card - Ctrl+I turns them off for one page")
+		? _L("For network cards. Ctrl+I hides them on one page")
 		: _L("Only when asked suits a modem - Ctrl+I shows one page's pictures"));
 	}
 
@@ -4089,7 +4089,7 @@ void CPwSetupDialog::ShowStyleNoteL()
 	else if (style == StandardStyle(c))
 		SetLabelL(EPwDlgSuStyleNote, _L("Full is the standard with PsiProxy, which lightens pages itself"));
 	else if (c.helper != PG_SU_HELPER_PSIPROXY && style != PW_STYLE_TEXT && style != PW_STYLE_READER)
-		SetLabelL(EPwDlgSuStyleNote, _L("Without PsiProxy, Text only suits big sites - it skips their menus"));
+		SetLabelL(EPwDlgSuStyleNote, _L("Without PsiProxy, Text only skips big sites' menus"));
 	else
 		SetLabelL(EPwDlgSuStyleNote, _L("Reader shows the article first - Shift+Ctrl+R changes the page's style"));
 	}
@@ -4204,14 +4204,14 @@ TBool CPwSetupDialog::OkToExitL(TInt aButtonId)
 		{
 		TBuf<120> why;
 		if (iNow.conn == PG_SU_CONN_ATOM)
-			why.Copy(_L("Between the Atom modem and PsiProxy - fine at home, not on public WiFi"));
+			why.Copy(_L("Between the Atom modem and PsiProxy. Do not use on public WiFi"));
 		else
 			{
 			TBuf<PG_SU_HOST_MAX> h;
 			h.Copy(TPtrC8((const TUint8*)now.host));
 			TPtrC hc = Clip(h, 24);
-			why.Format(iTall ? _L("Between the netBook and PsiProxy at %S - fine at home, not on public WiFi")
-				: _L("Between the Series 5mx and PsiProxy at %S - fine at home, not on public WiFi"), &hc);
+			why.Format(iTall ? _L("Between the netBook and PsiProxy at %S. Do not use on public WiFi")
+				: _L("Between the Series 5mx and PsiProxy at %S. Do not use on public WiFi"), &hc);
 			}
 		if (!CPwQueryDialog::AskL(_L("PsiProxy on a computer"), _L("Pages and passwords cross your network unencrypted"),
 			why, _L("Use PsiProxy on this network?")))
@@ -4655,7 +4655,7 @@ TInt CPwAppUi::OfferCallback(TAny* aSelf)
 	TBool yes = EFalse;
 	TRAPD(err, yes = CPwQueryDialog::AskL(_L("Page style"),
 		_L("Without PsiProxy, big sites start with a screen of menus"),
-		_L("Text only leaves menus and pictures out - View > Page style changes it"),
+		_L("Text only omits menus and pictures. Change it in View > Page style"),
 		_L("Show pages as Text only?")));
 	if (err == KErrNone && yes)
 		{

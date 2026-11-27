@@ -44,6 +44,7 @@ int main(void)
 	/* (1.03) psiglue's hold after a failed connection: not "no connection" */
 	CHECK(pw_problem_kind("Unknown error", "The Psion's Internet connection failed a moment ago - try again in a few seconds") == PW_PROB_RETRY);
 	CHECK(pw_problem_kind("x", "The Psion's Internet connection is still busy with the last attempt - wait a moment and try again") == PW_PROB_RETRY);
+	CHECK(pw_problem_kind("x", "The Internet connection is still busy - try again in a moment") == PW_PROB_RETRY);
 
 	for (k = 0; k < PW_PROB_COUNT; k++) {
 		const PwRoute *r = k % 3 == 0 ? &direct : k % 3 == 1 ? &atom : &pp;
@@ -58,7 +59,7 @@ int main(void)
 	pw_problem_html(page, sizeof(page), "https://www.ebay.co.uk/", PW_PROB_TLS, "", &direct);
 	CHECK(strstr(page, "www.ebay.co.uk") && strstr(page, "PsiProxy on a computer") && strstr(page, "Route: Direct, on the network card"));
 	pw_problem_html(page, sizeof(page), "https://example.com/", PW_PROB_ATOM_TLS, "", &direct);
-	CHECK(strstr(page, "example.com") && strstr(page, "Atom modem could not make a secure connection") && !strstr(page, "older security"));
+	CHECK(strstr(page, "example.com") && strstr(page, "The Atom could not connect securely") && !strstr(page, "older security"));
 	pw_problem_html(page, sizeof(page), "http://x.org/", PW_PROB_REFUSED, "", &atom);
 	CHECK(strstr(page, "Route: Atom modem helper, through the modem"));
 	pw_problem_html(page, sizeof(page), "http://x.org/", PW_PROB_REFUSED, "", &pp);

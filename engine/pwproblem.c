@@ -33,7 +33,8 @@ int pw_problem_kind(const char *aEngineWhy, const char *aConnWhy)
 		   (it read "There is no connection - the network card's cable may be
 		   out" while the network was up) */
 		if (has(c, "failed a moment ago") || has(c, "busy with the last attempt")
-		    || has(c, "connection is busy - try again"))
+		    || has(c, "connection is busy - try again")
+		    || has(c, "connection is still busy"))
 			return PW_PROB_RETRY;
 		if (starts(c, "Clock not set")) return PW_PROB_CLOCK;     /* (0.98) pwcert.c */
 		if (has(c, "clock") || has(c, "out of date") || has(c, "expired") || has(c, "not valid yet"))
@@ -139,7 +140,7 @@ static const char *cause(int aKind, const PwRoute *r)
 		return "Another program has the serial port - the Remote link may be on (System screen, Ctrl+L), or PsiTerm or PsiMail may still be connected";
 	case PW_PROB_NO_LINK:
 		return r && r->net_mode
-			? "There is no connection - the network card's cable may be out, the netBook may have no address from the network yet, or the dial-up did not start"
+			? "No connection - the cable may be out, no network address yet, or dial-up failed"
 			: "There is no connection - the modem may be off or not on the cable, or it has no WiFi";
 	case PW_PROB_NAME:
 		return "The name was not found - the address may be mistyped, or the connection has no name servers";
@@ -151,21 +152,21 @@ static const char *cause(int aKind, const PwRoute *r)
 		return helper ? "The secure connection was refused"
 		              : "The site needs older security than PsiWeb has - it may open through PsiProxy on a computer";
 	case PW_PROB_CERT:
-		return "The site's certificate is not trusted - it may not be the site it says it is, or PsiWeb does not know who signed it";
+		return "Certificate not trusted - site may not be genuine, or signer unknown";
 	case PW_PROB_CERT_DATE:
 		return "The site's certificate is out of date for the Psion's clock - the Psion's date may be wrong (Time, Ctrl+T)";
 	case PW_PROB_BROKE:
 		return "The connection broke part way - the line may have dropped";
 	case PW_PROB_BAD_ANSWER:
-		return "The server's answer made no sense - the site may be down, or need a full browser";
+		return "Invalid reply - the site may be down or need a full browser";
 	case PW_PROB_NOT_FOUND:
 		return "The file was not found on the Psion";
 	case PW_PROB_ATOM_TLS:
-		return "The Atom modem could not make a secure connection to the site - the site's certificate may not be trusted, the site may be down, or the Atom may have no WiFi (the Atom's log says which)";
+		return "The Atom could not connect securely - untrusted certificate, site down or no WiFi. See the Atom's log";
 	case PW_PROB_CLOCK:
 		return "The Psion's clock is not set, so no site's certificate can be checked - set the date first (Time, Ctrl+T)";
 	case PW_PROB_RETRY:
-		return "The connection before this one failed a moment ago, so this page could not be tried - Try again in a few seconds";
+		return "The last connection has just failed - try again in a few seconds";
 	case PW_PROB_HELPER:	/* (its address: pw_problem_html) */
 		return "The web helper did not answer - PsiProxy may not be running on that computer, or the computer may be off or off the network";
 	default:

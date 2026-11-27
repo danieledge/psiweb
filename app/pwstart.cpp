@@ -166,7 +166,7 @@ void CPwAppUi::UpdateStartPageL()
 		Add(p, _L8("<table width=\"100%\" border=\"1\" cellspacing=\"0\" cellpadding=\"4\"><tr><td>Connection: "));
 		Esc(p, route, 100);
 		Add(p, _L8("<br><small>"));
-		Add(p, helper ? _L8("Secure sites are checked by the helper, which sees the pages.")
+		Add(p, helper ? _L8("The helper checks secure sites and can read pages.")
 		                : _L8("Secure sites are checked on the netBook."));
 		// (0.99) no line breaks inside a link's words (&nbsp;)
 		Add(p, _L8(" Pages drawn by scripts may not work.</small> &nbsp; "
