@@ -221,7 +221,7 @@ static TBool PwDiagOn()
 _LIT(KIniFile, "C:\\System\\Apps\\PsiWeb\\PsiWeb.ini");
 _LIT(KUpdIniFile, "C:\\System\\Apps\\PsiWeb\\Update.ini");
 _LIT(KFavsKept, "C:\\System\\Apps\\PsiWeb\\Favourites.dat");   // (pwfavs.cpp's KFavsFile)
-_LIT(KVersion, "1.08");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
+_LIT(KVersion, "1.09");           // also web/pkg/psiweb.pkg and dist/PsiWeb-version.txt (two digits from 0.54: see the .pkg)
 _LIT(KDefaultHome, "http://68k.news/");
 const TInt KZoomSteps[] = { 50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200 };
 const TInt KZoomCount = 11;
@@ -1231,13 +1231,13 @@ void CPwView::EngineEnded()
 	AppLog(iShared, iCoeEnv->FsSession(), l);
 	}
 	if (type == EExitPanic)
-		why = _L("Stopped - use Tools > Troubleshooting > Restart browser engine");
+		why = _L("Stopped. Use Tools > Troubleshooting > Restart browser engine");
 	else if (iShared->exit_msg[0])
 		{
 		FromUtf8(why, iShared->exit_msg);
 		}
 	else
-		why = _L("It closed - Tools > Troubleshooting > Restart browser engine starts it again");
+		why = _L("It closed. Tools > Troubleshooting > Restart browser engine starts it again");
 	ShowMessage(_L("The browser engine has stopped"), why);
 	}
 
@@ -1674,7 +1674,7 @@ void CPwView::SendLog()
 		}
 	if (!(iSettings.iDisplay & KPwKeepLog))
 		{
-		iEikonEnv->InfoMsg(_L("No log kept - tick Tools > Troubleshooting > Keep a log"));
+		iEikonEnv->InfoMsg(_L("No log kept. Tick Tools > Troubleshooting > Keep a log"));
 		return;
 		}
 	if (!iRunning)
@@ -2983,7 +2983,7 @@ void CPwAppUi::ClipboardL(TInt aCommand)
 		}
 	if (!iAddress || !iToolBand->IsVisible())
 		{
-		iEikonEnv->InfoMsg(_L("Nothing to paste into - Shift+Ctrl+T shows the address"));
+		iEikonEnv->InfoMsg(_L("Nothing to paste into. Shift+Ctrl+T shows the address"));
 		return;
 		}
 	StartAddressL();
@@ -3427,7 +3427,7 @@ void CPwAppUi::HandleAttemptDimmedSelectionL(TInt aCommandId)
 		return;
 		}
 	if (!(iView->Settings().iDisplay & KPwKeepLog))
-		iEikonEnv->InfoMsg(_L("No log kept - tick Tools > Troubleshooting > Keep a log"));
+		iEikonEnv->InfoMsg(_L("No log kept. Tick Tools > Troubleshooting > Keep a log"));
 	else
 		iEikonEnv->InfoMsg(_L("Not available - set a web helper in Connection settings"));
 	}

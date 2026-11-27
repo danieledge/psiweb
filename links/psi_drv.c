@@ -1130,7 +1130,7 @@ void psi_load_failed(unsigned char *why, struct session *ses, unsigned char *url
 		psi_retry_used = 1;
 		safe_strncpy(psi_retry_url, url, sizeof(psi_retry_url));
 		install_timer(PSI_RETRY_MS, psi_retry_fn, NULL);
-		psi_infoprint("The last connection failed - trying again shortly");
+		psi_infoprint("The last connection failed. Trying again shortly");
 		psi_conn_why[0] = 0;
 #ifdef PSI_EPOC
 		{

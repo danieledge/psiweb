@@ -18,6 +18,10 @@ Up to 0.61 the engine was NetSurf. Its sources are still in the tree as a fallba
 
 [![Download PsiWeb.sis](https://img.shields.io/badge/Download-PsiWeb.sis-2ea44f?logo=github)](https://github.com/danieledge/psiterm/raw/main/dist/PsiWeb.sis)
 
+## What's new in 1.09
+
+- Wording clean-up.
+
 ## What's new in 1.08
 
 - Wording clean-up.

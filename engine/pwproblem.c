@@ -32,7 +32,7 @@ int pw_problem_kind(const char *aEngineWhy, const char *aConnWhy)
 		   tried at all, so it says nothing about the cable or the network
 		   (it read "There is no connection - the network card's cable may be
 		   out" while the network was up) */
-		if (has(c, "failed a moment ago") || has(c, "busy with the last attempt")
+		if (has(c, "last Internet connection failed") || has(c, "busy with the last attempt")
 		    || has(c, "connection is busy - try again")
 		    || has(c, "connection is still busy"))
 			return PW_PROB_RETRY;
@@ -194,7 +194,7 @@ const char *pw_problem_short(int aKind, const PwRoute *r)
 	case PW_PROB_ATOM_TLS:   return "The Atom modem did not make the secure connection";
 	case PW_PROB_CLOCK:      return "The Psion's clock is not set - set the date first (Time, Ctrl+T)";
 	case PW_PROB_HELPER:     return "The web helper did not answer - PsiProxy may not be running";
-	case PW_PROB_RETRY:      return "The last connection failed - try again in a few seconds";
+	case PW_PROB_RETRY:      return "The last connection failed. Try again in a few seconds";
 	default:                 return "The page did not come";
 	}
 }

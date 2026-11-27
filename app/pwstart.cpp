@@ -110,7 +110,7 @@ void CPwAppUi::UpdateStartPageL()
 	// underscores and "[ Search ]": a terminal's look on the netBook
 	Add(p, _L8("<p><b>PsiWeb</b> &nbsp; <small>Ctrl+L, then an address or words to search for</small></p>"));
 	if (tall)
-		Add(p, _L8("<p><small>Favourites - press 1 to 8, or tap</small></p>"));
+		Add(p, _L8("<p><small>Favourites. Press 1 to 8, or tap</small></p>"));
 	// the favourites: 4 x 2 (called the speed dial until 0.98)
 	Add(p, _L8("<table width=\"100%\" cellspacing=\"4\" cellpadding=\"0\">"));
 	TInt n = iFavs->Count() < KTiles ? iFavs->Count() : KTiles;

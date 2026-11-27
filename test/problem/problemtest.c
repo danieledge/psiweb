@@ -42,7 +42,7 @@ int main(void)
 	/* (0.90) the Atom modem's own TLS (engine/pwatom.h) did not come up: not "the modem", not "older security" */
 	CHECK(pw_problem_kind("x", "Secure connection not made by the Atom modem - example.com") == PW_PROB_ATOM_TLS);
 	/* (1.03) psiglue's hold after a failed connection: not "no connection" */
-	CHECK(pw_problem_kind("Unknown error", "The Psion's Internet connection failed a moment ago - try again in a few seconds") == PW_PROB_RETRY);
+	CHECK(pw_problem_kind("Unknown error", "The last Internet connection failed. Try again in a few seconds") == PW_PROB_RETRY);
 	CHECK(pw_problem_kind("x", "The Psion's Internet connection is still busy with the last attempt - wait a moment and try again") == PW_PROB_RETRY);
 	CHECK(pw_problem_kind("x", "The Internet connection is still busy - try again in a moment") == PW_PROB_RETRY);
 

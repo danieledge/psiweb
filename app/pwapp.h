@@ -426,7 +426,7 @@ private:
 	void PreLayoutDynInitL();
 	TBool OkToExitL(TInt aButtonId);
 	void HandleControlStateChangeL(TInt aControlId);
-	void DimComputerLines();             // (0.99) its lines only for "A computer on my network"
+	void DimComputerLines();             // (0.99) its lines only for "A local computer"
 	TInt& iSource;
 	TDes& iHost;
 	TInt& iPort;
